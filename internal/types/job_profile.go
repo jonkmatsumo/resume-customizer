@@ -1,3 +1,6 @@
+// Package types provides type definitions for structured data used throughout the resume-customizer system.
+//
+//nolint:revive // types is a standard Go package name pattern
 package types
 
 // JobProfile represents a structured job posting extracted from raw text

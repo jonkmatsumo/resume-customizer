@@ -1,3 +1,4 @@
+// Package ingestion provides functionality to ingest job postings from files or URLs and clean the text content.
 package ingestion
 
 import (
@@ -77,13 +78,6 @@ func cleanLine(line string) string {
 		return strings.Repeat(" ", leadingSpace) + content
 	}
 	return content
-}
-
-// isBulletLine checks if a line is a bullet list item
-func isBulletLine(line string) bool {
-	trimmed := strings.TrimLeft(line, " \t")
-	return strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ") ||
-		strings.HasPrefix(trimmed, "• ") || strings.HasPrefix(trimmed, "· ")
 }
 
 // removeExcessiveBlankLines reduces consecutive blank lines to max 2

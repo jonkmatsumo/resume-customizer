@@ -29,13 +29,17 @@ func init() {
 	parseJobCmd.Flags().StringVarP(&parseOutputFile, "out", "o", "", "Path to output JSON file (required)")
 	parseJobCmd.Flags().StringVar(&parseAPIKey, "api-key", "", "Gemini API key (overrides GEMINI_API_KEY env var)")
 
-	parseJobCmd.MarkFlagRequired("in")
-	parseJobCmd.MarkFlagRequired("out")
+	if err := parseJobCmd.MarkFlagRequired("in"); err != nil {
+		panic(fmt.Sprintf("failed to mark in flag as required: %v", err))
+	}
+	if err := parseJobCmd.MarkFlagRequired("out"); err != nil {
+		panic(fmt.Sprintf("failed to mark out flag as required: %v", err))
+	}
 
 	rootCmd.AddCommand(parseJobCmd)
 }
 
-func runParseJob(cmd *cobra.Command, args []string) error {
+func runParseJob(_ *cobra.Command, _ []string) error {
 	// Read input file
 	inputContent, err := os.ReadFile(parseInputFile)
 	if err != nil {
@@ -75,8 +79,8 @@ func runParseJob(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("generated JSON does not validate against schema: %w", err)
 	}
 
-	fmt.Fprintf(os.Stdout, "Successfully parsed job profile\n")
-	fmt.Fprintf(os.Stdout, "Output: %s\n", parseOutputFile)
+	_, _ = fmt.Fprintf(os.Stdout, "Successfully parsed job profile\n")
+	_, _ = fmt.Fprintf(os.Stdout, "Output: %s\n", parseOutputFile)
 
 	return nil
 }

@@ -64,9 +64,9 @@ func TestEndToEnd_URL_MockServer(t *testing.T) {
 </body>
 </html>`
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(htmlContent))
+		_, _ = w.Write([]byte(htmlContent))
 	}))
 	defer server.Close()
 

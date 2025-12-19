@@ -66,10 +66,10 @@ func TestParseJobCommand_MissingAPIKey(t *testing.T) {
 
 	// Unset GEMINI_API_KEY for this test
 	oldAPIKey := os.Getenv("GEMINI_API_KEY")
-	os.Unsetenv("GEMINI_API_KEY")
+	_ = os.Unsetenv("GEMINI_API_KEY")
 	defer func() {
 		if oldAPIKey != "" {
-			os.Setenv("GEMINI_API_KEY", oldAPIKey)
+			_ = os.Setenv("GEMINI_API_KEY", oldAPIKey)
 		}
 	}()
 
@@ -91,12 +91,12 @@ func TestParseJobCommand_InvalidInputFile(t *testing.T) {
 
 	// Set a dummy API key so we get past that check
 	oldAPIKey := os.Getenv("GEMINI_API_KEY")
-	os.Setenv("GEMINI_API_KEY", "test-key")
+	_ = os.Setenv("GEMINI_API_KEY", "test-key")
 	defer func() {
 		if oldAPIKey != "" {
-			os.Setenv("GEMINI_API_KEY", oldAPIKey)
+			_ = os.Setenv("GEMINI_API_KEY", oldAPIKey)
 		} else {
-			os.Unsetenv("GEMINI_API_KEY")
+			_ = os.Unsetenv("GEMINI_API_KEY")
 		}
 	}()
 

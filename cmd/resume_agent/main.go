@@ -29,13 +29,17 @@ var (
 func init() {
 	validateCmd.Flags().StringVarP(&schemaPath, "schema", "s", "", "Path to JSON Schema file (required)")
 	validateCmd.Flags().StringVarP(&jsonPath, "json", "j", "", "Path to JSON file to validate (required)")
-	validateCmd.MarkFlagRequired("schema")
-	validateCmd.MarkFlagRequired("json")
+	if err := validateCmd.MarkFlagRequired("schema"); err != nil {
+		panic(fmt.Sprintf("failed to mark schema flag as required: %v", err))
+	}
+	if err := validateCmd.MarkFlagRequired("json"); err != nil {
+		panic(fmt.Sprintf("failed to mark json flag as required: %v", err))
+	}
 
 	rootCmd.AddCommand(validateCmd)
 }
 
-func runValidate(cmd *cobra.Command, args []string) error {
+func runValidate(_ *cobra.Command, _ []string) error {
 	if schemaPath == "" {
 		return fmt.Errorf("--schema flag is required")
 	}
@@ -45,7 +49,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 
 	err := schemas.ValidateJSON(schemaPath, jsonPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Validation failed:\n%s\n", err.Error())
+		_, _ = fmt.Fprintf(os.Stderr, "Validation failed:\n%s\n", err.Error())
 		return err
 	}
 

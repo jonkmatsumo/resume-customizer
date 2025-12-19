@@ -1,3 +1,4 @@
+// Package schemas provides JSON Schema validation functionality for structured data artifacts.
 package schemas
 
 import (

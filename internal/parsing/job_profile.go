@@ -1,3 +1,4 @@
+// Package parsing provides functionality to parse job postings into structured JobProfile JSON using LLM extraction.
 package parsing
 
 import (
@@ -33,7 +34,7 @@ func ParseJobProfile(ctx context.Context, cleanedText string, apiKey string) (*t
 			Cause:   err,
 		}
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	model := client.GenerativeModel(DefaultModel)
 	model.SetTemperature(DefaultTemperature)
@@ -51,7 +52,8 @@ func ParseJobProfile(ctx context.Context, cleanedText string, apiKey string) (*t
 	}
 
 	// Extract text from response
-	responseText, err := extractTextFromResponse(resp)
+	var responseText string
+	responseText, err = extractTextFromResponse(resp)
 	if err != nil {
 		return nil, &APICallError{
 			Message: "failed to extract text from API response",
@@ -60,7 +62,8 @@ func ParseJobProfile(ctx context.Context, cleanedText string, apiKey string) (*t
 	}
 
 	// Parse JSON response
-	profile, err := parseJSONResponse(responseText)
+	var profile *types.JobProfile
+	profile, err = parseJSONResponse(responseText)
 	if err != nil {
 		return nil, err
 	}

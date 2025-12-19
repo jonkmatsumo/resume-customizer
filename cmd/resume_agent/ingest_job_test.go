@@ -39,12 +39,11 @@ func TestIngestJobCommand_TextFileSuccess(t *testing.T) {
 }
 
 func TestIngestJobCommand_URLSuccess(t *testing.T) {
-	binaryPath := getBinaryPath(t)
-
 	// Skip this test if we can't make network requests
 	// In real CI, we'd use a mock server
 	t.Skip("Skipping URL test - requires network access or mock server setup")
 
+	binaryPath := getBinaryPath(t)
 	tmpDir := t.TempDir()
 	outDir := filepath.Join(tmpDir, "output")
 

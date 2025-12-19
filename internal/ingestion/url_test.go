@@ -35,7 +35,7 @@ func TestIngestFromURL_InvalidURL(t *testing.T) {
 
 func TestIngestFromURL_Success(t *testing.T) {
 	// Create mock HTTP server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		html := `<!DOCTYPE html>
 <html>
 <body>
@@ -48,7 +48,7 @@ func TestIngestFromURL_Success(t *testing.T) {
 </body>
 </html>`
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(html))
+		_, _ = w.Write([]byte(html))
 	}))
 	defer server.Close()
 
@@ -67,7 +67,7 @@ func TestIngestFromURL_Success(t *testing.T) {
 
 func TestIngestFromURL_HTTPError(t *testing.T) {
 	// Create mock server that returns 404
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer server.Close()
@@ -173,9 +173,9 @@ func TestExtractTextFromHTML_FallbackToBody(t *testing.T) {
 }
 
 func TestFetchHTML_Success(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("<html><body>Test</body></html>"))
+		_, _ = w.Write([]byte("<html><body>Test</body></html>"))
 	}))
 	defer server.Close()
 
@@ -186,7 +186,7 @@ func TestFetchHTML_Success(t *testing.T) {
 }
 
 func TestFetchHTML_404Error(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer server.Close()
@@ -196,7 +196,7 @@ func TestFetchHTML_404Error(t *testing.T) {
 }
 
 func TestFetchHTML_500Error(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer server.Close()
@@ -212,9 +212,9 @@ func TestIngestFromURL_WithTestFixtures(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create mock server serving the HTML
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write(htmlContent)
+		_, _ = w.Write(htmlContent)
 	}))
 	defer server.Close()
 

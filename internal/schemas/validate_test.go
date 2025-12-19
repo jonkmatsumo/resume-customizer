@@ -204,7 +204,7 @@ func TestValidateJSON_NestedFieldValidation(t *testing.T) {
 	assert.True(t, found, "should include field path in error")
 }
 
-func TestValidateJSON_ArrayValidation(t *testing.T) {
+func TestValidateJSON_ArrayValidation(_ *testing.T) {
 	schemaContent := `{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"type": "object",

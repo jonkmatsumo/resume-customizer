@@ -1,3 +1,4 @@
+// Package main implements the resume_agent CLI tool for schema-first resume generation.
 package main
 
 import (
@@ -26,12 +27,14 @@ func init() {
 	ingestJobCmd.Flags().StringVarP(&urlStr, "url", "u", "", "URL to fetch job posting from")
 	ingestJobCmd.Flags().StringVarP(&outDir, "out", "o", "", "Output directory (required)")
 
-	ingestJobCmd.MarkFlagRequired("out")
+	if err := ingestJobCmd.MarkFlagRequired("out"); err != nil {
+		panic(fmt.Sprintf("failed to mark out flag as required: %v", err))
+	}
 
 	rootCmd.AddCommand(ingestJobCmd)
 }
 
-func runIngestJob(cmd *cobra.Command, args []string) error {
+func runIngestJob(_ *cobra.Command, _ []string) error {
 	// Validate mutually exclusive flags
 	if textFile == "" && urlStr == "" {
 		return fmt.Errorf("either --text-file or --url must be provided")
@@ -62,9 +65,9 @@ func runIngestJob(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
-	fmt.Fprintf(os.Stdout, "Successfully ingested job posting\n")
-	fmt.Fprintf(os.Stdout, "Cleaned text: %s/job_posting.cleaned.txt\n", outDir)
-	fmt.Fprintf(os.Stdout, "Metadata: %s/job_posting.meta.json\n", outDir)
+	_, _ = fmt.Fprintf(os.Stdout, "Successfully ingested job posting\n")
+	_, _ = fmt.Fprintf(os.Stdout, "Cleaned text: %s/job_posting.cleaned.txt\n", outDir)
+	_, _ = fmt.Fprintf(os.Stdout, "Metadata: %s/job_posting.meta.json\n", outDir)
 
 	return nil
 }
