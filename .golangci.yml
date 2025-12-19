@@ -3,8 +3,6 @@ version: 2
 linters-settings:
   errcheck:
     check-type-assertions: true
-  govet:
-    check-shadowing: true
   staticcheck:
     checks: ["all"]
   unused:

@@ -1,0 +1,26 @@
+{
+  "company": "NormalizeCo",
+  "role_title": "Engineer",
+  "responsibilities": [],
+  "hard_requirements": [
+    {
+      "skill": "golang",
+      "evidence": "golang required"
+    },
+    {
+      "skill": "JS",
+      "evidence": "JS required"
+    },
+    {
+      "skill": "k8s",
+      "evidence": "k8s required"
+    }
+  ],
+  "nice_to_haves": [],
+  "keywords": [
+    "react.js",
+    "nodejs"
+  ],
+  "eval_signals": {}
+}
+

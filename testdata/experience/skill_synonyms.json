@@ -1,0 +1,30 @@
+{
+  "stories": [
+    {
+      "id": "story_001",
+      "company": "Test Company",
+      "role": "Software Engineer",
+      "start_date": "2020-01",
+      "end_date": "2023-06",
+      "bullets": [
+        {
+          "id": "bullet_001",
+          "text": "Built system with golang and javascript",
+          "skills": ["golang", "javascript", "js", "typescript", "ts", "k8s", "kubernetes"],
+          "length_chars": 38,
+          "evidence_strength": "high",
+          "risk_flags": []
+        },
+        {
+          "id": "bullet_002",
+          "text": "Used react.js and node.js",
+          "skills": ["react.js", "reactjs", "node.js", "nodejs"],
+          "length_chars": 24,
+          "evidence_strength": "medium",
+          "risk_flags": []
+        }
+      ]
+    }
+  ]
+}
+

@@ -1,0 +1,30 @@
+{
+  "stories": [
+    {
+      "id": "story_001",
+      "company": "Test Company",
+      "role": "Software Engineer",
+      "start_date": "2020-01",
+      "end_date": "2023-06",
+      "bullets": [
+        {
+          "id": "bullet_001",
+          "text": "Built distributed system",
+          "skills": ["Go"],
+          "length_chars": 25,
+          "evidence_strength": "invalid_value",
+          "risk_flags": []
+        },
+        {
+          "id": "bullet_002",
+          "text": "Optimized performance",
+          "skills": ["JavaScript"],
+          "length_chars": 22,
+          "evidence_strength": "bad_strength",
+          "risk_flags": []
+        }
+      ]
+    }
+  ]
+}
+

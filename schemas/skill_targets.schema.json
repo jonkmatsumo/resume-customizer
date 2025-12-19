@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jonathan/resume-customizer/schemas/skill_targets.schema.json",
+  "title": "Skill Targets Schema",
+  "description": "Schema for weighted skill targets extracted from job profiles",
+  "type": "object",
+  "required": ["skills"],
+  "properties": {
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Normalized skill name"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Weight/importance of the skill (0-1)"
+          },
+          "source": {
+            "type": "string",
+            "enum": ["hard_requirement", "preferred", "nice_to_have", "keyword"],
+            "description": "Source of the skill requirement"
+          }
+        }
+      },
+      "description": "List of target skills with weights"
+    }
+  }
+}

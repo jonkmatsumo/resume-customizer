@@ -1,0 +1,40 @@
+{
+  "skills": [
+    {
+      "name": "Go",
+      "weight": 1.0,
+      "source": "hard_requirement"
+    },
+    {
+      "name": "Python",
+      "weight": 1.0,
+      "source": "hard_requirement"
+    },
+    {
+      "name": "Kubernetes",
+      "weight": 0.5,
+      "source": "nice_to_have"
+    },
+    {
+      "name": "Docker",
+      "weight": 0.5,
+      "source": "nice_to_have"
+    },
+    {
+      "name": "Microservices",
+      "weight": 0.3,
+      "source": "keyword"
+    },
+    {
+      "name": "Distributed Systems",
+      "weight": 0.3,
+      "source": "keyword"
+    },
+    {
+      "name": "Cloud Infrastructure",
+      "weight": 0.3,
+      "source": "keyword"
+    }
+  ]
+}
+

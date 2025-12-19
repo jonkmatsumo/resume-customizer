@@ -1,0 +1,23 @@
+{
+  "company": "DuplicateCo",
+  "role_title": "Developer",
+  "responsibilities": [],
+  "hard_requirements": [
+    {
+      "skill": "Go",
+      "evidence": "Go required"
+    }
+  ],
+  "nice_to_haves": [
+    {
+      "skill": "Go",
+      "evidence": "Go experience preferred"
+    }
+  ],
+  "keywords": [
+    "Go",
+    "golang"
+  ],
+  "eval_signals": {}
+}
+

@@ -1,0 +1,44 @@
+{
+  "company": "TestCo",
+  "role_title": "Software Engineer",
+  "responsibilities": [
+    "Build systems",
+    "Write code"
+  ],
+  "hard_requirements": [
+    {
+      "skill": "Go",
+      "level": "3+ years",
+      "evidence": "Must have 3+ years Go experience"
+    },
+    {
+      "skill": "Python",
+      "level": "2+ years",
+      "evidence": "Python required"
+    }
+  ],
+  "nice_to_haves": [
+    {
+      "skill": "Kubernetes",
+      "level": "1+ year",
+      "evidence": "Kubernetes experience preferred"
+    },
+    {
+      "skill": "Docker",
+      "evidence": "Docker knowledge nice to have"
+    }
+  ],
+  "keywords": [
+    "microservices",
+    "distributed systems",
+    "cloud infrastructure"
+  ],
+  "eval_signals": {
+    "latency": false,
+    "reliability": true,
+    "ownership": false,
+    "scale": true,
+    "collaboration": false
+  }
+}
+
