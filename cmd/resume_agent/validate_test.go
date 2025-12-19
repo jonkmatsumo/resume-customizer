@@ -1,31 +1,12 @@
 package main
 
 import (
-	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-func getBinaryPath(t *testing.T) string {
-	// Build the binary for testing
-	binaryName := "resume_agent"
-	if testing.Short() {
-		t.Skip("Skipping CLI tests in short mode")
-	}
-
-	// Try to find or build the binary
-	binaryPath := filepath.Join("..", "..", "bin", binaryName)
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		// Binary doesn't exist, we'll need to build it
-		// For now, we'll skip if it doesn't exist
-		t.Skipf("Binary not found at %s, build it first with 'go build -o bin/resume_agent ./cmd/resume_agent'", binaryPath)
-	}
-
-	return binaryPath
-}
 
 func TestValidateCommand_Success(t *testing.T) {
 	binaryPath := getBinaryPath(t)
@@ -109,4 +90,3 @@ func TestValidateCommand_InvalidJSONPath(t *testing.T) {
 	assert.Error(t, err, "command should fail")
 	assert.Contains(t, string(output), "not found", "should indicate file not found")
 }
-

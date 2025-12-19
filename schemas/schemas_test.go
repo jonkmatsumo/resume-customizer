@@ -155,4 +155,3 @@ func TestJobProfile_ReferencesCommonSchema(t *testing.T) {
 		}
 	}
 }
-

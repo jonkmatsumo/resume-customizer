@@ -65,4 +65,3 @@ func main() {
 		os.Exit(2) // Usage error
 	}
 }
-

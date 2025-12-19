@@ -1,0 +1,29 @@
+# Senior Software Engineer
+
+
+We need someone with:
+
+
+- Go experience
+
+
+- Distributed systems knowledge
+
+
+## Responsibilities
+
+
+Build scalable systems    with high availability
+
+
+Design APIs              for microservices
+
+
+## Skills Required
+
+
+* Go (5+ years)
+* Distributed Systems
+* API Design
+
+

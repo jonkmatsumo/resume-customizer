@@ -224,4 +224,3 @@ func TestValidateJSON_ArrayValidation(t *testing.T) {
 	// Just ensure it doesn't panic
 	_ = err
 }
-

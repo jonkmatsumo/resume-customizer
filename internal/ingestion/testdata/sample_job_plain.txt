@@ -1,0 +1,14 @@
+Senior Software Engineer
+
+About the Role:
+We are looking for a Senior Software Engineer to join our team.
+
+Requirements:
+5+ years of experience with Go
+Experience with distributed systems
+Strong problem-solving skills
+
+Nice to Have:
+Kubernetes experience
+Previous startup experience
+
