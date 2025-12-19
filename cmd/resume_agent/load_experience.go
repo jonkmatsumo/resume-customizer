@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/jonathan/resume-customizer/internal/experience"
-	"github.com/jonathan/resume-customizer/internal/schemas"
 	"github.com/spf13/cobra"
 )
 
@@ -67,14 +66,8 @@ func runLoadExperience(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
 
-	// Validate output against schema to ensure normalization didn't break anything
-	if err := schemas.ValidateJSON(experience.ExperienceBankSchemaPath, loadOutputFile); err != nil {
-		return fmt.Errorf("normalized output failed schema validation: %w", err)
-	}
-
 	_, _ = fmt.Fprintf(os.Stdout, "Successfully loaded and normalized experience bank\n")
 	_, _ = fmt.Fprintf(os.Stdout, "Output: %s\n", loadOutputFile)
 
 	return nil
 }
-

@@ -1,0 +1,40 @@
+{
+  "company": "TechCorp",
+  "role_title": "Senior Software Engineer",
+  "responsibilities": [
+    "Build distributed systems",
+    "Lead technical initiatives"
+  ],
+  "hard_requirements": [
+    {
+      "skill": "Go",
+      "level": "3+ years",
+      "evidence": "Must have 3+ years Go experience"
+    },
+    {
+      "skill": "Distributed Systems",
+      "level": "5+ years",
+      "evidence": "5+ years building distributed systems"
+    }
+  ],
+  "nice_to_haves": [
+    {
+      "skill": "Kubernetes",
+      "level": "2+ years",
+      "evidence": "Experience with Kubernetes preferred"
+    }
+  ],
+  "keywords": [
+    "microservices",
+    "distributed systems",
+    "cloud infrastructure"
+  ],
+  "eval_signals": {
+    "latency": true,
+    "reliability": true,
+    "ownership": false,
+    "scale": true,
+    "collaboration": false
+  }
+}
+

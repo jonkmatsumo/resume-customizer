@@ -3,6 +3,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,8 +53,11 @@ func runBuildSkillTargets(_ *cobra.Command, _ []string) error {
 	}
 
 	// 2. Validate input JobProfile against schema (optional but recommended)
-	if err := schemas.ValidateJSON("schemas/job_profile.schema.json", buildSkillTargetsJobProfile); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Warning: Input job profile failed schema validation: %v\n", err)
+	schemaPath := schemas.ResolveSchemaPath("schemas/job_profile.schema.json")
+	if schemaPath != "" {
+		if err := schemas.ValidateJSON(schemaPath, buildSkillTargetsJobProfile); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Warning: Input job profile failed schema validation: %v\n", err)
+		}
 	}
 
 	// 3. Build skill targets
@@ -82,16 +86,27 @@ func runBuildSkillTargets(_ *cobra.Command, _ []string) error {
 	}
 
 	// 6. Validate output against schema (if schema file exists)
-	schemaPath := "schemas/skill_targets.schema.json"
-	if _, err := os.Stat(schemaPath); err == nil {
-		if err := schemas.ValidateJSON(schemaPath, buildSkillTargetsOutput); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Warning: Generated skill targets failed schema validation: %v\n", err)
-			return fmt.Errorf("generated skill targets are invalid: %w", err)
+	outputSchemaPath := schemas.ResolveSchemaPath("schemas/skill_targets.schema.json")
+	if outputSchemaPath != "" {
+		if err := schemas.ValidateJSON(outputSchemaPath, buildSkillTargetsOutput); err != nil {
+			// Distinguish between validation errors (data doesn't match schema) and schema load errors
+			var validationErr *schemas.ValidationError
+			var schemaLoadErr *schemas.SchemaLoadError
+			if errors.As(err, &validationErr) {
+				// Actual validation failure - return error
+				return fmt.Errorf("generated skill targets are invalid: %w", err)
+			} else if errors.As(err, &schemaLoadErr) {
+				// Schema loading issue - log warning and continue
+				_, _ = fmt.Fprintf(os.Stderr, "Warning: Could not validate output against schema (schema loading failed): %v\n", err)
+			} else {
+				// Other errors - log warning and continue
+				_, _ = fmt.Fprintf(os.Stderr, "Warning: Could not validate output against schema: %v\n", err)
+			}
 		}
 	}
+	// If schema path not found, skip validation (non-fatal)
 
 	_, _ = fmt.Fprintf(os.Stdout, "Successfully built skill targets to %s\n", buildSkillTargetsOutput)
 
 	return nil
 }
-

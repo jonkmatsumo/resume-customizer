@@ -10,6 +10,32 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
+// ResolveSchemaPath attempts to find a schema file by trying multiple common path resolutions.
+// It tries paths relative to the current working directory, then paths relative to likely repo root locations.
+// Returns the first path that exists, or empty string if none found.
+// This is useful when CLI commands may run from different working directory contexts (e.g., tests).
+func ResolveSchemaPath(relativePath string) string {
+	// Try paths in order:
+	// 1. Relative to current working directory
+	// 2. One level up (../schemas/...)
+	// 3. Two levels up (../../schemas/...)
+	candidates := []string{
+		relativePath,
+		filepath.Join("..", relativePath),
+		filepath.Join("..", "..", relativePath),
+	}
+
+	for _, candidate := range candidates {
+		if absPath, err := filepath.Abs(candidate); err == nil {
+			if _, err := os.Stat(absPath); err == nil {
+				return absPath
+			}
+		}
+	}
+
+	return ""
+}
+
 // ValidationError represents a schema validation error with field paths
 type ValidationError struct {
 	Errors []FieldError

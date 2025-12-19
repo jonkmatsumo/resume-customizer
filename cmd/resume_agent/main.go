@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -60,12 +61,15 @@ func runValidate(_ *cobra.Command, _ []string) error {
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		// Determine exit code based on error type
-		if _, ok := err.(*schemas.ValidationError); ok {
+		// Use errors.As to traverse the error chain and find the original error type
+		var validationErr *schemas.ValidationError
+		var schemaLoadErr *schemas.SchemaLoadError
+		if errors.As(err, &validationErr) {
 			os.Exit(1) // Validation failure
 		}
-		if _, ok := err.(*schemas.SchemaLoadError); ok {
+		if errors.As(err, &schemaLoadErr) {
 			os.Exit(2) // Schema load error (usage/configuration issue)
 		}
-		os.Exit(2) // Usage error
+		os.Exit(2) // Generic error
 	}
 }

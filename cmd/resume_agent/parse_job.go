@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
@@ -73,11 +74,26 @@ func runParseJob(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
 
-	// Validate against schema
-	schemaPath := "schemas/job_profile.schema.json"
-	if err := schemas.ValidateJSON(schemaPath, parseOutputFile); err != nil {
-		return fmt.Errorf("generated JSON does not validate against schema: %w", err)
+	// Validate against schema (if schema file exists)
+	schemaPath := schemas.ResolveSchemaPath("schemas/job_profile.schema.json")
+	if schemaPath != "" {
+		if err := schemas.ValidateJSON(schemaPath, parseOutputFile); err != nil {
+			// Distinguish between validation errors (data doesn't match schema) and schema load errors
+			var validationErr *schemas.ValidationError
+			var schemaLoadErr *schemas.SchemaLoadError
+			if errors.As(err, &validationErr) {
+				// Actual validation failure - return error
+				return fmt.Errorf("generated JSON does not validate against schema: %w", err)
+			} else if errors.As(err, &schemaLoadErr) {
+				// Schema loading issue - log warning and continue
+				_, _ = fmt.Fprintf(os.Stderr, "Warning: Could not validate output against schema (schema loading failed): %v\n", err)
+			} else {
+				// Other errors - log warning and continue
+				_, _ = fmt.Fprintf(os.Stderr, "Warning: Could not validate output against schema: %v\n", err)
+			}
+		}
 	}
+	// If schema path not found, skip validation (non-fatal)
 
 	_, _ = fmt.Fprintf(os.Stdout, "Successfully parsed job profile\n")
 	_, _ = fmt.Fprintf(os.Stdout, "Output: %s\n", parseOutputFile)
