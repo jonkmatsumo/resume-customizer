@@ -10,6 +10,9 @@ This system is designed for **incremental development, determinism, and debuggab
 
 - Go 1.21 or later
 - Make (optional, for convenience commands)
+- Google Gemini API key (required for `parse-job` command)
+  - Get your API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+  - Set it as `GEMINI_API_KEY` environment variable or use `--api-key` flag
 
 ### Build
 
@@ -31,6 +34,23 @@ go build -o bin/resume_agent ./cmd/resume_agent
   --json testdata/valid/job_profile.json
 ```
 
+### Parse Job Posting
+
+```bash
+# Set your Gemini API key
+export GEMINI_API_KEY=your-api-key-here
+
+# Parse a cleaned job posting
+./bin/resume_agent parse-job \
+  --in artifacts/job_posting.cleaned.txt \
+  --out artifacts/job_profile.json
+
+# Validate the output
+./bin/resume_agent validate \
+  --schema schemas/job_profile.schema.json \
+  --json artifacts/job_profile.json
+```
+
 ## CLI Usage
 
 ### Validate Command
@@ -49,6 +69,27 @@ resume_agent validate --schema <schema_path> --json <json_path>
 - `0`: Validation passed
 - `1`: Validation failed (returns `ValidationError`)
 - `2`: Usage error or schema loading error (missing flags, file not found, invalid schema, etc.)
+
+### Parse Job Command
+
+Parse a cleaned job posting text file into structured JobProfile JSON:
+
+```bash
+resume_agent parse-job --in <input_file> --out <output_file> [--api-key <key>]
+```
+
+**Flags:**
+- `--in`, `-i`: Path to cleaned text file containing job posting (required)
+- `--out`, `-o`: Path to output JSON file (required)
+- `--api-key`: Gemini API key (optional, overrides `GEMINI_API_KEY` environment variable)
+
+**Environment Variables:**
+- `GEMINI_API_KEY`: Google Gemini API key (required if `--api-key` flag is not provided)
+
+**Exit Codes:**
+- `0`: Parsing and validation succeeded
+- `1`: Validation failed (output doesn't match schema)
+- `2`: Usage error (missing flags, file I/O error, API key missing, API call failed, etc.)
 
 **Examples:**
 

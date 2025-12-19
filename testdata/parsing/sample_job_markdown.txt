@@ -1,0 +1,27 @@
+# Senior Software Engineer
+
+## About the Role
+
+We are looking for a Senior Software Engineer to join our team. You will be responsible for designing and implementing distributed systems that handle millions of requests per day.
+
+## Responsibilities
+
+- Design and implement scalable distributed systems
+- Lead technical initiatives and mentor junior engineers
+- Collaborate with cross-functional teams
+- Ensure system reliability and performance
+
+## Requirements
+
+- 5+ years of experience with Go (Golang)
+- Experience building distributed systems
+- Strong problem-solving skills
+- Experience with Kubernetes (K8s) preferred
+- Knowledge of microservices architecture
+
+## Nice to Have
+
+- Experience with cloud infrastructure (AWS)
+- Previous startup experience
+- Experience with monitoring and observability tools
+

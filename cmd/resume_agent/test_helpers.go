@@ -20,4 +20,3 @@ func getBinaryPath(t *testing.T) string {
 
 	return binaryPath
 }
-
