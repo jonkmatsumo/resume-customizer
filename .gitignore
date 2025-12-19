@@ -30,3 +30,12 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+.cursorrules
+
+# Design documents
+docs/
+
+# Build artifacts
+bin/
+artifacts/*
+!artifacts/.gitkeep

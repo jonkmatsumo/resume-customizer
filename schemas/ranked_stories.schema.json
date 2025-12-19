@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jonathan/resume-customizer/schemas/ranked_stories.schema.json",
+  "title": "Ranked Stories",
+  "description": "Deterministically scored candidate stories",
+  "type": "object",
+  "required": ["ranked"],
+  "properties": {
+    "ranked": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["story_id", "relevance_score", "skill_overlap", "keyword_overlap", "evidence_strength", "matched_skills", "notes"],
+        "properties": {
+          "story_id": {
+            "type": "string",
+            "description": "Reference to story ID from experience bank"
+          },
+          "relevance_score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Overall relevance score (0-1)"
+          },
+          "skill_overlap": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Skill overlap score (0-1)"
+          },
+          "keyword_overlap": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Keyword overlap score (0-1)"
+          },
+          "evidence_strength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Evidence strength score (0-1)"
+          },
+          "matched_skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of matching skills"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Brief explanation of ranking"
+          }
+        }
+      }
+    }
+  }
+}
+

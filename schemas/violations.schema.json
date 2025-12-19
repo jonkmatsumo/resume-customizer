@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jonathan/resume-customizer/schemas/violations.schema.json",
+  "title": "Violations",
+  "description": "Structured validation failures",
+  "type": "object",
+  "required": ["violations"],
+  "properties": {
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "severity", "details"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["page_overflow", "line_too_long", "forbidden_phrase", "section_overflow", "latex_error"],
+            "description": "Type of violation"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["error", "warning"],
+            "description": "Severity level"
+          },
+          "details": {
+            "type": "string",
+            "description": "Detailed description of the violation"
+          },
+          "affected_sections": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of affected sections (optional)"
+          },
+          "line_number": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Line number where violation occurs (optional)"
+          },
+          "char_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Character count (for line length violations, optional)"
+          }
+        }
+      }
+    }
+  }
+}
+

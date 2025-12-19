@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jonathan/resume-customizer/schemas/job_profile.schema.json",
+  "title": "Job Profile",
+  "description": "Structured job requirements extracted from a job posting",
+  "type": "object",
+  "required": ["company", "role_title", "responsibilities", "hard_requirements", "nice_to_haves", "keywords", "eval_signals"],
+  "properties": {
+    "company": {
+      "type": "string",
+      "description": "Company name"
+    },
+    "role_title": {
+      "type": "string",
+      "description": "Job title/role name"
+    },
+    "responsibilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of role responsibilities"
+    },
+    "hard_requirements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Requirement"
+      },
+      "description": "Must-have skills and requirements"
+    },
+    "nice_to_haves": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Requirement"
+      },
+      "description": "Preferred but not required skills"
+    },
+    "keywords": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Extracted domain-specific terms and keywords"
+    },
+    "eval_signals": {
+      "$ref": "#/$defs/EvalSignals",
+      "description": "Inferred evaluation criteria"
+    }
+  },
+  "$defs": {
+    "Requirement": {
+      "type": "object",
+      "required": ["skill", "evidence"],
+      "properties": {
+        "skill": {
+          "type": "string",
+          "description": "Required or preferred skill name"
+        },
+        "level": {
+          "type": "string",
+          "description": "Level or experience requirement (e.g., '3+ years')"
+        },
+        "evidence": {
+          "type": "string",
+          "description": "Traceable snippet from original job posting"
+        }
+      }
+    },
+    "EvalSignals": {
+      "type": "object",
+      "properties": {
+        "latency": {
+          "type": "boolean",
+          "description": "Latency/performance is an evaluation criterion"
+        },
+        "reliability": {
+          "type": "boolean",
+          "description": "Reliability is an evaluation criterion"
+        },
+        "ownership": {
+          "type": "boolean",
+          "description": "Ownership/autonomy is an evaluation criterion"
+        },
+        "scale": {
+          "type": "boolean",
+          "description": "Scale/volume is an evaluation criterion"
+        },
+        "collaboration": {
+          "type": "boolean",
+          "description": "Collaboration is an evaluation criterion"
+        }
+      }
+    }
+  }
+}
+

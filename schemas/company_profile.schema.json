@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jonathan/resume-customizer/schemas/company_profile.schema.json",
+  "title": "Company Profile",
+  "description": "Brand voice and style rules for a company",
+  "type": "object",
+  "required": ["company", "tone", "style_rules", "taboo_phrases", "domain_context", "values", "evidence_urls"],
+  "properties": {
+    "company": {
+      "type": "string",
+      "description": "Company name"
+    },
+    "tone": {
+      "type": "string",
+      "description": "Brand tone (e.g., 'direct, metric-driven')"
+    },
+    "style_rules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Actionable style guidelines"
+    },
+    "taboo_phrases": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Words/phrases to avoid"
+    },
+    "domain_context": {
+      "type": "string",
+      "description": "Domain/industry context (e.g., 'B2B SaaS, infrastructure')"
+    },
+    "values": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Core company values"
+    },
+    "evidence_urls": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      },
+      "description": "URLs where voice information was sourced"
+    }
+  }
+}
+

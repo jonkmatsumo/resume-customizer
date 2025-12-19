@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jonathan/resume-customizer/schemas/bullets.schema.json",
+  "title": "Bullets",
+  "description": "Selected and rewritten bullet points",
+  "$defs": {
+    "SelectedBullet": {
+      "type": "object",
+      "required": ["id", "story_id", "text", "skills", "length_chars"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Bullet ID"
+        },
+        "story_id": {
+          "type": "string",
+          "description": "Parent story ID"
+        },
+        "text": {
+          "type": "string",
+          "description": "Original bullet text"
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skills demonstrated"
+        },
+        "metrics": {
+          "type": "string",
+          "description": "Quantified metrics (optional)"
+        },
+        "length_chars": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Character length"
+        }
+      }
+    },
+    "RewrittenBullet": {
+      "type": "object",
+      "required": ["original_bullet_id", "final_text", "length_chars", "estimated_lines", "style_checks"],
+      "properties": {
+        "original_bullet_id": {
+          "type": "string",
+          "description": "Reference to original bullet ID"
+        },
+        "final_text": {
+          "type": "string",
+          "description": "Rewritten bullet text"
+        },
+        "length_chars": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Character length of final text"
+        },
+        "estimated_lines": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Estimated number of lines"
+        },
+        "style_checks": {
+          "type": "object",
+          "required": ["strong_verb", "quantified", "no_taboo", "target_length"],
+          "properties": {
+            "strong_verb": {
+              "type": "boolean",
+              "description": "Uses strong action verb"
+            },
+            "quantified": {
+              "type": "boolean",
+              "description": "Contains quantified impact"
+            },
+            "no_taboo": {
+              "type": "boolean",
+              "description": "Does not contain taboo phrases"
+            },
+            "target_length": {
+              "type": "boolean",
+              "description": "Meets target length requirement"
+            }
+          }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["bullets"],
+      "properties": {
+        "bullets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SelectedBullet"
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["bullets"],
+      "properties": {
+        "bullets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RewrittenBullet"
+          }
+        }
+      }
+    }
+  ]
+}
+

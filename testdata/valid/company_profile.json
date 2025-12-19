@@ -1,0 +1,24 @@
+{
+  "company": "Acme Corp",
+  "tone": "direct, metric-driven",
+  "style_rules": [
+    "Lead with quantified impact",
+    "Avoid marketing jargon",
+    "Use active voice"
+  ],
+  "taboo_phrases": [
+    "synergy",
+    "ninja",
+    "rockstar"
+  ],
+  "domain_context": "B2B SaaS, infrastructure",
+  "values": [
+    "Ownership",
+    "Customer obsession"
+  ],
+  "evidence_urls": [
+    "https://company.com/values",
+    "https://company.com/culture"
+  ]
+}
+

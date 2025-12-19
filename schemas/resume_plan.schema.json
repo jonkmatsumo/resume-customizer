@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jonathan/resume-customizer/schemas/resume_plan.schema.json",
+  "title": "Resume Plan",
+  "description": "Selection contract defining which stories and bullets to use",
+  "type": "object",
+  "required": ["selected_stories", "space_budget", "coverage"],
+  "properties": {
+    "selected_stories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["story_id", "bullet_ids", "section", "estimated_lines"],
+        "properties": {
+          "story_id": {
+            "type": "string",
+            "description": "Reference to story ID"
+          },
+          "bullet_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of bullet IDs to include from this story"
+          },
+          "section": {
+            "type": "string",
+            "enum": ["experience", "skills", "education", "projects"],
+            "description": "Resume section where this story appears"
+          },
+          "estimated_lines": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Estimated number of lines this story will occupy"
+          }
+        }
+      }
+    },
+    "space_budget": {
+      "type": "object",
+      "required": ["max_bullets", "max_lines"],
+      "properties": {
+        "max_bullets": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of bullets allowed"
+        },
+        "max_lines": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of lines allowed"
+        },
+        "sections": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Maximum lines per section"
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["top_skills_covered", "coverage_score"],
+      "properties": {
+        "top_skills_covered": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of top skills that are covered by this plan"
+        },
+        "coverage_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Overall skill coverage score (0-1)"
+        }
+      }
+    }
+  }
+}
+

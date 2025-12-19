@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jonathan/resume-customizer/schemas/repair_actions.schema.json",
+  "title": "Repair Actions",
+  "description": "Structured fixes for violations",
+  "type": "object",
+  "required": ["actions"],
+  "properties": {
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "reason"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["shorten_bullet", "drop_bullet", "swap_story", "tighten_section", "adjust_template_params"],
+            "description": "Type of repair action"
+          },
+          "bullet_id": {
+            "type": "string",
+            "description": "Target bullet ID (required for shorten_bullet, drop_bullet)"
+          },
+          "story_id": {
+            "type": "string",
+            "description": "Target story ID (required for swap_story)"
+          },
+          "target_chars": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Target character count (for shorten_bullet)"
+          },
+          "section": {
+            "type": "string",
+            "description": "Target section (for tighten_section)"
+          },
+          "template_params": {
+            "type": "object",
+            "description": "Template parameters to adjust (for adjust_template_params)"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for this repair action"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "shorten_bullet"
+                }
+              }
+            },
+            "then": {
+              "required": ["bullet_id", "target_chars"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "drop_bullet"
+                }
+              }
+            },
+            "then": {
+              "required": ["bullet_id"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "swap_story"
+                }
+              }
+            },
+            "then": {
+              "required": ["story_id"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "tighten_section"
+                }
+              }
+            },
+            "then": {
+              "required": ["section"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "adjust_template_params"
+                }
+              }
+            },
+            "then": {
+              "required": ["template_params"]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+

@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jonathan/resume-customizer/schemas/common.schema.json",
+  "title": "Common Schema Definitions",
+  "description": "Shared definitions used across multiple schemas",
+  "$defs": {
+    "Skill": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Normalized skill name"
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Weight/importance of the skill (0-1)"
+        },
+        "source": {
+          "type": "string",
+          "enum": ["hard_requirement", "preferred", "nice_to_have", "keyword"],
+          "description": "Source of the skill requirement"
+        }
+      }
+    },
+    "SkillTargets": {
+      "type": "object",
+      "required": ["skills"],
+      "properties": {
+        "skills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Skill"
+          },
+          "description": "List of target skills with weights"
+        }
+      }
+    },
+    "Requirement": {
+      "type": "object",
+      "required": ["skill", "evidence"],
+      "properties": {
+        "skill": {
+          "type": "string",
+          "description": "Required or preferred skill name"
+        },
+        "level": {
+          "type": "string",
+          "description": "Level or experience requirement (e.g., '3+ years')"
+        },
+        "evidence": {
+          "type": "string",
+          "description": "Traceable snippet from original job posting"
+        }
+      }
+    },
+    "Evidence": {
+      "type": "object",
+      "required": ["snippet"],
+      "properties": {
+        "snippet": {
+          "type": "string",
+          "description": "Evidence text snippet"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL where evidence was found (optional)"
+        }
+      }
+    },
+    "EvalSignals": {
+      "type": "object",
+      "properties": {
+        "latency": {
+          "type": "boolean",
+          "description": "Latency/performance is an evaluation criterion"
+        },
+        "reliability": {
+          "type": "boolean",
+          "description": "Reliability is an evaluation criterion"
+        },
+        "ownership": {
+          "type": "boolean",
+          "description": "Ownership/autonomy is an evaluation criterion"
+        },
+        "scale": {
+          "type": "boolean",
+          "description": "Scale/volume is an evaluation criterion"
+        },
+        "collaboration": {
+          "type": "boolean",
+          "description": "Collaboration is an evaluation criterion"
+        }
+      }
+    }
+  }
+}
+
