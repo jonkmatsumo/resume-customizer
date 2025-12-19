@@ -1,0 +1,37 @@
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+  govet:
+    check-shadowing: true
+  staticcheck:
+    checks: ["all"]
+  gosimple:
+    checks: ["all"]
+  unused:
+    check-exported: false
+
+linters:
+  enable:
+    - errcheck      # Check for unchecked errors
+    - gofmt         # Format code
+    - goimports     # Format imports
+    - govet         # Go vet
+    - staticcheck   # Static analysis
+    - unused        # Unused code
+    - gosimple      # Simplify code
+    - ineffassign   # Ineffective assignments
+    - typecheck     # Type checking
+    - misspell      # Spelling mistakes
+    - revive        # Fast, configurable linter
+  disable:
+    - deadcode      # Deprecated in favor of staticcheck
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck  # Allow unchecked errors in tests
+

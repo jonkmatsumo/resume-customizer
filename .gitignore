@@ -39,3 +39,10 @@ docs/
 bin/
 artifacts/*
 !artifacts/.gitkeep
+
+# Pre-commit
+.pre-commit-config.yaml.bak
+
+# Coverage reports
+coverage.out
+coverage.html

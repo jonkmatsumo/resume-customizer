@@ -108,37 +108,82 @@ resume-customizer/
 
 ## Development
 
-### Running Tests
+### Prerequisites
+
+Install development tools:
 
 ```bash
-# Run all tests
-make test
+# Install goimports (for formatting)
+go install golang.org/x/tools/cmd/goimports@latest
+
+# Install golangci-lint (for linting)
+# macOS
+brew install golangci-lint
+# or via script
+curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+
+# Install pre-commit (optional, for git hooks)
+brew install pre-commit
 # or
-go test ./...
-
-# Run tests with coverage
-go test -cover ./...
-
-# Run specific package tests
-go test ./internal/schemas/...
+pip install pre-commit
 ```
 
-### Building
+### Pre-commit Hooks (Optional)
+
+Set up git hooks to run linting and formatting before commits:
 
 ```bash
+# Install pre-commit hooks
+pre-commit install
+
+# Run on all files (optional)
+pre-commit run --all-files
+```
+
+Hooks will automatically run on `git commit`. You can skip them with `git commit --no-verify` if needed.
+
+### Local Development Workflow
+
+```bash
+# Format code
+make fmt
+
+# Check formatting (CI use)
+make fmt-check
+
+# Run linter
+make lint
+
+# Run all tests
+make test
+
+# Run tests with race detector
+make test-race
+
+# Run tests with coverage
+make test-coverage
+
+# Run all CI checks locally
+make ci
+
 # Build binary
 make build
 
-# Clean build artifacts
-make clean
-```
-
-### Schema Validation
-
-```bash
-# Validate all schema files are valid JSON
+# Validate schema files
 make validate-schemas
 ```
+
+### CI/CD
+
+The project uses GitHub Actions for continuous integration. The CI pipeline runs on every push and pull request:
+
+1. **Lint**: Runs `golangci-lint` to check code quality
+2. **Format Check**: Verifies code is properly formatted
+3. **Test**: Runs all tests with race detector and coverage
+4. **Build**: Verifies code compiles successfully
+5. **Schema Validation**: Validates all JSON schema files
+
+All checks must pass for PRs to be mergeable. See `.github/workflows/ci.yml` for details.
 
 ## Error Types
 
