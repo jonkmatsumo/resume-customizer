@@ -28,7 +28,7 @@ graph TD
     Materialize --> SelectedBullets[SelectedBullets JSON]
     
     JobProfile --> Research[Research Company]
-    CompanyURL[Company URL (Optional)] --> Research
+    CompanyURL["Company URL (Optional)"] --> Research
     Research --> Seeds[Discovery / Seeds]
     
     Seeds --> CrawlBrand[Crawl Brand Corpus]
