@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/joho/godotenv"
 	"github.com/jonathan/resume-customizer/internal/schemas"
 	"github.com/spf13/cobra"
 )
@@ -60,6 +61,9 @@ func runValidate(_ *cobra.Command, _ []string) error {
 }
 
 func main() {
+	// Load .env file if it exists
+	_ = godotenv.Load()
+
 	if err := rootCmd.Execute(); err != nil {
 		// Determine exit code based on error type
 		// Use errors.As to traverse the error chain and find the original error type

@@ -46,3 +46,7 @@ artifacts/*
 coverage.out
 coverage.html
 /resume_agent
+
+# Web page save artifacts
+*_files/
+testdata/actual/

@@ -83,7 +83,7 @@ func TestCrawlBrandCommand_InvalidURL(t *testing.T) {
 	output, err := cmd.CombinedOutput()
 
 	assert.Error(t, err)
-	assert.Contains(t, string(output), "invalid seed URL")
+	assert.Contains(t, string(output), "no valid seed URLs provided")
 }
 
 func TestCrawlBrandCommand_CreatesOutputDirectory(t *testing.T) {

@@ -46,7 +46,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	}
 
 	fmt.Printf("Step 1/12: Ingesting job posting from %s...\n", opts.JobPath)
-	cleanedText, jobMetadata, err := ingestion.IngestFromFile(opts.JobPath)
+	cleanedText, jobMetadata, err := ingestion.IngestFromFile(ctx, opts.JobPath, opts.APIKey)
 	if err != nil {
 		return fmt.Errorf("job ingestion failed: %w", err)
 	}

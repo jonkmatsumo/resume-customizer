@@ -1,6 +1,7 @@
 package ingestion
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -22,7 +23,7 @@ func TestEndToEnd_TextFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ingest
-	cleanedText, metadata, err := IngestFromFile(testFile)
+	cleanedText, metadata, err := IngestFromFile(context.Background(), testFile, "")
 	require.NoError(t, err)
 
 	// Write output
@@ -150,19 +151,12 @@ func TestRealJobBoardFormats(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			content, err := os.ReadFile(tt.fixture)
-			require.NoError(t, err)
 
 			var cleanedText string
-			// For HTML files, extract text first, then clean
-			if filepath.Ext(tt.fixture) == ".html" {
-				extractedText, err := extractTextFromHTML(string(content))
-				require.NoError(t, err)
-				cleanedText = CleanText(extractedText)
-			} else {
-				// For text files, clean directly
-				cleanedText = CleanText(string(content))
-			}
+			// Use IngestFromFile which now handles HTML and text files
+			cleaned, _, err := IngestFromFile(context.Background(), tt.fixture, "")
+			require.NoError(t, err)
+			cleanedText = cleaned
 
 			for _, expected := range tt.expected {
 				assert.Contains(t, cleanedText, expected, "should contain expected text")

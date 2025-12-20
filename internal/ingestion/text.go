@@ -2,12 +2,67 @@
 package ingestion
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/PuerkitoBio/goquery"
 )
+
+// CleanHTML extracts meaningful text and links from HTML content
+func CleanHTML(htmlContent string) (string, []string, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to parse HTML: %w", err)
+	}
+
+	// Extract links before removing elements
+	var links []string
+	doc.Find("a[href]").Each(func(i int, s *goquery.Selection) {
+		href, exists := s.Attr("href")
+		if exists && href != "" && !strings.HasPrefix(href, "javascript:") && !strings.HasPrefix(href, "#") {
+			links = append(links, strings.TrimSpace(href))
+		}
+	})
+
+	// Remove noise
+	// Remove noise tags
+	doc.Find("script, style, nav, footer, header, meta, link, svg, path, noscript, iframe, aside").Remove()
+
+	// Remove noise classes/ids
+	// This is a heuristic list of common non-content selectors
+	noiseSelectors := []string{
+		".sidebar", "#sidebar",
+		".nav", "#nav", ".navigation",
+		".footer", "#footer",
+		".header", "#header",
+		".ad", ".advertisement", ".banner",
+		".cookie-banner", ".cookie-consent",
+		".menu", "#menu",
+		".social-media", ".share-buttons",
+	}
+	doc.Find(strings.Join(noiseSelectors, ", ")).Remove()
+
+	// Extract text. Use a custom walker or just standard .Text() but .Text() joins tightly.
+	// We want to preserve basic structure.
+	// Better approach: Iterate over relevant block elements and extract text with newlines.
+	var sb strings.Builder
+	doc.Find("body").Each(func(i int, s *goquery.Selection) {
+		// Just getting all text often squashes things.
+		// Let's try reasonable approach: separate block tags with newlines.
+		text := s.Text()
+		sb.WriteString(text)
+	})
+
+	rawText := doc.Text()
+
+	// Post-process the text using the existing text logic
+	cleaned := CleanText(rawText)
+	return cleaned, links, nil
+}
 
 // CleanText cleans and normalizes text content while preserving structure
 func CleanText(content string) string {
@@ -88,7 +143,7 @@ func removeExcessiveBlankLines(content string) string {
 }
 
 // IngestFromFile reads a text file, cleans it, and returns cleaned text with metadata
-func IngestFromFile(path string) (string, *Metadata, error) {
+func IngestFromFile(ctx context.Context, path string, apiKey string) (string, *Metadata, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -97,8 +152,44 @@ func IngestFromFile(path string) (string, *Metadata, error) {
 		return "", nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
-	cleanedText := CleanText(string(content))
+	var cleanedText string
+	var links []string
+	var adminInfo map[string]string
+
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext == ".html" || ext == ".htm" {
+		cleanedText, links, err = CleanHTML(string(content))
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to clean HTML: %w", err)
+		}
+	} else {
+		cleanedText = CleanText(string(content))
+	}
+
+	// If API key is provided, use LLM to separate core content from metadata
+	if apiKey != "" {
+		extracted, err := ExtractWithLLM(ctx, cleanedText, apiKey)
+		if err == nil {
+			// Success! Use extracted content
+			var sb strings.Builder
+			sb.WriteString("Requirements:\n")
+			for _, req := range extracted.Requirements {
+				sb.WriteString("- " + req + "\n")
+			}
+			sb.WriteString("\nResponsibilities:\n")
+			for _, resp := range extracted.Responsibilities {
+				sb.WriteString("- " + resp + "\n")
+			}
+			cleanedText = sb.String()
+			adminInfo = extracted.AdminInfo
+		} else {
+			return "", nil, fmt.Errorf("LLM extraction failed: %w", err)
+		}
+	}
+
 	metadata := NewMetadata(cleanedText, "")
+	metadata.ExtractedLinks = links
+	metadata.AdminInfo = adminInfo
 
 	return cleanedText, metadata, nil
 }

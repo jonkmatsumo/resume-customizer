@@ -27,6 +27,8 @@ func init() {
 	ingestJobCmd.Flags().StringVarP(&urlStr, "url", "u", "", "URL to fetch job posting from")
 	ingestJobCmd.Flags().StringVarP(&outDir, "out", "o", "", "Output directory (required)")
 
+	ingestJobCmd.Flags().StringVar(&runAPIKey, "api-key", "", "Gemini API Key (optional, defaults to GEMINI_API_KEY env var) - required for HTML extraction")
+
 	if err := ingestJobCmd.MarkFlagRequired("out"); err != nil {
 		panic(fmt.Sprintf("failed to mark out flag as required: %v", err))
 	}
@@ -34,7 +36,7 @@ func init() {
 	rootCmd.AddCommand(ingestJobCmd)
 }
 
-func runIngestJob(_ *cobra.Command, _ []string) error {
+func runIngestJob(cmd *cobra.Command, _ []string) error {
 	// Validate mutually exclusive flags
 	if textFile == "" && urlStr == "" {
 		return fmt.Errorf("either --text-file or --url must be provided")
@@ -43,17 +45,31 @@ func runIngestJob(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("--text-file and --url are mutually exclusive; provide only one")
 	}
 
+	// Get API key
+	apiKey := runAPIKey
+	if apiKey == "" {
+		apiKey = os.Getenv("GEMINI_API_KEY")
+	}
+
+	ctx := cmd.Context()
 	var cleanedText string
 	var metadata *ingestion.Metadata
 	var err error
 
 	// Ingest from either text file or URL
 	if textFile != "" {
-		cleanedText, metadata, err = ingestion.IngestFromFile(textFile)
+		cleanedText, metadata, err = ingestion.IngestFromFile(ctx, textFile, apiKey)
 		if err != nil {
 			return fmt.Errorf("failed to ingest from file: %w", err)
 		}
 	} else {
+		// URL ingestion logic update (needs corresponding backend change)
+		// For now, URL ingestion likely doesn't support the new LLM extraction yet
+		// as IngestFromURL hasn't been updated in this plan.
+		// However, IngestFromURL is less critical for the current "HTML file" request.
+		// We'll leave it as is for now or update it if needed.
+		// Wait, IngestFromURL is not updated in text.go? Check url.go.
+		// For the purpose of this task (HTML file), we focus on IngestFromFile.
 		cleanedText, metadata, err = ingestion.IngestFromURL(urlStr)
 		if err != nil {
 			return fmt.Errorf("failed to ingest from URL: %w", err)

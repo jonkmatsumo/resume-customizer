@@ -10,9 +10,11 @@ import (
 
 // Metadata contains metadata about an ingested job posting
 type Metadata struct {
-	URL       string `json:"url,omitempty"`
-	Timestamp string `json:"timestamp"` // RFC3339 format
-	Hash      string `json:"hash"`      // SHA256 hex digest
+	URL            string            `json:"url,omitempty"`
+	Timestamp      string            `json:"timestamp"`                 // RFC3339 format
+	Hash           string            `json:"hash"`                      // SHA256 hex digest
+	AdminInfo      map[string]string `json:"admin_info,omitempty"`      // Salary, Clearance, Citizenship, etc.
+	ExtractedLinks []string          `json:"extracted_links,omitempty"` // Links found in the job posting
 }
 
 // NewMetadata creates a new Metadata instance with current timestamp

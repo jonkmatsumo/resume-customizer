@@ -1,6 +1,7 @@
 package ingestion
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -101,7 +102,7 @@ func TestIngestFromFile_Success(t *testing.T) {
 	err := os.WriteFile(testFile, []byte(testContent), 0644)
 	require.NoError(t, err)
 
-	cleanedText, metadata, err := IngestFromFile(testFile)
+	cleanedText, metadata, err := IngestFromFile(context.Background(), testFile, "")
 	require.NoError(t, err)
 
 	assert.NotEmpty(t, cleanedText)
@@ -112,7 +113,7 @@ func TestIngestFromFile_Success(t *testing.T) {
 }
 
 func TestIngestFromFile_FileNotFound(t *testing.T) {
-	cleanedText, metadata, err := IngestFromFile("/nonexistent/file.txt")
+	cleanedText, metadata, err := IngestFromFile(context.Background(), "/nonexistent/file.txt", "")
 
 	assert.Error(t, err)
 	assert.Empty(t, cleanedText)
@@ -127,10 +128,10 @@ func TestIngestFromFile_MetadataGeneration(t *testing.T) {
 	err := os.WriteFile(testFile, []byte(testContent), 0644)
 	require.NoError(t, err)
 
-	_, metadata1, err1 := IngestFromFile(testFile)
+	_, metadata1, err1 := IngestFromFile(context.Background(), testFile, "")
 	require.NoError(t, err1)
 
-	_, metadata2, err2 := IngestFromFile(testFile)
+	_, metadata2, err2 := IngestFromFile(context.Background(), testFile, "")
 	require.NoError(t, err2)
 
 	// Same file should produce same hash
@@ -150,10 +151,10 @@ func TestIngestFromFile_HashUniqueness(t *testing.T) {
 	err = os.WriteFile(testFile2, []byte("Content 2"), 0644)
 	require.NoError(t, err)
 
-	_, metadata1, err1 := IngestFromFile(testFile1)
+	_, metadata1, err1 := IngestFromFile(context.Background(), testFile1, "")
 	require.NoError(t, err1)
 
-	_, metadata2, err2 := IngestFromFile(testFile2)
+	_, metadata2, err2 := IngestFromFile(context.Background(), testFile2, "")
 	require.NoError(t, err2)
 
 	// Different files should produce different hashes
