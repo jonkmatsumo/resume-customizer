@@ -1,3 +1,4 @@
+// Package pipeline provides the high-level orchestration for the resume generation process.
 package pipeline
 
 import (

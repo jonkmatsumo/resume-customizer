@@ -1,3 +1,4 @@
+// Package research provides functionality for external company research and discovery.
 package research
 
 import (
@@ -34,7 +35,8 @@ func (r *Researcher) DiscoverCompanyWebsite(ctx context.Context, jobProfile *typ
 	// For now, assume it's not and we need to search.
 
 	query := fmt.Sprintf("%s official website", jobProfile.Company)
-	resp, err := r.svc.Cse.List().Cx(r.cx).Q(query).Do()
+
+	resp, err := r.svc.Cse.List().Cx(r.cx).Q(query).Context(ctx).Do()
 	if err != nil {
 		return "", fmt.Errorf("search failed: %w", err)
 	}
@@ -67,7 +69,7 @@ func (r *Researcher) FindVoiceSeeds(ctx context.Context, companyName string, web
 
 	for _, q := range queries {
 		// Be gentle with rate limits if needed, but standard quota is okay for low volume
-		resp, err := r.svc.Cse.List().Cx(r.cx).Q(q).Num(3).Do() // Get top 3 for each
+		resp, err := r.svc.Cse.List().Cx(r.cx).Q(q).Num(3).Context(ctx).Do() // Get top 3 for each
 		if err != nil {
 			continue // Skip failed queries gracefully
 		}

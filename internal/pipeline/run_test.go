@@ -20,7 +20,7 @@ func TestRunPipeline_Integration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	// Use testdata paths (assuming running from module root or adjusting path)
 	// We need to locate the project root relative to this test file.

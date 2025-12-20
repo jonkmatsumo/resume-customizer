@@ -27,7 +27,11 @@ graph TD
     ExperienceBank --> Materialize
     Materialize --> SelectedBullets[SelectedBullets JSON]
     
-    CompanyURL[Company URL] --> CrawlBrand[Crawl Brand Corpus]
+    JobProfile --> Research[Research Company]
+    CompanyURL[Company URL (Optional)] --> Research
+    Research --> Seeds[Discovery / Seeds]
+    
+    Seeds --> CrawlBrand[Crawl Brand Corpus]
     CrawlBrand --> CompanyCorpus[Company Corpus Text + Sources]
     
     CompanyCorpus --> SummarizeVoice[Summarize Voice]
