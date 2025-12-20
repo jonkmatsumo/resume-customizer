@@ -12,13 +12,13 @@ import (
 const (
 	// Weight constants for skill sources
 	weightHardRequirement = 1.0
-	weightNiceToHave     = 0.5
-	weightKeyword        = 0.3
+	weightNiceToHave      = 0.5
+	weightKeyword         = 0.3
 
 	// Source constants
 	sourceHardRequirement = "hard_requirement"
-	sourceNiceToHave     = "nice_to_have"
-	sourceKeyword        = "keyword"
+	sourceNiceToHave      = "nice_to_have"
+	sourceKeyword         = "keyword"
 )
 
 // BuildSkillTargets builds a weighted list of target skills from a JobProfile.
@@ -118,4 +118,3 @@ func getSourcePriority(source string) int {
 		return 0
 	}
 }
-

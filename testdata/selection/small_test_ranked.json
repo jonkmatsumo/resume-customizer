@@ -1,0 +1,32 @@
+{
+  "ranked": [
+    {
+      "story_id": "story_001",
+      "relevance_score": 0.9,
+      "skill_overlap": 0.8,
+      "keyword_overlap": 0.5,
+      "evidence_strength": 0.9,
+      "matched_skills": ["Go", "Kubernetes"],
+      "notes": "Strong skill match (Go, Kubernetes). High evidence strength"
+    },
+    {
+      "story_id": "story_002",
+      "relevance_score": 0.7,
+      "skill_overlap": 0.6,
+      "keyword_overlap": 0.3,
+      "evidence_strength": 0.7,
+      "matched_skills": ["Python"],
+      "notes": "Moderate skill match (Python). Medium evidence strength"
+    },
+    {
+      "story_id": "story_003",
+      "relevance_score": 0.5,
+      "skill_overlap": 0.3,
+      "keyword_overlap": 0.2,
+      "evidence_strength": 0.5,
+      "matched_skills": ["Java"],
+      "notes": "Weak skill match (Java). Medium evidence strength"
+    }
+  ]
+}
+

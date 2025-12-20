@@ -28,4 +28,3 @@ type Bullet struct {
 	EvidenceStrength string   `json:"evidence_strength"`
 	RiskFlags        []string `json:"risk_flags"`
 }
-

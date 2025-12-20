@@ -1,0 +1,34 @@
+{
+  "company": "Test Company",
+  "role_title": "Senior Software Engineer",
+  "responsibilities": [
+    "Build scalable distributed systems",
+    "Lead technical projects"
+  ],
+  "hard_requirements": [
+    {
+      "skill": "Go",
+      "level": "expert",
+      "evidence": "Must have 5+ years of Go experience"
+    },
+    {
+      "skill": "Kubernetes",
+      "level": "intermediate",
+      "evidence": "Experience with Kubernetes required"
+    }
+  ],
+  "nice_to_haves": [
+    {
+      "skill": "Python",
+      "level": "intermediate",
+      "evidence": "Python experience is a plus"
+    }
+  ],
+  "keywords": ["microservices", "distributed systems", "cloud"],
+  "eval_signals": {
+    "latency": true,
+    "reliability": true,
+    "scale": true
+  }
+}
+

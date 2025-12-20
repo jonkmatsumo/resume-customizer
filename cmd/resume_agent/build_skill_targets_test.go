@@ -177,4 +177,3 @@ func TestBuildSkillTargetsCommand_EmptyJobProfile(t *testing.T) {
 	assert.Contains(t, string(output), "failed to build skill targets")
 	assert.Contains(t, string(output), "no skills found")
 }
-

@@ -18,4 +18,3 @@ type RankedStory struct {
 	MatchedSkills    []string `json:"matched_skills"`
 	Notes            string   `json:"notes"`
 }
-

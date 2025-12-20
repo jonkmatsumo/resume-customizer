@@ -138,4 +138,3 @@ func TestExperienceBank_MultipleStories(t *testing.T) {
 	assert.Len(t, unmarshaled.Stories[1].Bullets, 1)
 	assert.Equal(t, []string{"needs_citation"}, unmarshaled.Stories[1].Bullets[0].RiskFlags)
 }
-

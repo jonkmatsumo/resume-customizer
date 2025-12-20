@@ -83,4 +83,3 @@ func ValidateEvidenceStrength(bank *types.ExperienceBank) error {
 
 	return nil
 }
-

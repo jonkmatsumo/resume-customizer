@@ -14,4 +14,3 @@ type Skill struct {
 	Weight float64 `json:"weight"`
 	Source string  `json:"source"`
 }
-

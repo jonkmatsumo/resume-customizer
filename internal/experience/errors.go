@@ -36,4 +36,3 @@ func (e *NormalizationError) Error() string {
 func (e *NormalizationError) Unwrap() error {
 	return e.Cause
 }
-

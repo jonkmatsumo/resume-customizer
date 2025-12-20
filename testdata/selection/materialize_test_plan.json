@@ -1,0 +1,25 @@
+{
+  "selected_stories": [
+    {
+      "story_id": "story_001",
+      "bullet_ids": ["bullet_001", "bullet_002"],
+      "section": "experience",
+      "estimated_lines": 2
+    },
+    {
+      "story_id": "story_002",
+      "bullet_ids": ["bullet_003"],
+      "section": "experience",
+      "estimated_lines": 1
+    }
+  ],
+  "space_budget": {
+    "max_bullets": 8,
+    "max_lines": 45
+  },
+  "coverage": {
+    "top_skills_covered": ["Go", "Python"],
+    "coverage_score": 0.85
+  }
+}
+

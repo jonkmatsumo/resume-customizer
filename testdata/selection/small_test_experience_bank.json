@@ -1,0 +1,65 @@
+{
+  "stories": [
+    {
+      "id": "story_001",
+      "company": "Company A",
+      "role": "Senior Software Engineer",
+      "start_date": "2022-01",
+      "end_date": "2024-01",
+      "bullets": [
+        {
+          "id": "bullet_001",
+          "text": "Built Go microservices processing 1M+ requests/day",
+          "skills": ["Go", "Kubernetes"],
+          "metrics": "1M+ requests/day",
+          "length_chars": 60,
+          "evidence_strength": "high",
+          "risk_flags": []
+        },
+        {
+          "id": "bullet_002",
+          "text": "Designed distributed system architecture",
+          "skills": ["Go", "distributed systems"],
+          "length_chars": 50,
+          "evidence_strength": "high",
+          "risk_flags": []
+        }
+      ]
+    },
+    {
+      "id": "story_002",
+      "company": "Company B",
+      "role": "Software Engineer",
+      "start_date": "2020-01",
+      "end_date": "2022-01",
+      "bullets": [
+        {
+          "id": "bullet_003",
+          "text": "Developed Python backend services",
+          "skills": ["Python", "Django"],
+          "length_chars": 45,
+          "evidence_strength": "medium",
+          "risk_flags": []
+        }
+      ]
+    },
+    {
+      "id": "story_003",
+      "company": "Company C",
+      "role": "Junior Developer",
+      "start_date": "2019-01",
+      "end_date": "2020-01",
+      "bullets": [
+        {
+          "id": "bullet_004",
+          "text": "Worked on Java applications",
+          "skills": ["Java", "Spring"],
+          "length_chars": 40,
+          "evidence_strength": "low",
+          "risk_flags": []
+        }
+      ]
+    }
+  ]
+}
+
