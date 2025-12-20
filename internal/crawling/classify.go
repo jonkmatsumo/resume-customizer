@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jonathan/resume-customizer/internal/llm"
+	"github.com/jonathan/resume-customizer/internal/prompts"
 )
 
 // ClassifiedLink represents a link with its classification category
@@ -63,24 +64,10 @@ func ClassifyLinks(ctx context.Context, links []string, apiKey string) ([]Classi
 // buildClassificationPrompt constructs the prompt for link classification
 func buildClassificationPrompt(links []string) string {
 	linksList := strings.Join(links, "\n")
-	return fmt.Sprintf(`Classify the following URLs into categories. Return a JSON array of objects with "url" and "category" fields.
-
-Categories:
-- values: Values, principles, mission statements
-- careers: Careers, culture, team, jobs pages
-- press: Press, news, blog, articles, media
-- product: Product, features, solutions pages
-- about: About, company information
-- other: Anything that doesn't fit the above categories
-
-URLs to classify:
-%s
-
-Return ONLY valid JSON array, no markdown, no explanation. Example format:
-[
-  {"url": "https://example.com/about", "category": "about"},
-  {"url": "https://example.com/careers", "category": "careers"}
-]`, linksList)
+	template := prompts.MustGet("crawling.json", "classify-links")
+	return prompts.Format(template, map[string]string{
+		"Links": linksList,
+	})
 }
 
 // parseClassificationResponse parses the JSON response from classification

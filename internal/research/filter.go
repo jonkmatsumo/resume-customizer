@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jonathan/resume-customizer/internal/llm"
+	"github.com/jonathan/resume-customizer/internal/prompts"
 )
 
 // FilterLinksResult contains the results of link filtering
@@ -53,28 +54,12 @@ func FilterLinks(ctx context.Context, links []string, companyName string, compan
 func buildFilterPrompt(links []string, companyName string, companyDomain string) string {
 	linksList := strings.Join(links, "\n")
 
-	return fmt.Sprintf(`You are filtering URLs to find relevant company information pages.
-
-Company: %s
-Domain: %s
-
-For each URL, decide:
-- KEEP: Links to the company's own domain OR links that contain relevant company information (culture, values, engineering, about)
-- SKIP: Third-party platforms (greenhouse.io, lever.co, workday.com), job boards, promotional content, unrelated pages
-
-For kept links, assign:
-- priority: 0.0-1.0 (higher = more relevant for brand voice/values)
-- reason: Why it's relevant
-- type: "values", "culture", "engineering", "press", "about", "other"
-
-URLs to filter:
-%s
-
-Return ONLY valid JSON:
-{
-  "kept": [{"url": "...", "priority": 0.9, "reason": "...", "type": "values"}],
-  "skipped": [{"url": "...", "reason": "third-party job board"}]
-}`, companyName, companyDomain, linksList)
+	template := prompts.MustGet("research.json", "filter-links")
+	return prompts.Format(template, map[string]string{
+		"Company": companyName,
+		"Domain":  companyDomain,
+		"Links":   linksList,
+	})
 }
 
 // IsThirdParty checks if a URL is from a known third-party platform

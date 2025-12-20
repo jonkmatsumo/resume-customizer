@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jonathan/resume-customizer/internal/llm"
+	"github.com/jonathan/resume-customizer/internal/prompts"
 	"github.com/jonathan/resume-customizer/internal/types"
 )
 
@@ -65,34 +66,23 @@ func SummarizeVoice(ctx context.Context, corpusText string, sources []types.Sour
 
 // buildExtractionPrompt constructs the prompt for structured voice extraction
 func buildExtractionPrompt(corpusText string, sourceURLs []string) string {
-	var sb strings.Builder
-	sb.WriteString("Extract brand voice and style rules from the following company corpus text. Return ONLY valid JSON matching this exact structure:\n\n")
-	sb.WriteString("{\n")
-	sb.WriteString("  \"company\": \"string (company name)\",\n")
-	sb.WriteString("  \"tone\": \"string (brand tone, e.g., 'direct, metric-driven', 'collaborative, values-driven')\",\n")
-	sb.WriteString("  \"style_rules\": [\"string (actionable style guidelines, e.g., 'lead with metrics', 'avoid hype', 'use active voice')\"],\n")
-	sb.WriteString("  \"taboo_phrases\": [\"string (words/phrases to avoid)\"],\n")
-	sb.WriteString("  \"domain_context\": \"string (domain/industry context, e.g., 'B2B SaaS, infrastructure')\",\n")
-	sb.WriteString("  \"values\": [\"string (core company values)\"]\n")
-	sb.WriteString("}\n\n")
-	sb.WriteString("IMPORTANT:\n")
-	sb.WriteString("- Style rules must be actionable and specific (e.g., 'lead with quantified impact', 'avoid marketing jargon')\n")
-	sb.WriteString("- Extract values directly from the corpus text\n")
-	sb.WriteString("- Taboo phrases should include words/phrases the company explicitly avoids or criticizes\n")
-	sb.WriteString("- Tone should capture the overall communication style\n")
-	sb.WriteString("- Domain context should summarize the industry/domain\n")
-	sb.WriteString("- Return ONLY the JSON object, no markdown, no explanation, no code blocks\n\n")
+	// Build sources section if URLs are provided
+	var sourcesSection string
 	if len(sourceURLs) > 0 {
+		var sb strings.Builder
 		sb.WriteString("Sources (for context):\n")
 		for _, url := range sourceURLs {
 			sb.WriteString(fmt.Sprintf("- %s\n", url))
 		}
 		sb.WriteString("\n")
+		sourcesSection = sb.String()
 	}
-	sb.WriteString("Company corpus text:\n")
-	sb.WriteString(corpusText)
 
-	return sb.String()
+	template := prompts.MustGet("voice.json", "extract-brand-voice")
+	return prompts.Format(template, map[string]string{
+		"Sources":    sourcesSection,
+		"CorpusText": corpusText,
+	})
 }
 
 // parseJSONResponse parses the JSON response into a CompanyProfile

@@ -4,6 +4,8 @@ package llm
 import (
 	"fmt"
 	"strings"
+
+	"github.com/jonathan/resume-customizer/internal/prompts"
 )
 
 // ExtractionSchema defines the structure for LLM-based content extraction.
@@ -71,12 +73,8 @@ func BuildExtractionPrompt(schema ExtractionSchema, inputText string) string {
 // Extracts company info, level detection, team context, requirements, and responsibilities.
 func JobRequirementsSchema() ExtractionSchema {
 	return ExtractionSchema{
-		Name: "JobRequirements",
-		Description: `You are an expert job posting parser. COPY TEXT VERBATIM - do not paraphrase, summarize, or reword.
-Your task is to extract and categorize information from a raw job posting.
-IMPORTANT: Preserve the exact wording from the original text.
-Goal: Extract company info, position level, team context, requirements, and responsibilities.
-EXCLUDE: Application form fields, EEO statements, legal disclaimers, generic "About Company" boilerplate.`,
+		Name:        "JobRequirements",
+		Description: prompts.MustGet("ingestion.json", "job-requirements-description"),
 		Fields: []SchemaField{
 			{
 				Name:        "company",
@@ -146,9 +144,8 @@ EXCLUDE: Application form fields, EEO statements, legal disclaimers, generic "Ab
 // Extracts tone, style rules, taboo phrases, values, and domain context.
 func BrandVoiceSchema() ExtractionSchema {
 	return ExtractionSchema{
-		Name: "BrandVoice",
-		Description: `You are an expert brand analyst. Your task is to extract brand voice characteristics from company text.
-Analyze the tone, communication style, and values expressed in the content.`,
+		Name:        "BrandVoice",
+		Description: prompts.MustGet("ingestion.json", "brand-voice-description"),
 		Fields: []SchemaField{
 			{
 				Name:        "company",

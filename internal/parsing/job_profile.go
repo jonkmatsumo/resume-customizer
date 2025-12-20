@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jonathan/resume-customizer/internal/llm"
+	"github.com/jonathan/resume-customizer/internal/prompts"
 	"github.com/jonathan/resume-customizer/internal/types"
 )
 
@@ -59,44 +60,10 @@ func ParseJobProfile(ctx context.Context, cleanedText string, apiKey string) (*t
 
 // buildExtractionPrompt constructs the prompt for structured extraction
 func buildExtractionPrompt(jobText string) string {
-	return fmt.Sprintf(`Extract structured information from the following job posting. Return ONLY valid JSON matching this exact structure:
-
-{
-  "company": "string (company name, best-effort)",
-  "role_title": "string (job title)",
-  "responsibilities": ["string (list of responsibilities)"],
-  "hard_requirements": [
-    {
-      "skill": "string (skill name)",
-      "level": "string (e.g., '3+ years', optional)",
-      "evidence": "string (exact quote from job posting)"
-    }
-  ],
-  "nice_to_haves": [
-    {
-      "skill": "string (skill name)",
-      "level": "string (optional)",
-      "evidence": "string (exact quote from job posting)"
-    }
-  ],
-  "keywords": ["string (domain-specific terms)"],
-  "eval_signals": {
-    "latency": boolean,
-    "reliability": boolean,
-    "ownership": boolean,
-    "scale": boolean,
-    "collaboration": boolean
-  }
-}
-
-IMPORTANT:
-- Include exact quotes from the job posting as evidence snippets
-- Set eval_signals based on what the posting emphasizes (e.g., latency if performance mentioned, ownership if autonomy/ownership mentioned)
-- Extract all mentioned skills, even if implicit
-- Return ONLY the JSON object, no markdown, no explanation, no code blocks
-
-Job posting:
-%s`, jobText)
+	template := prompts.MustGet("parsing.json", "extract-job-profile")
+	return prompts.Format(template, map[string]string{
+		"JobText": jobText,
+	})
 }
 
 // cleanJSONBlock removes markdown code block wrappers from JSON

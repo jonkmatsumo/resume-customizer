@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jonathan/resume-customizer/internal/llm"
+	"github.com/jonathan/resume-customizer/internal/prompts"
 	"github.com/jonathan/resume-customizer/internal/types"
 )
 
@@ -64,7 +65,10 @@ func ProposeRepairs(ctx context.Context, violations *types.Violations, plan *typ
 func buildRepairPrompt(violations *types.Violations, plan *types.ResumePlan, rewrittenBullets *types.RewrittenBullets, rankedStories *types.RankedStories, jobProfile *types.JobProfile, companyProfile *types.CompanyProfile) string {
 	var sb strings.Builder
 
-	sb.WriteString("You are a resume repair assistant. Analyze the following violations and propose repair actions to fix them.\n\n")
+	// Add intro from external prompt
+	sb.WriteString(prompts.MustGet("repair.json", "propose-repairs-intro"))
+
+	// Add violations (dynamic)
 	sb.WriteString("## Violations\n\n")
 	for i, violation := range violations.Violations {
 		sb.WriteString(fmt.Sprintf("%d. Type: %s, Severity: %s\n", i+1, violation.Type, violation.Severity))
@@ -78,6 +82,7 @@ func buildRepairPrompt(violations *types.Violations, plan *types.ResumePlan, rew
 		sb.WriteString("\n")
 	}
 
+	// Add resume plan (dynamic)
 	sb.WriteString("## Current Resume Plan\n\n")
 	sb.WriteString(fmt.Sprintf("Selected Stories: %d\n", len(plan.SelectedStories)))
 	for _, story := range plan.SelectedStories {
@@ -85,6 +90,7 @@ func buildRepairPrompt(violations *types.Violations, plan *types.ResumePlan, rew
 	}
 	sb.WriteString("\n")
 
+	// Add rewritten bullets (dynamic)
 	sb.WriteString("## Current Rewritten Bullets\n\n")
 	for i, bullet := range rewrittenBullets.Bullets {
 		sb.WriteString(fmt.Sprintf("%d. ID: %s, Length: %d chars, Lines: %d\n", i+1, bullet.OriginalBulletID, bullet.LengthChars, bullet.EstimatedLines))
@@ -92,6 +98,7 @@ func buildRepairPrompt(violations *types.Violations, plan *types.ResumePlan, rew
 		sb.WriteString("\n")
 	}
 
+	// Add alternative stories (dynamic)
 	sb.WriteString("## Available Alternative Stories\n\n")
 	for i, story := range rankedStories.Ranked {
 		if i >= 10 { // Limit to top 10
@@ -101,6 +108,7 @@ func buildRepairPrompt(violations *types.Violations, plan *types.ResumePlan, rew
 	}
 	sb.WriteString("\n")
 
+	// Add job requirements (dynamic)
 	sb.WriteString("## Job Requirements\n\n")
 	sb.WriteString(fmt.Sprintf("Role: %s\n", jobProfile.RoleTitle))
 	sb.WriteString(fmt.Sprintf("Company: %s\n", jobProfile.Company))
@@ -112,6 +120,7 @@ func buildRepairPrompt(violations *types.Violations, plan *types.ResumePlan, rew
 	}
 	sb.WriteString("\n")
 
+	// Add company brand voice (dynamic)
 	if companyProfile != nil {
 		sb.WriteString("## Company Brand Voice\n\n")
 		if len(companyProfile.TabooPhrases) > 0 {
@@ -123,33 +132,11 @@ func buildRepairPrompt(violations *types.Violations, plan *types.ResumePlan, rew
 		sb.WriteString("\n")
 	}
 
-	sb.WriteString("## Repair Action Types\n\n")
-	sb.WriteString("You can propose the following action types:\n")
-	sb.WriteString("1. shorten_bullet: Reduce bullet length (requires bullet_id, target_chars)\n")
-	sb.WriteString("2. drop_bullet: Remove bullet from plan (requires bullet_id)\n")
-	sb.WriteString("3. swap_story: Replace story with alternative (requires story_id)\n")
-	sb.WriteString("4. tighten_section: Reduce spacing/font (requires section) - NOT IMPLEMENTED, DO NOT USE\n")
-	sb.WriteString("5. adjust_template_params: Modify template (requires template_params) - NOT IMPLEMENTED, DO NOT USE\n\n")
+	// Add action types from external prompt
+	sb.WriteString(prompts.MustGet("repair.json", "repair-action-types"))
 
-	sb.WriteString("## Instructions\n\n")
-	sb.WriteString("Propose 1-3 repair actions (preferably 1-2) that will address the violations.\n")
-	sb.WriteString("Prioritize actions that will have the most impact:\n")
-	sb.WriteString("- For page_overflow: prefer drop_bullet or swap_story to shorten_bullet\n")
-	sb.WriteString("- For line_too_long: use shorten_bullet\n")
-	sb.WriteString("- For forbidden_phrase: use shorten_bullet to rewrite and remove phrase\n")
-	sb.WriteString("- For latex_error: use drop_bullet or swap_story\n\n")
-	sb.WriteString("Return ONLY valid JSON matching this schema:\n")
-	sb.WriteString(`{
-  "actions": [
-    {
-      "type": "shorten_bullet|drop_bullet|swap_story",
-      "bullet_id": "string (if type is shorten_bullet or drop_bullet)",
-      "story_id": "string (if type is swap_story)",
-      "target_chars": number (if type is shorten_bullet, must be < current length),
-      "reason": "string explaining why this action fixes the violation"
-    }
-  ]
-}`)
+	// Add instructions from external prompt
+	sb.WriteString(prompts.MustGet("repair.json", "repair-instructions"))
 
 	return sb.String()
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/jonathan/resume-customizer/internal/llm"
+	"github.com/jonathan/resume-customizer/internal/prompts"
 )
 
 // ExtractBrandSignals extracts brand-relevant information from page text
@@ -51,27 +52,11 @@ func buildSignalPrompt(pageText string, url string) string {
 		pageText = pageText[:8000] + "..."
 	}
 
-	return fmt.Sprintf(`Extract brand voice signals from this company page.
-
-URL: %s
-
-INSTRUCTIONS:
-1. COPY KEY POINTS VERBATIM - do not paraphrase
-2. Focus on statements about culture, values, principles, working style
-3. Include memorable quotes that reveal company character
-4. Note any repeated themes or emphasized points
-
-Return ONLY valid JSON:
-{
-  "type": "values|culture|engineering|press|about|other",
-  "key_points": ["exact quote 1", "exact quote 2", ...],
-  "values": ["inferred value 1", "inferred value 2", ...]
-}
-
-Page content:
-"""
-%s
-"""`, url, pageText)
+	template := prompts.MustGet("research.json", "extract-brand-signals")
+	return prompts.Format(template, map[string]string{
+		"URL":         url,
+		"PageContent": pageText,
+	})
 }
 
 // AggregateSignals combines brand signals into a corpus

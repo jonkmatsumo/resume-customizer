@@ -13,6 +13,7 @@ import (
 	"github.com/jonathan/resume-customizer/internal/fetch"
 	"github.com/jonathan/resume-customizer/internal/ingestion"
 	"github.com/jonathan/resume-customizer/internal/llm"
+	"github.com/jonathan/resume-customizer/internal/prompts"
 )
 
 // RunResearchOptions configures the research session
@@ -260,19 +261,11 @@ func SuggestNextQueries(ctx context.Context, session *Session, apiKey string) ([
 	}
 	defer func() { _ = client.Close() }()
 
-	prompt := fmt.Sprintf(`Based on research so far for %s, suggest 3-5 search queries to find more brand voice content.
-
-Already found:
-%s
-
-Suggest queries to find:
-- Leadership principles or values statements
-- Engineering culture blog posts
-- Company mission or vision pages
-- Employee testimonials or culture descriptions
-
-Return ONLY a JSON array of strings:
-["query 1", "query 2", ...]`, session.Company, summarizeFindingsBrief(session))
+	template := prompts.MustGet("research.json", "suggest-search-queries")
+	prompt := prompts.Format(template, map[string]string{
+		"Company":         session.Company,
+		"CurrentFindings": summarizeFindingsBrief(session),
+	})
 
 	jsonResp, err := client.GenerateJSON(ctx, prompt, llm.TierLite)
 	if err != nil {

@@ -1,0 +1,4 @@
+{
+    "rewrite-bullet-intro": "Rewrite the following resume bullet point to match the job requirements and company brand voice.\n\nOriginal bullet:\n{{.BulletText}}\n\n",
+    "rewrite-bullet-requirements": "Requirements:\n- Start with a strong action verb\n- Include quantified impact/metrics where possible\n- Match the company's tone and style rules\n- Do NOT use any taboo phrases\n- Keep similar length to original (approximately {{.TargetLength}} characters)\n- Align with job requirements and keywords\n- Return ONLY the rewritten bullet text, no markdown, no explanation, no code blocks"
+}

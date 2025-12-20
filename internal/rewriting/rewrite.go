@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jonathan/resume-customizer/internal/llm"
+	"github.com/jonathan/resume-customizer/internal/prompts"
 	"github.com/jonathan/resume-customizer/internal/types"
 )
 
@@ -68,12 +69,13 @@ func RewriteBullets(ctx context.Context, selectedBullets *types.SelectedBullets,
 func buildRewritingPrompt(bullet types.SelectedBullet, jobProfile *types.JobProfile, companyProfile *types.CompanyProfile) string {
 	var sb strings.Builder
 
-	sb.WriteString("Rewrite the following resume bullet point to match the job requirements and company brand voice.\n\n")
-	sb.WriteString("Original bullet:\n")
-	sb.WriteString(bullet.Text)
-	sb.WriteString("\n\n")
+	// Add intro from external prompt
+	introTemplate := prompts.MustGet("rewriting.json", "rewrite-bullet-intro")
+	sb.WriteString(prompts.Format(introTemplate, map[string]string{
+		"BulletText": bullet.Text,
+	}))
 
-	// Add job requirements context
+	// Add job requirements context (dynamic)
 	if jobProfile != nil {
 		sb.WriteString("Job requirements:\n")
 		if len(jobProfile.HardRequirements) > 0 {
@@ -102,7 +104,7 @@ func buildRewritingPrompt(bullet types.SelectedBullet, jobProfile *types.JobProf
 		sb.WriteString("\n")
 	}
 
-	// Add company voice context
+	// Add company voice context (dynamic)
 	if companyProfile != nil {
 		sb.WriteString("Company brand voice:\n")
 		sb.WriteString(fmt.Sprintf("- Tone: %s\n", companyProfile.Tone))
@@ -120,15 +122,11 @@ func buildRewritingPrompt(bullet types.SelectedBullet, jobProfile *types.JobProf
 		sb.WriteString("\n")
 	}
 
-	sb.WriteString("Requirements:\n")
-	sb.WriteString("- Start with a strong action verb\n")
-	sb.WriteString("- Include quantified impact/metrics where possible\n")
-	sb.WriteString("- Match the company's tone and style rules\n")
-	sb.WriteString("- Do NOT use any taboo phrases\n")
-	sb.WriteString("- Keep similar length to original (approximately ")
-	sb.WriteString(fmt.Sprintf("%d characters)\n", bullet.LengthChars))
-	sb.WriteString("- Align with job requirements and keywords\n")
-	sb.WriteString("- Return ONLY the rewritten bullet text, no markdown, no explanation, no code blocks\n")
+	// Add requirements from external prompt
+	reqsTemplate := prompts.MustGet("rewriting.json", "rewrite-bullet-requirements")
+	sb.WriteString(prompts.Format(reqsTemplate, map[string]string{
+		"TargetLength": fmt.Sprintf("%d", bullet.LengthChars),
+	}))
 
 	return sb.String()
 }
