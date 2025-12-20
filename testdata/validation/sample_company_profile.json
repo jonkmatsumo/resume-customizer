@@ -1,0 +1,22 @@
+{
+  "company": "Example Corp",
+  "tone": "professional, direct",
+  "style_rules": [
+    "Lead with quantified impact",
+    "Avoid marketing jargon"
+  ],
+  "taboo_phrases": [
+    "ninja",
+    "synergy",
+    "rockstar"
+  ],
+  "domain_context": "B2B SaaS",
+  "values": [
+    "Ownership",
+    "Customer obsession"
+  ],
+  "evidence_urls": [
+    "https://example.com/values"
+  ]
+}
+

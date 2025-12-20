@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/jonathan/resume-customizer/internal/schemas"
 	"github.com/spf13/cobra"
@@ -70,6 +71,18 @@ func main() {
 		if errors.As(err, &schemaLoadErr) {
 			os.Exit(2) // Schema load error (usage/configuration issue)
 		}
+		// Check if error message indicates violations were found (from validate-latex)
+		errMsg := err.Error()
+		if contains(errMsg, "validation found") && contains(errMsg, "violation") {
+			os.Exit(1) // Violations found
+		}
 		os.Exit(2) // Generic error
 	}
+}
+
+// contains is a simple case-insensitive string contains check
+func contains(s, substr string) bool {
+	sLower := strings.ToLower(s)
+	substrLower := strings.ToLower(substr)
+	return strings.Contains(sLower, substrLower)
 }
