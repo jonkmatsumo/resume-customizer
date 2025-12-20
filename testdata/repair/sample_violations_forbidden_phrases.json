@@ -1,0 +1,11 @@
+{
+  "violations": [
+    {
+      "type": "forbidden_phrase",
+      "severity": "error",
+      "details": "Line 10 contains forbidden phrase: ninja",
+      "line_number": 10
+    }
+  ]
+}
+

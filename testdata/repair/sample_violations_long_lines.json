@@ -1,0 +1,19 @@
+{
+  "violations": [
+    {
+      "type": "line_too_long",
+      "severity": "warning",
+      "details": "Line 15 has 95 characters, maximum is 90",
+      "line_number": 15,
+      "char_count": 95
+    },
+    {
+      "type": "line_too_long",
+      "severity": "warning",
+      "details": "Line 23 has 102 characters, maximum is 90",
+      "line_number": 23,
+      "char_count": 102
+    }
+  ]
+}
+

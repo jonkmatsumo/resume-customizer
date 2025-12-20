@@ -1,0 +1,10 @@
+{
+  "actions": [
+    {
+      "type": "drop_bullet",
+      "bullet_id": "bullet_003",
+      "reason": "Remove bullet to reduce page count from 2 to 1"
+    }
+  ]
+}
+
