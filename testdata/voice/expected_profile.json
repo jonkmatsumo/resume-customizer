@@ -1,0 +1,28 @@
+{
+  "company": "Example Company",
+  "tone": "direct, metric-driven",
+  "style_rules": [
+    "Lead with quantified impact and measurable outcomes",
+    "Avoid marketing jargon and buzzwords",
+    "Use active voice in all communications",
+    "Focus on concrete achievements rather than abstract concepts"
+  ],
+  "taboo_phrases": [
+    "synergy",
+    "ninja",
+    "rockstar"
+  ],
+  "domain_context": "B2B SaaS infrastructure",
+  "values": [
+    "Ownership",
+    "Customer obsession",
+    "Transparency",
+    "Data-driven decision making"
+  ],
+  "evidence_urls": [
+    "https://example.com/values",
+    "https://example.com/culture",
+    "https://example.com/about"
+  ]
+}
+
