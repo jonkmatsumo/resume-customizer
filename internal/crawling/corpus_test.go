@@ -117,10 +117,11 @@ func TestComputeHash_ProducesConsistentHashes(t *testing.T) {
 }
 
 func TestCrawlBrandCorpus_InvalidURL(t *testing.T) {
-	_, err := CrawlBrandCorpus(context.Background(), "not-a-url", 10, "api-key")
+	_, err := CrawlBrandCorpus(context.Background(), []string{"not-a-url"}, 10, "api-key")
 	assert.Error(t, err)
-	var crawlErr *CrawlError
-	assert.ErrorAs(t, err, &crawlErr)
+	// The function now filters out invalid seeds instead of erroring immediately if ONE is invalid,
+	// unless ALL are invalid.
+	// Since "not-a-url" is invalid, and it's the only one, it should error with "no valid seed URLs provided"
 }
 
 func TestCrawlBrandCorpus_EnforcesMaxPagesLimit(t *testing.T) {

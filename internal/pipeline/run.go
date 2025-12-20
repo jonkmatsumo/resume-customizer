@@ -14,6 +14,7 @@ import (
 	"github.com/jonathan/resume-customizer/internal/ranking"
 	"github.com/jonathan/resume-customizer/internal/rendering"
 	"github.com/jonathan/resume-customizer/internal/repair"
+	"github.com/jonathan/resume-customizer/internal/research"
 	"github.com/jonathan/resume-customizer/internal/rewriting"
 	"github.com/jonathan/resume-customizer/internal/selection"
 	"github.com/jonathan/resume-customizer/internal/types"
@@ -105,9 +106,67 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		return err
 	}
 
-	fmt.Printf("Step 7/12: Crawling company voice (seed: %s)...\n", opts.CompanySeedURL)
-	// Default max pages to 3 for now, could be configurable
-	companyCorpus, err := crawling.CrawlBrandCorpus(ctx, opts.CompanySeedURL, 3, opts.APIKey)
+	fmt.Printf("Step 7/12: Researching company voice...\n")
+
+	// Determine seeds
+	var seeds []string
+
+	// If Google Search API keys are present, try discovery
+	googleKey := os.Getenv("GOOGLE_SEARCH_API_KEY")
+	googleCX := os.Getenv("GOOGLE_SEARCH_CX")
+
+	if googleKey != "" && googleCX != "" {
+		fmt.Printf("Using Google Search for discovery...\n")
+		researcher, err := research.NewResearcher(ctx, googleKey, googleCX)
+		if err == nil {
+			// 1. Discover website if missing
+			companyWebsite := opts.CompanySeedURL
+			if companyWebsite == "" {
+				website, err := researcher.DiscoverCompanyWebsite(ctx, jobProfile)
+				if err != nil {
+					fmt.Printf("Warning: Failed to discover company website: %v\n", err)
+				} else {
+					fmt.Printf("Discovered company website: %s\n", website)
+					companyWebsite = website
+				}
+			}
+
+			// 2. Find voice seeds
+			if companyWebsite != "" || jobProfile.Company != "" {
+				discoveredSeeds, err := researcher.FindVoiceSeeds(ctx, jobProfile.Company, companyWebsite)
+				if err != nil {
+					fmt.Printf("Warning: Failed to find voice seeds: %v\n", err)
+				} else {
+					fmt.Printf("Discovered %d additional voice seeds\n", len(discoveredSeeds))
+					seeds = append(seeds, discoveredSeeds...)
+				}
+			}
+		} else {
+			fmt.Printf("Warning: Failed to initialize researcher: %v\n", err)
+		}
+	}
+
+	// Fallback/Augment with provided seed if not already in list
+	if opts.CompanySeedURL != "" {
+		found := false
+		for _, s := range seeds {
+			if s == opts.CompanySeedURL {
+				found = true
+				break
+			}
+		}
+		if !found {
+			seeds = append(seeds, opts.CompanySeedURL)
+		}
+	}
+
+	if len(seeds) == 0 {
+		return fmt.Errorf("no company seed URL provided and discovery failed (or disabled)")
+	}
+
+	fmt.Printf("Crawling company voice (seeds: %v)...\n", seeds)
+	// Default max pages to 5 (slightly higher due to better targeting)
+	companyCorpus, err := crawling.CrawlBrandCorpus(ctx, seeds, 5, opts.APIKey)
 	if err != nil {
 		return fmt.Errorf("crawling company failed: %w", err)
 	}

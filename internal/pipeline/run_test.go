@@ -26,7 +26,7 @@ func TestRunPipeline_Integration(t *testing.T) {
 	// We need to locate the project root relative to this test file.
 	// For simplicity, we assume the test is run from the project root or we can find testdata.
 	// Since this is in internal/pipeline, testdata is at ../../testdata
-	
+
 	opts := RunOptions{
 		JobPath:        "../../testdata/parsing/sample_job_plain.txt",
 		ExperiencePath: "../../testdata/valid/experience_bank.json",

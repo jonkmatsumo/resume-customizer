@@ -59,7 +59,7 @@ func runCrawlBrand(_ *cobra.Command, _ []string) error {
 
 	// Crawl corpus
 	ctx := context.Background()
-	corpus, err := crawling.CrawlBrandCorpus(ctx, crawlBrandSeedURL, crawlBrandMaxPages, apiKey)
+	corpus, err := crawling.CrawlBrandCorpus(ctx, []string{crawlBrandSeedURL}, crawlBrandMaxPages, apiKey)
 	if err != nil {
 		return fmt.Errorf("failed to crawl brand corpus: %w", err)
 	}

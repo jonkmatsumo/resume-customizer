@@ -24,13 +24,26 @@ const (
 )
 
 // CrawlBrandCorpus crawls a company website and builds a text corpus
-func CrawlBrandCorpus(ctx context.Context, seedURL string, maxPages int, apiKey string) (*types.CompanyCorpus, error) {
-	// Validate seed URL
-	parsedURL, err := url.Parse(seedURL)
-	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+func CrawlBrandCorpus(ctx context.Context, seedURLs []string, maxPages int, apiKey string) (*types.CompanyCorpus, error) {
+	if len(seedURLs) == 0 {
 		return nil, &CrawlError{
-			Message: fmt.Sprintf("invalid seed URL: %s", seedURL),
-			Cause:   err,
+			Message: "no seed URLs provided",
+		}
+	}
+
+	// Validate all seed URLs
+	validSeeds := make([]string, 0)
+	for _, seed := range seedURLs {
+		parsedURL, err := url.Parse(seed)
+		if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+			continue // Skip invalid seeds
+		}
+		validSeeds = append(validSeeds, seed)
+	}
+
+	if len(validSeeds) == 0 {
+		return nil, &CrawlError{
+			Message: "no valid seed URLs provided",
 		}
 	}
 
@@ -42,115 +55,104 @@ func CrawlBrandCorpus(ctx context.Context, seedURL string, maxPages int, apiKey 
 		maxPages = 10 // Default
 	}
 
-	// Fetch homepage
-	homepageHTML, err := fetchHTML(seedURL)
-	if err != nil {
-		return nil, &CrawlError{
-			Message: "failed to fetch homepage",
-			Cause:   err,
+	var corpusParts []string
+	sources := make([]types.Source, 0)
+	visited := make(map[string]bool)
+	allLinks := make([]string, 0)
+
+	// Phase 1: Fetch all seeds first
+	for _, seed := range validSeeds {
+		if visited[seed] {
+			continue
 		}
-	}
 
-	// Extract links
-	links, err := ExtractLinks(homepageHTML, seedURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract links: %w", err)
-	}
-
-	// Limit candidate links to top 30 for classification efficiency
-	maxCandidates := 30
-	if len(links) > maxCandidates {
-		links = links[:maxCandidates]
-	}
-
-	if len(links) == 0 {
-		// Only homepage available
-		text, err := extractTextFromHTML(homepageHTML)
+		// Fetch seed page
+		html, err := fetchHTML(seed)
 		if err != nil {
-			return nil, &CrawlError{
-				Message: "failed to extract text from homepage",
-				Cause:   err,
-			}
+			// Log error but continue
+			continue
+		}
+		visited[seed] = true
+
+		// Add text to corpus
+		text, err := extractTextFromHTML(html)
+		if err == nil {
+			cleanedText := ingestion.CleanText(text)
+			hash := computeHash(cleanedText)
+			corpusParts = append(corpusParts, cleanedText)
+			sources = append(sources, types.Source{
+				URL:       seed,
+				Timestamp: time.Now().UTC().Format(time.RFC3339),
+				Hash:      hash,
+			})
 		}
 
-		cleanedText := ingestion.CleanText(text)
-		hash := computeHash(cleanedText)
+		// Extract links for Phase 2
+		pageLinks, err := ExtractLinks(html, seed)
+		if err == nil {
+			allLinks = append(allLinks, pageLinks...)
+		}
+	}
 
+	// If we've reached maxPages just with seeds, return early
+	if len(sources) >= maxPages {
+		corpus := strings.Join(corpusParts, "\n\n---\n\n")
 		return &types.CompanyCorpus{
-			Corpus: cleanedText,
-			Sources: []types.Source{
-				{
-					URL:       seedURL,
-					Timestamp: time.Now().UTC().Format(time.RFC3339),
-					Hash:      hash,
-				},
-			},
+			Corpus:  corpus,
+			Sources: sources,
 		}, nil
 	}
 
-	// Classify links
-	classified, err := ClassifyLinks(ctx, links, apiKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to classify links: %w", err)
-	}
-
-	// Select pages to crawl based on classification
-	selectedURLs := selectPages(classified, maxPages, seedURL)
-
-	// Crawl selected pages
-	var corpusParts []string
-	sources := make([]types.Source, 0)
-
-	// Always include homepage
-	homepageText, err := extractTextFromHTML(homepageHTML)
-	if err != nil {
-		return nil, &CrawlError{
-			Message: "failed to extract text from homepage",
-			Cause:   err,
-		}
-	}
-	cleanedHomepageText := ingestion.CleanText(homepageText)
-	homepageHash := computeHash(cleanedHomepageText)
-	corpusParts = append(corpusParts, cleanedHomepageText)
-	sources = append(sources, types.Source{
-		URL:       seedURL,
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		Hash:      homepageHash,
-	})
-
-	// Crawl additional pages
-	visited := map[string]bool{seedURL: true}
-	for _, pageURL := range selectedURLs {
-		if visited[pageURL] {
-			continue
-		}
-		visited[pageURL] = true
-
-		// Rate limiting
-		time.Sleep(DefaultRateLimitDelay)
-
-		// Fetch page
-		pageHTML, err := fetchHTML(pageURL)
-		if err != nil {
-			// Log error but continue with other pages
-			continue
+	// Phase 2: Classify and select more pages if needed
+	if len(allLinks) > 0 {
+		// Limit candidate links to top 50, deduped
+		uniqueLinks := make([]string, 0)
+		linkSeen := make(map[string]bool)
+		for _, l := range allLinks {
+			if !linkSeen[l] && !visited[l] {
+				uniqueLinks = append(uniqueLinks, l)
+				linkSeen[l] = true
+			}
 		}
 
-		// Extract text
-		pageText, err := extractTextFromHTML(pageHTML)
-		if err != nil {
-			continue
+		maxCandidates := 30
+		if len(uniqueLinks) > maxCandidates {
+			uniqueLinks = uniqueLinks[:maxCandidates]
 		}
 
-		cleanedPageText := ingestion.CleanText(pageText)
-		pageHash := computeHash(cleanedPageText)
+		if len(uniqueLinks) > 0 {
+			classified, err := ClassifyLinks(ctx, uniqueLinks, apiKey)
+			if err == nil {
+				// Use the first valid seed as "homepage" for exclusion logic (best effort)
+				selectedURLs := selectPages(classified, maxPages-len(sources), validSeeds[0])
 
-		corpusParts = append(corpusParts, cleanedPageText)
-		sources = append(sources, types.Source{
-			URL:       pageURL,
-			Timestamp: time.Now().UTC().Format(time.RFC3339),
-			Hash:      pageHash,
-		})
+				for _, pageURL := range selectedURLs {
+					if visited[pageURL] {
+						continue
+					}
+					visited[pageURL] = true
+
+					time.Sleep(DefaultRateLimitDelay)
+
+					html, err := fetchHTML(pageURL)
+					if err != nil {
+						continue
+					}
+
+					text, err := extractTextFromHTML(html)
+					if err == nil {
+						cleanedText := ingestion.CleanText(text)
+						hash := computeHash(cleanedText)
+						corpusParts = append(corpusParts, cleanedText)
+						sources = append(sources, types.Source{
+							URL:       pageURL,
+							Timestamp: time.Now().UTC().Format(time.RFC3339),
+							Hash:      hash,
+						})
+					}
+				}
+			}
+		}
 	}
 
 	// Concatenate corpus with separators
