@@ -137,4 +137,3 @@ func TestSummarizeVoice_MissingAPIKey(t *testing.T) {
 	assert.ErrorAs(t, err, &apiErr)
 	assert.Contains(t, err.Error(), "API key is required")
 }
-

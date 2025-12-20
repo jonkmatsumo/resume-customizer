@@ -49,4 +49,3 @@ func (e *ValidationError) Error() string {
 	}
 	return fmt.Sprintf("validation error: %s", e.Message)
 }
-

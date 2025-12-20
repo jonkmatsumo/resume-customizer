@@ -14,7 +14,6 @@ type Source struct {
 // Note: The Corpus field is primarily for testing/metadata purposes.
 // The CLI writes the corpus text directly to a .txt file.
 type CompanyCorpus struct {
-	Corpus  string   `json:"corpus"`  // Concatenated text (for JSON representation, but primary output is .txt file)
+	Corpus  string   `json:"corpus"` // Concatenated text (for JSON representation, but primary output is .txt file)
 	Sources []Source `json:"sources"`
 }
-

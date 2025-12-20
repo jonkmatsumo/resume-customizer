@@ -53,4 +53,3 @@ func (e *ClassificationError) Error() string {
 func (e *ClassificationError) Unwrap() error {
 	return e.Cause
 }
-

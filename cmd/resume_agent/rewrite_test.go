@@ -330,4 +330,3 @@ func TestRewriteCommand_ValidInput(t *testing.T) {
 		assert.NotNil(t, bullet.StyleChecks)
 	}
 }
-

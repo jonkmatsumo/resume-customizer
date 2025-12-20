@@ -42,4 +42,3 @@ func TestClassifyLinks_RealAPI(t *testing.T) {
 		assert.Contains(t, classifiedMap, link, "link %s should be classified", link)
 	}
 }
-

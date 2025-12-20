@@ -163,4 +163,3 @@ func parseClassificationResponse(responseText string, originalLinks []string) ([
 
 	return result, nil
 }
-

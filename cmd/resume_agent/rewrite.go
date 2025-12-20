@@ -9,9 +9,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/jonathan/resume-customizer/internal/rewriting"
 	"github.com/jonathan/resume-customizer/internal/schemas"
 	"github.com/jonathan/resume-customizer/internal/types"
-	"github.com/jonathan/resume-customizer/internal/rewriting"
 	"github.com/spf13/cobra"
 )
 
@@ -23,11 +23,11 @@ var rewriteCmd = &cobra.Command{
 }
 
 var (
-	rewriteSelectedFile      string
-	rewriteJobProfileFile    string
+	rewriteSelectedFile       string
+	rewriteJobProfileFile     string
 	rewriteCompanyProfileFile string
-	rewriteOutputFile        string
-	rewriteAPIKey            string
+	rewriteOutputFile         string
+	rewriteAPIKey             string
 )
 
 func init() {
@@ -147,4 +147,3 @@ func runRewrite(_ *cobra.Command, _ []string) error {
 
 	return nil
 }
-

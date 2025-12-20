@@ -1,0 +1,48 @@
+{
+  "stories": [
+    {
+      "id": "story_001",
+      "company": "Acme Corp",
+      "role": "Senior Software Engineer",
+      "start_date": "2022-01",
+      "end_date": "2024-01",
+      "bullets": [
+        {
+          "id": "bullet_001",
+          "text": "Built distributed system with Go and Kubernetes handling 1M+ requests/day",
+          "skills": ["Go", "Kubernetes", "Distributed Systems"],
+          "metrics": "1M+ requests/day",
+          "length_chars": 67,
+          "evidence_strength": "high",
+          "risk_flags": []
+        },
+        {
+          "id": "bullet_002",
+          "text": "Designed microservices architecture reducing latency by 40%",
+          "skills": ["Architecture", "Microservices"],
+          "length_chars": 54,
+          "evidence_strength": "high",
+          "risk_flags": []
+        }
+      ]
+    },
+    {
+      "id": "story_002",
+      "company": "Tech Startup",
+      "role": "Software Engineer",
+      "start_date": "2020-01",
+      "end_date": "2022-01",
+      "bullets": [
+        {
+          "id": "bullet_003",
+          "text": "Led team of 5 engineers delivering 3 major features on schedule",
+          "skills": ["Leadership"],
+          "length_chars": 61,
+          "evidence_strength": "medium",
+          "risk_flags": []
+        }
+      ]
+    }
+  ]
+}
+

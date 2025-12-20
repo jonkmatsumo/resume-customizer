@@ -341,4 +341,3 @@ func TestMaterializeCommand_BulletNotFound(t *testing.T) {
 	assert.Contains(t, string(output), "failed to materialize bullets")
 	assert.Contains(t, string(output), "bullet not found")
 }
-

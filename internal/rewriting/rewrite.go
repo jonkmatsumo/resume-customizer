@@ -240,4 +240,3 @@ func postProcessBullet(rewrittenText string, originalBullet types.SelectedBullet
 		},
 	}, nil
 }
-

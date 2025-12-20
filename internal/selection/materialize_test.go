@@ -415,4 +415,3 @@ func TestMaterializeBullets_EmptyMetrics(t *testing.T) {
 	require.Len(t, result.Bullets, 1)
 	assert.Equal(t, "", result.Bullets[0].Metrics)
 }
-

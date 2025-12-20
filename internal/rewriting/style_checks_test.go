@@ -90,7 +90,7 @@ func TestCheckTargetLength(t *testing.T) {
 		expected        bool
 	}{
 		{"Exact match", 50, 50, true},
-		{"Within tolerance - slightly longer", 55, 50, true}, // 10% longer
+		{"Within tolerance - slightly longer", 55, 50, true},  // 10% longer
 		{"Within tolerance - slightly shorter", 45, 50, true}, // 10% shorter
 		{"Too long", 100, 50, false},
 		{"Too short", 10, 50, false},
@@ -113,13 +113,13 @@ func TestValidateStyle(t *testing.T) {
 	}
 
 	tests := []struct {
-		name             string
-		rewrittenText    string
-		originalLength   int
-		expectedStrong   bool
-		expectedQuant    bool
-		expectedNoTaboo  bool
-		expectedLength   bool
+		name            string
+		rewrittenText   string
+		originalLength  int
+		expectedStrong  bool
+		expectedQuant   bool
+		expectedNoTaboo bool
+		expectedLength  bool
 	}{
 		{
 			name:            "All checks pass",
@@ -173,8 +173,8 @@ func TestValidateStyle(t *testing.T) {
 
 func TestEstimateLines(t *testing.T) {
 	tests := []struct {
-		name         string
-		lengthChars  int
+		name          string
+		lengthChars   int
 		expectedLines int
 	}{
 		{"Short text", 45, 1},
@@ -215,4 +215,3 @@ func TestComputeLengthChars(t *testing.T) {
 		})
 	}
 }
-

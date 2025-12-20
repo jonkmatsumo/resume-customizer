@@ -13,13 +13,13 @@ import (
 
 func TestCompanyProfile_JSONMarshaling(t *testing.T) {
 	profile := CompanyProfile{
-		Company:      "Acme Corp",
-		Tone:         "direct, metric-driven",
-		StyleRules:   []string{"Lead with quantified impact", "Avoid marketing jargon", "Use active voice"},
-		TabooPhrases: []string{"synergy", "ninja", "rockstar"},
+		Company:       "Acme Corp",
+		Tone:          "direct, metric-driven",
+		StyleRules:    []string{"Lead with quantified impact", "Avoid marketing jargon", "Use active voice"},
+		TabooPhrases:  []string{"synergy", "ninja", "rockstar"},
 		DomainContext: "B2B SaaS, infrastructure",
-		Values:       []string{"Ownership", "Customer obsession"},
-		EvidenceURLs: []string{"https://company.com/values", "https://company.com/culture"},
+		Values:        []string{"Ownership", "Customer obsession"},
+		EvidenceURLs:  []string{"https://company.com/values", "https://company.com/culture"},
 	}
 
 	jsonBytes, err := json.MarshalIndent(profile, "", "  ")
@@ -93,4 +93,3 @@ func TestCompanyProfile_RequiredFields(t *testing.T) {
 	assert.NotEmpty(t, unmarshaledProfile.Values)
 	assert.NotEmpty(t, unmarshaledProfile.EvidenceURLs)
 }
-

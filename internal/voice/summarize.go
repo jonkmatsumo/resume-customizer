@@ -215,4 +215,3 @@ func postProcessProfile(profile *types.CompanyProfile, sources []types.Source) e
 
 	return nil
 }
-

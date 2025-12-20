@@ -20,10 +20,10 @@ var crawlBrandCmd = &cobra.Command{
 }
 
 var (
-	crawlBrandSeedURL string
-	crawlBrandMaxPages int
+	crawlBrandSeedURL   string
+	crawlBrandMaxPages  int
 	crawlBrandOutputDir string
-	crawlBrandAPIKey   string
+	crawlBrandAPIKey    string
 )
 
 func init() {
@@ -86,4 +86,3 @@ func runCrawlBrand(_ *cobra.Command, _ []string) error {
 
 	return nil
 }
-

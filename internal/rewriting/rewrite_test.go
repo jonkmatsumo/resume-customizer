@@ -183,4 +183,3 @@ func TestPostProcessBullet_NoCompanyProfile(t *testing.T) {
 	assert.Equal(t, rewrittenText, rewritten.FinalText)
 	assert.NotNil(t, rewritten.StyleChecks)
 }
-

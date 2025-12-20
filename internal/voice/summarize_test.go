@@ -278,4 +278,3 @@ func TestPostProcessProfile_EmptyValues(t *testing.T) {
 	assert.ErrorAs(t, err, &validationErr)
 	assert.Equal(t, "values", validationErr.Field)
 }
-

@@ -1,0 +1,41 @@
+{
+  "bullets": [
+    {
+      "original_bullet_id": "bullet_001",
+      "final_text": "Built distributed system with Go and Kubernetes handling 1M+ requests/day",
+      "length_chars": 67,
+      "estimated_lines": 1,
+      "style_checks": {
+        "strong_verb": true,
+        "quantified": true,
+        "no_taboo": true,
+        "target_length": true
+      }
+    },
+    {
+      "original_bullet_id": "bullet_002",
+      "final_text": "Designed microservices architecture reducing latency by 40%",
+      "length_chars": 54,
+      "estimated_lines": 1,
+      "style_checks": {
+        "strong_verb": true,
+        "quantified": true,
+        "no_taboo": true,
+        "target_length": true
+      }
+    },
+    {
+      "original_bullet_id": "bullet_003",
+      "final_text": "Led team of 5 engineers delivering 3 major features on schedule",
+      "length_chars": 61,
+      "estimated_lines": 1,
+      "style_checks": {
+        "strong_verb": true,
+        "quantified": true,
+        "no_taboo": true,
+        "target_length": true
+      }
+    }
+  ]
+}
+

@@ -149,4 +149,3 @@ func TestCrawlBrandCommand_ValidInput(t *testing.T) {
 		assert.NoError(t, err, "sources file should exist")
 	}
 }
-

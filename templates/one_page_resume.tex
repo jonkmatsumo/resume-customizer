@@ -1,0 +1,59 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{hyperref}
+
+% Page geometry: tight margins for one-page constraint
+\geometry{
+    left=0.5in,
+    right=0.5in,
+    top=0.5in,
+    bottom=0.5in,
+    marginparwidth=0pt,
+    marginparsep=0pt
+}
+
+% Disable page numbering
+\pagestyle{empty}
+
+% Tighten spacing
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+\setlength{\itemsep}{0pt}
+\setlength{\topsep}{0pt}
+\setlength{\partopsep}{0pt}
+\setlength{\parsep}{0pt}
+
+% Custom bullet spacing
+\setlist[itemize]{leftmargin=*,itemsep=2pt,parsep=0pt,topsep=2pt}
+
+\begin{document}
+
+% Header Section
+\begin{center}
+    {\huge\textbf{{{.Name}}}}\\[0.3cm]
+    {{if .Email}}\texttt{{{.Email}}}{{if .Phone}} | {{{.Phone}}}{{end}}{{else}}{{if .Phone}}{{{.Phone}}}{{end}}{{end}}
+\end{center}
+
+\vspace{0.2cm}
+
+% Experience Section
+\section*{Experience}
+
+{{range .Experience}}
+\textbf{{{.Role}}} \hfill {{if .StartDate}}{{{.StartDate}}}{{end}}{{if and .StartDate .EndDate}} -- {{end}}{{if .EndDate}}{{{.EndDate}}}{{end}}\\
+\textit{{{.Company}}}
+
+\begin{itemize}
+{{range .Bullets}}
+    \item {{{.}}}
+{{end}}
+\end{itemize}
+
+\vspace{0.15cm}
+{{end}}
+
+\end{document}
+

@@ -263,4 +263,3 @@ We avoid marketing jargon. Domain: B2B SaaS infrastructure.`
 	assert.NotEmpty(t, profile.EvidenceURLs)
 	assert.Len(t, profile.EvidenceURLs, 2)
 }
-

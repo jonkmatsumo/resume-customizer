@@ -142,4 +142,3 @@ func EstimateLines(lengthChars int) int {
 func ComputeLengthChars(text string) int {
 	return len(text)
 }
-
