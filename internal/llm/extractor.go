@@ -68,16 +68,46 @@ func BuildExtractionPrompt(schema ExtractionSchema, inputText string) string {
 // --- Predefined Schemas ---
 
 // JobRequirementsSchema returns the extraction schema for job postings.
-// Extracts team context, requirements, responsibilities, and administrative metadata.
+// Extracts company info, level detection, team context, requirements, and responsibilities.
 func JobRequirementsSchema() ExtractionSchema {
 	return ExtractionSchema{
 		Name: "JobRequirements",
 		Description: `You are an expert job posting parser. COPY TEXT VERBATIM - do not paraphrase, summarize, or reword.
 Your task is to extract and categorize information from a raw job posting.
 IMPORTANT: Preserve the exact wording from the original text.
-Goal: Extract team context, requirements, responsibilities, and administrative metadata.
+Goal: Extract company info, position level, team context, requirements, and responsibilities.
 EXCLUDE: Application form fields, EEO statements, legal disclaimers, generic "About Company" boilerplate.`,
 		Fields: []SchemaField{
+			{
+				Name:        "company",
+				Type:        "\"string\"",
+				Description: "Company name hiring for this position",
+				Required:    false,
+			},
+			{
+				Name:        "company_domain",
+				Type:        "\"string\"",
+				Description: "Company website domain (e.g., 'doordash.com', 'netflix.com')",
+				Required:    false,
+			},
+			{
+				Name:        "title",
+				Type:        "\"string\"",
+				Description: "Exact job title from the posting",
+				Required:    false,
+			},
+			{
+				Name:        "level",
+				Type:        "\"string\"",
+				Description: "Inferred seniority level: junior, mid, senior, staff, principal, lead, manager",
+				Required:    false,
+			},
+			{
+				Name:        "level_signals",
+				Type:        "[\"string\"]",
+				Description: "Phrases that indicate seniority (e.g., 'mentor junior engineers', '8+ years', 'lead projects')",
+				Required:    false,
+			},
 			{
 				Name:        "team_context",
 				Type:        "\"string\"",

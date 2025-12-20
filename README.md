@@ -15,7 +15,7 @@ The system utilizes specialized AI agents to handle different stages of the proc
 
 ## 2. The Multi-Agent Workflow
 
-The pipeline orchestrates specialized agents that pass validated data between stages to ensure the final resume meets both job requirements and physical layout constraints.
+The pipeline orchestrates specialized agents that pass validated data between stages. **Orange nodes** indicate LLM-powered decision making, while **blue nodes** are deterministic tools.
 
 ```mermaid
 graph TD
@@ -75,7 +75,82 @@ graph TD
     style FinalResume fill:#d4edda
     style Violations fill:#fff3cd
     style CheckViolations fill:#fff3cd
+    
+    %% LLM-powered steps (orange)
+    style ParseJob fill:#ffe6cc
+    style SummarizeVoice fill:#ffe6cc
+    style Rewrite fill:#ffe6cc
+    style Repair fill:#ffe6cc
+    
+    %% Deterministic tools (blue)
+    style IngestJob fill:#cce5ff
+    style RankStories fill:#cce5ff
+    style SelectPlan fill:#cce5ff
+    style RenderLaTeX fill:#cce5ff
+    style Validate fill:#cce5ff
 ```
+
+### Research Pipeline (Detail of IngestJob → Research)
+
+This diagram expands the job ingestion and company research workflow from the main pipeline above:
+
+```mermaid
+flowchart TD
+    subgraph "Job Ingestion"
+        A[Job Posting URL] --> B[IngestFromURL]
+        B --> C[LLM: Extract JobContext]
+        
+        C --> D[Requirements]
+        C --> E[Responsibilities]
+        C --> F[Level & Signals]
+        C --> T[Team Notes]
+        C --> S[Seed URLs]
+        
+        D --> JP[JobProfile]
+        E --> JP
+        F --> JP
+        T --> JP
+    end
+    
+    subgraph "Company Research"
+        S --> FL[LLM: Filter Links]
+        FL -->|Kept| FR[URL Frontier]
+        FL -->|Skip| SK[Skipped: third-party]
+        
+        FR --> FE[Fetch Page]
+        FE --> EX[LLM: Extract Brand Signals]
+        EX --> BG{Budget > 0?}
+        BG -->|Yes| SE[Search & Expand]
+        SE --> FL2[LLM: Filter New Links]
+        FL2 --> FR
+        BG -->|No| AG[Aggregate Corpus]
+        
+        T -.->|shared| AG
+        AG --> SV[LLM: Summarize Voice]
+        SV --> CP[Company Profile]
+    end
+    
+    JP --> OUT[To Resume Pipeline]
+    CP --> OUT
+    
+    style C fill:#ffe6cc
+    style FL fill:#ffe6cc
+    style FL2 fill:#ffe6cc
+    style EX fill:#ffe6cc
+    style SV fill:#ffe6cc
+    
+    style B fill:#cce5ff
+    style FE fill:#cce5ff
+    style AG fill:#cce5ff
+```
+
+**Legend:** 🟠 Orange = LLM-powered | 🔵 Blue = Deterministic
+
+**Data Flow:**
+- **JobProfile** combines: Requirements, Responsibilities, Level/Signals, Team Notes
+- **Team Notes** are shared with Company Research for context enrichment
+- **Company Profile** feeds into bullet rewriting for voice matching
+
 
 ---
 

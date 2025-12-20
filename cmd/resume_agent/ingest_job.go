@@ -17,10 +17,11 @@ var ingestJobCmd = &cobra.Command{
 }
 
 var (
-	textFile string
-	urlStr   string
-	outDir   string
-	verbose  bool
+	textFile   string
+	urlStr     string
+	outDir     string
+	verbose    bool
+	useBrowser bool
 )
 
 func init() {
@@ -28,6 +29,7 @@ func init() {
 	ingestJobCmd.Flags().StringVarP(&urlStr, "url", "u", "", "URL to fetch job posting from")
 	ingestJobCmd.Flags().StringVarP(&outDir, "out", "o", "", "Output directory (required)")
 	ingestJobCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Print detailed debug information")
+	ingestJobCmd.Flags().BoolVar(&useBrowser, "use-browser", false, "Use headless browser for SPA sites (requires Chrome)")
 
 	ingestJobCmd.Flags().StringVar(&runAPIKey, "api-key", "", "Gemini API Key (optional, defaults to GEMINI_API_KEY env var) - required for HTML extraction")
 
@@ -65,8 +67,8 @@ func runIngestJob(cmd *cobra.Command, _ []string) error {
 			return fmt.Errorf("failed to ingest from file: %w", err)
 		}
 	} else {
-		// URL ingestion with platform detection and LLM extraction
-		cleanedText, metadata, err = ingestion.IngestFromURL(ctx, urlStr, apiKey, verbose)
+		// URL ingestion with platform detection, LLM extraction, and optional browser fallback
+		cleanedText, metadata, err = ingestion.IngestFromURL(ctx, urlStr, apiKey, useBrowser, verbose)
 		if err != nil {
 			return fmt.Errorf("failed to ingest from URL: %w", err)
 		}

@@ -21,8 +21,9 @@ var (
 // IngestFromURL fetches content from a URL, extracts text, cleans it, and returns cleaned text with metadata.
 // It uses platform detection to apply platform-specific selectors for better content extraction.
 // If apiKey is provided, it uses LLM to extract structured job requirements.
+// If useBrowser is true, falls back to headless browser for SPA sites with insufficient content.
 // If verbose is true, logs detailed information about the extraction process.
-func IngestFromURL(ctx context.Context, urlStr string, apiKey string, verbose bool) (string, *Metadata, error) {
+func IngestFromURL(ctx context.Context, urlStr string, apiKey string, useBrowser bool, verbose bool) (string, *Metadata, error) {
 	// Detect platform for platform-specific selectors
 	platform := fetch.DetectPlatform(urlStr)
 	if verbose {
@@ -54,6 +55,33 @@ func IngestFromURL(ctx context.Context, urlStr string, apiKey string, verbose bo
 	}
 	if verbose {
 		log.Printf("[VERBOSE] Extracted text: %d chars", len(textContent))
+	}
+
+	// Check if we should use browser fallback for SPA sites
+	if useBrowser && fetch.ShouldUseBrowser(textContent) {
+		if verbose {
+			log.Printf("[VERBOSE] Content too short (%d chars < %d), falling back to browser rendering...",
+				len(textContent), fetch.MinContentLength)
+		}
+
+		// Fetch with headless browser
+		browserHTML, browserErr := fetch.BrowserSimple(ctx, urlStr, verbose)
+		if browserErr != nil {
+			if verbose {
+				log.Printf("[VERBOSE] Browser rendering failed: %v, using HTTP content", browserErr)
+			}
+			// Continue with HTTP content if browser fails
+		} else {
+			// Re-extract from browser-rendered HTML
+			textContent, err = fetch.ExtractMainText(browserHTML, contentSelectors, noiseSelectors...)
+			if err != nil {
+				if verbose {
+					log.Printf("[VERBOSE] Browser content extraction failed: %v", err)
+				}
+			} else if verbose {
+				log.Printf("[VERBOSE] Browser extracted text: %d chars", len(textContent))
+			}
+		}
 	}
 
 	// Clean text

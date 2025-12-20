@@ -10,7 +10,19 @@ import (
 
 // ExtractedContent represents the structured output from the ingestion LLM
 type ExtractedContent struct {
-	TeamContext      string            `json:"team_context,omitempty"`
+	// Company metadata
+	Company       string `json:"company,omitempty"`
+	CompanyDomain string `json:"company_domain,omitempty"` // e.g., "doordash.com"
+
+	// Position metadata
+	Title        string   `json:"title,omitempty"`
+	Level        string   `json:"level,omitempty"`         // junior, mid, senior, staff, principal, lead
+	LevelSignals []string `json:"level_signals,omitempty"` // Phrases indicating level
+
+	// Team context
+	TeamContext string `json:"team_context,omitempty"`
+
+	// Core content
 	Requirements     []string          `json:"requirements"`
 	Responsibilities []string          `json:"responsibilities"`
 	NiceToHave       []string          `json:"nice_to_have,omitempty"`

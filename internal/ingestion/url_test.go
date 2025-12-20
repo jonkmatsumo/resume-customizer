@@ -26,7 +26,7 @@ func TestIngestFromURL_InvalidURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, err := IngestFromURL(context.Background(), tt.urlStr, "", false)
+			_, _, err := IngestFromURL(context.Background(), tt.urlStr, "", false, false)
 			if tt.wantErr {
 				assert.Error(t, err)
 			}
@@ -53,7 +53,7 @@ func TestIngestFromURL_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cleanedText, metadata, err := IngestFromURL(context.Background(), server.URL, "", false)
+	cleanedText, metadata, err := IngestFromURL(context.Background(), server.URL, "", false, false)
 	require.NoError(t, err)
 
 	assert.NotEmpty(t, cleanedText)
@@ -73,13 +73,13 @@ func TestIngestFromURL_HTTPError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, _, err := IngestFromURL(context.Background(), server.URL, "", false)
+	_, _, err := IngestFromURL(context.Background(), server.URL, "", false, false)
 	assert.Error(t, err)
 }
 
 func TestIngestFromURL_NetworkError(t *testing.T) {
 	// Use invalid URL that will fail to connect
-	_, _, err := IngestFromURL(context.Background(), "http://localhost:99999/nonexistent", "", false)
+	_, _, err := IngestFromURL(context.Background(), "http://localhost:99999/nonexistent", "", false, false)
 	assert.Error(t, err)
 }
 
@@ -218,7 +218,7 @@ func TestIngestFromURL_WithTestFixtures(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cleanedText, metadata, err := IngestFromURL(context.Background(), server.URL, "", false)
+	cleanedText, metadata, err := IngestFromURL(context.Background(), server.URL, "", false, false)
 	require.NoError(t, err)
 
 	assert.NotEmpty(t, cleanedText)
