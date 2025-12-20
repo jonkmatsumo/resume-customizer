@@ -145,3 +145,94 @@ func TestSelectedBullets_EmptyBullets(t *testing.T) {
 	assert.Contains(t, string(jsonBytes), `"bullets":[]`)
 }
 
+func TestRewrittenBullet_JSONMarshaling(t *testing.T) {
+	bullet := RewrittenBullet{
+		OriginalBulletID: "bullet_001",
+		FinalText:        "Built Go microservices handling 1M+ requests/day",
+		LengthChars:      45,
+		EstimatedLines:   1,
+		StyleChecks: StyleChecks{
+			StrongVerb:   true,
+			Quantified:   true,
+			NoTaboo:      true,
+			TargetLength: true,
+		},
+	}
+
+	jsonBytes, err := json.MarshalIndent(bullet, "", "  ")
+	require.NoError(t, err)
+	assert.Contains(t, string(jsonBytes), `"original_bullet_id": "bullet_001"`)
+	assert.Contains(t, string(jsonBytes), `"final_text": "Built Go microservices handling 1M+ requests/day"`)
+	assert.Contains(t, string(jsonBytes), `"length_chars": 45`)
+	assert.Contains(t, string(jsonBytes), `"estimated_lines": 1`)
+	assert.Contains(t, string(jsonBytes), `"style_checks"`)
+	assert.Contains(t, string(jsonBytes), `"strong_verb": true`)
+	assert.Contains(t, string(jsonBytes), `"quantified": true`)
+	assert.Contains(t, string(jsonBytes), `"no_taboo": true`)
+	assert.Contains(t, string(jsonBytes), `"target_length": true`)
+
+	var unmarshaledBullet RewrittenBullet
+	err = json.Unmarshal(jsonBytes, &unmarshaledBullet)
+	require.NoError(t, err)
+	assert.Equal(t, bullet, unmarshaledBullet)
+}
+
+func TestRewrittenBullets_JSONMarshaling(t *testing.T) {
+	bullets := RewrittenBullets{
+		Bullets: []RewrittenBullet{
+			{
+				OriginalBulletID: "bullet_001",
+				FinalText:        "Bullet 1 rewritten",
+				LengthChars:      20,
+				EstimatedLines:   1,
+				StyleChecks: StyleChecks{
+					StrongVerb:   true,
+					Quantified:   false,
+					NoTaboo:      true,
+					TargetLength: true,
+				},
+			},
+			{
+				OriginalBulletID: "bullet_002",
+				FinalText:        "Bullet 2 rewritten",
+				LengthChars:      25,
+				EstimatedLines:   1,
+				StyleChecks: StyleChecks{
+					StrongVerb:   true,
+					Quantified:   true,
+					NoTaboo:      true,
+					TargetLength: false,
+				},
+			},
+		},
+	}
+
+	jsonBytes, err := json.MarshalIndent(bullets, "", "  ")
+	require.NoError(t, err)
+	assert.Contains(t, string(jsonBytes), `"bullets": [`)
+	assert.Contains(t, string(jsonBytes), `"original_bullet_id": "bullet_001"`)
+	assert.Contains(t, string(jsonBytes), `"original_bullet_id": "bullet_002"`)
+
+	var unmarshaledBullets RewrittenBullets
+	err = json.Unmarshal(jsonBytes, &unmarshaledBullets)
+	require.NoError(t, err)
+	assert.Equal(t, bullets, unmarshaledBullets)
+}
+
+func TestStyleChecks_JSONMarshaling(t *testing.T) {
+	styleChecks := StyleChecks{
+		StrongVerb:   true,
+		Quantified:   false,
+		NoTaboo:      true,
+		TargetLength: false,
+	}
+
+	jsonBytes, err := json.Marshal(styleChecks)
+	require.NoError(t, err)
+
+	var unmarshaled StyleChecks
+	err = json.Unmarshal(jsonBytes, &unmarshaled)
+	require.NoError(t, err)
+	assert.Equal(t, styleChecks, unmarshaled)
+}
+

@@ -1,0 +1,27 @@
+{
+  "bullets": [
+    {
+      "id": "bullet_001",
+      "story_id": "story_001",
+      "text": "Built a distributed system with Go and Kubernetes",
+      "skills": ["Go", "Kubernetes", "Distributed Systems"],
+      "metrics": "1M requests/day",
+      "length_chars": 47
+    },
+    {
+      "id": "bullet_002",
+      "story_id": "story_001",
+      "text": "Designed microservices architecture",
+      "skills": ["Architecture", "Microservices"],
+      "length_chars": 33
+    },
+    {
+      "id": "bullet_003",
+      "story_id": "story_002",
+      "text": "Led team of 5 engineers",
+      "skills": ["Leadership"],
+      "length_chars": 23
+    }
+  ]
+}
+

@@ -1,0 +1,41 @@
+{
+  "company": "Acme Corp",
+  "role_title": "Senior Software Engineer",
+  "responsibilities": [
+    "Design and implement distributed systems",
+    "Lead technical initiatives",
+    "Mentor junior engineers"
+  ],
+  "hard_requirements": [
+    {
+      "skill": "Go",
+      "level": "3+ years",
+      "evidence": "3+ years experience with Go"
+    },
+    {
+      "skill": "Distributed Systems",
+      "level": "5+ years",
+      "evidence": "5+ years building distributed systems"
+    }
+  ],
+  "nice_to_haves": [
+    {
+      "skill": "Kubernetes",
+      "level": "2+ years",
+      "evidence": "Experience with Kubernetes preferred"
+    }
+  ],
+  "keywords": [
+    "microservices",
+    "distributed systems",
+    "cloud infrastructure"
+  ],
+  "eval_signals": {
+    "latency": true,
+    "ownership": true,
+    "reliability": true,
+    "scale": false,
+    "collaboration": true
+  }
+}
+
