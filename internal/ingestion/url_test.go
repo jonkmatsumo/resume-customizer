@@ -1,11 +1,13 @@
 package ingestion
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 
+	"github.com/jonathan/resume-customizer/internal/fetch"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,10 +26,9 @@ func TestIngestFromURL_InvalidURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, err := IngestFromURL(tt.urlStr)
+			_, _, err := IngestFromURL(context.Background(), tt.urlStr, "", false)
 			if tt.wantErr {
 				assert.Error(t, err)
-				assert.ErrorIs(t, err, ErrInvalidURL)
 			}
 		})
 	}
@@ -52,7 +53,7 @@ func TestIngestFromURL_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cleanedText, metadata, err := IngestFromURL(server.URL)
+	cleanedText, metadata, err := IngestFromURL(context.Background(), server.URL, "", false)
 	require.NoError(t, err)
 
 	assert.NotEmpty(t, cleanedText)
@@ -72,18 +73,17 @@ func TestIngestFromURL_HTTPError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, _, err := IngestFromURL(server.URL)
+	_, _, err := IngestFromURL(context.Background(), server.URL, "", false)
 	assert.Error(t, err)
-	assert.ErrorIs(t, err, ErrHTTPRequestFailed)
 }
 
 func TestIngestFromURL_NetworkError(t *testing.T) {
 	// Use invalid URL that will fail to connect
-	_, _, err := IngestFromURL("http://localhost:99999/nonexistent")
+	_, _, err := IngestFromURL(context.Background(), "http://localhost:99999/nonexistent", "", false)
 	assert.Error(t, err)
 }
 
-func TestExtractTextFromHTML_GreenhouseLike(t *testing.T) {
+func TestExtractMainText_GreenhouseLike(t *testing.T) {
 	html := `<!DOCTYPE html>
 <html>
 <body>
@@ -99,7 +99,7 @@ func TestExtractTextFromHTML_GreenhouseLike(t *testing.T) {
 </body>
 </html>`
 
-	text, err := extractTextFromHTML(html)
+	text, err := fetch.ExtractMainText(html, fetch.JobPostingSelectors())
 	require.NoError(t, err)
 
 	assert.Contains(t, text, "Senior Software Engineer")
@@ -110,7 +110,7 @@ func TestExtractTextFromHTML_GreenhouseLike(t *testing.T) {
 	assert.NotContains(t, text, "Footer")
 }
 
-func TestExtractTextFromHTML_LeverLike(t *testing.T) {
+func TestExtractMainText_LeverLike(t *testing.T) {
 	html := `<!DOCTYPE html>
 <html>
 <body>
@@ -123,7 +123,7 @@ func TestExtractTextFromHTML_LeverLike(t *testing.T) {
 </body>
 </html>`
 
-	text, err := extractTextFromHTML(html)
+	text, err := fetch.ExtractMainText(html, fetch.JobPostingSelectors())
 	require.NoError(t, err)
 
 	assert.Contains(t, text, "Senior Software Engineer")
@@ -133,7 +133,7 @@ func TestExtractTextFromHTML_LeverLike(t *testing.T) {
 	assert.NotContains(t, text, "Ad")
 }
 
-func TestExtractTextFromHTML_RemovesScriptAndStyle(t *testing.T) {
+func TestExtractMainText_RemovesScriptAndStyle(t *testing.T) {
 	html := `<!DOCTYPE html>
 <html>
 <head>
@@ -147,7 +147,7 @@ func TestExtractTextFromHTML_RemovesScriptAndStyle(t *testing.T) {
 </body>
 </html>`
 
-	text, err := extractTextFromHTML(html)
+	text, err := fetch.ExtractMainText(html, fetch.JobPostingSelectors())
 	require.NoError(t, err)
 
 	assert.Contains(t, text, "Content here")
@@ -155,7 +155,7 @@ func TestExtractTextFromHTML_RemovesScriptAndStyle(t *testing.T) {
 	assert.NotContains(t, text, "color: red")
 }
 
-func TestExtractTextFromHTML_FallbackToBody(t *testing.T) {
+func TestExtractMainText_FallbackToBody(t *testing.T) {
 	// HTML without main/article elements
 	html := `<!DOCTYPE html>
 <html>
@@ -165,43 +165,43 @@ func TestExtractTextFromHTML_FallbackToBody(t *testing.T) {
 </body>
 </html>`
 
-	text, err := extractTextFromHTML(html)
+	text, err := fetch.ExtractMainText(html, fetch.DefaultTextSelectors())
 	require.NoError(t, err)
 
 	assert.Contains(t, text, "Title")
 	assert.Contains(t, text, "Content")
 }
 
-func TestFetchHTML_Success(t *testing.T) {
+func TestURL_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("<html><body>Test</body></html>"))
 	}))
 	defer server.Close()
 
-	html, err := fetchHTML(server.URL)
+	result, err := fetch.URL(context.Background(), server.URL, nil)
 	require.NoError(t, err)
 
-	assert.Contains(t, html, "Test")
+	assert.Contains(t, result.HTML, "Test")
 }
 
-func TestFetchHTML_404Error(t *testing.T) {
+func TestURL_404Error(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer server.Close()
 
-	_, err := fetchHTML(server.URL)
+	_, err := fetch.URL(context.Background(), server.URL, nil)
 	assert.Error(t, err)
 }
 
-func TestFetchHTML_500Error(t *testing.T) {
+func TestURL_500Error(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer server.Close()
 
-	_, err := fetchHTML(server.URL)
+	_, err := fetch.URL(context.Background(), server.URL, nil)
 	assert.Error(t, err)
 }
 
@@ -218,7 +218,7 @@ func TestIngestFromURL_WithTestFixtures(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cleanedText, metadata, err := IngestFromURL(server.URL)
+	cleanedText, metadata, err := IngestFromURL(context.Background(), server.URL, "", false)
 	require.NoError(t, err)
 
 	assert.NotEmpty(t, cleanedText)

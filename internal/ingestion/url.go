@@ -1,14 +1,12 @@
 package ingestion
 
 import (
+	"context"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
+	"log"
 	"strings"
-	"time"
 
-	"github.com/PuerkitoBio/goquery"
+	"github.com/jonathan/resume-customizer/internal/fetch"
 )
 
 var (
@@ -20,108 +18,118 @@ var (
 	ErrContentExtractionFailed = fmt.Errorf("content extraction failed")
 )
 
-// IngestFromURL fetches content from a URL, extracts text, cleans it, and returns cleaned text with metadata
-func IngestFromURL(urlStr string) (string, *Metadata, error) {
-	// Validate URL
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
-		return "", nil, fmt.Errorf("%w: %s", ErrInvalidURL, urlStr)
+// IngestFromURL fetches content from a URL, extracts text, cleans it, and returns cleaned text with metadata.
+// It uses platform detection to apply platform-specific selectors for better content extraction.
+// If apiKey is provided, it uses LLM to extract structured job requirements.
+// If verbose is true, logs detailed information about the extraction process.
+func IngestFromURL(ctx context.Context, urlStr string, apiKey string, verbose bool) (string, *Metadata, error) {
+	// Detect platform for platform-specific selectors
+	platform := fetch.DetectPlatform(urlStr)
+	if verbose {
+		log.Printf("[VERBOSE] URL: %s", urlStr)
+		log.Printf("[VERBOSE] Detected platform: %s", platform)
 	}
 
-	// Fetch HTML
-	htmlContent, err := fetchHTML(urlStr)
+	// Fetch HTML using the generic fetch package
+	result, err := fetch.URL(ctx, urlStr, nil)
 	if err != nil {
 		return "", nil, fmt.Errorf("%w: %w", ErrHTTPRequestFailed, err)
 	}
+	if verbose {
+		log.Printf("[VERBOSE] Fetched HTML: %d bytes", len(result.HTML))
+	}
 
-	// Extract text from HTML
-	textContent, err := extractTextFromHTML(htmlContent)
+	// Get platform-specific selectors
+	contentSelectors := fetch.PlatformContentSelectors(platform)
+	noiseSelectors := fetch.PlatformNoiseSelectors(platform)
+	if verbose {
+		log.Printf("[VERBOSE] Content selectors: %v", contentSelectors)
+		log.Printf("[VERBOSE] Noise selectors count: %d", len(noiseSelectors))
+	}
+
+	// Extract text from HTML using platform-specific selectors and noise removal
+	textContent, err := fetch.ExtractMainText(result.HTML, contentSelectors, noiseSelectors...)
 	if err != nil {
 		return "", nil, fmt.Errorf("%w: %w", ErrContentExtractionFailed, err)
+	}
+	if verbose {
+		log.Printf("[VERBOSE] Extracted text: %d chars", len(textContent))
 	}
 
 	// Clean text
 	cleanedText := CleanText(textContent)
+	if verbose {
+		log.Printf("[VERBOSE] Cleaned text: %d chars", len(cleanedText))
+	}
 
 	// Generate metadata
 	metadata := NewMetadata(cleanedText, urlStr)
+	metadata.Platform = string(platform)
+
+	// If API key is provided, use LLM to extract structured content
+	if apiKey != "" {
+		if verbose {
+			log.Printf("[VERBOSE] Calling LLM for structured extraction...")
+		}
+		extracted, err := ExtractWithLLM(ctx, cleanedText, apiKey)
+		if err == nil {
+			if verbose {
+				log.Printf("[VERBOSE] LLM extraction successful")
+				log.Printf("[VERBOSE] Team context: %d chars", len(extracted.TeamContext))
+				log.Printf("[VERBOSE] Requirements: %d items", len(extracted.Requirements))
+				log.Printf("[VERBOSE] Responsibilities: %d items", len(extracted.Responsibilities))
+				log.Printf("[VERBOSE] Nice to have: %d items", len(extracted.NiceToHave))
+			}
+			// Format extracted content with team context
+			cleanedText = FormatExtractedContent(extracted)
+			metadata.AdminInfo = extracted.AdminInfo
+		} else {
+			if verbose {
+				log.Printf("[VERBOSE] LLM extraction failed: %v, using cleaned text", err)
+			}
+		}
+	}
 
 	return cleanedText, metadata, nil
 }
 
-// fetchHTML fetches HTML content from a URL
-func fetchHTML(urlStr string) (string, error) {
-	client := &http.Client{
-		Timeout: 30 * time.Second,
+// FormatExtractedContent formats the structured extraction as readable text.
+func FormatExtractedContent(extracted *ExtractedContent) string {
+	var sb strings.Builder
+
+	// Team context first (important for brand voice)
+	if extracted.TeamContext != "" {
+		sb.WriteString("Team Context:\n")
+		sb.WriteString(extracted.TeamContext)
+		sb.WriteString("\n\n")
 	}
 
-	req, err := http.NewRequest("GET", urlStr, nil)
-	if err != nil {
-		return "", err
-	}
-
-	// Set user agent to avoid blocking
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ResumeAgent/1.0)")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("HTTP status %d", resp.StatusCode)
-	}
-
-	// Read response body
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	return string(bodyBytes), nil
-}
-
-// extractTextFromHTML extracts main content text from HTML, removing nav, footer, etc.
-func extractTextFromHTML(htmlContent string) (string, error) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
-	if err != nil {
-		return "", fmt.Errorf("failed to parse HTML: %w", err)
-	}
-
-	// Remove unwanted elements
-	doc.Find("nav, footer, header, script, style, .ad, .advertisement, .ads, .sidebar").Remove()
-
-	// Try to find main content using common selectors (in priority order)
-	var mainContent *goquery.Selection
-
-	selectors := []string{
-		"main",
-		"article",
-		".job-description",
-		".job-content",
-		"#job-description",
-		".content",
-		"#content",
-	}
-
-	for _, selector := range selectors {
-		if selection := doc.Find(selector); selection.Length() > 0 {
-			mainContent = selection.First()
-			break
+	// Requirements
+	if len(extracted.Requirements) > 0 {
+		sb.WriteString("Requirements:\n")
+		for _, req := range extracted.Requirements {
+			sb.WriteString("- " + req + "\n")
 		}
+		sb.WriteString("\n")
 	}
 
-	// Fallback to body (minus nav/footer which we already removed)
-	if mainContent == nil {
-		mainContent = doc.Find("body")
+	// Responsibilities
+	if len(extracted.Responsibilities) > 0 {
+		sb.WriteString("Responsibilities:\n")
+		for _, resp := range extracted.Responsibilities {
+			sb.WriteString("- " + resp + "\n")
+		}
+		sb.WriteString("\n")
 	}
 
-	// Extract text content
-	text := mainContent.Text()
+	// Nice to have
+	if len(extracted.NiceToHave) > 0 {
+		sb.WriteString("Nice to Have:\n")
+		for _, nth := range extracted.NiceToHave {
+			sb.WriteString("- " + nth + "\n")
+		}
+		sb.WriteString("\n")
+	}
 
-	// Clean up extra whitespace
-	text = strings.TrimSpace(text)
-
-	return text, nil
+	return sb.String()
 }

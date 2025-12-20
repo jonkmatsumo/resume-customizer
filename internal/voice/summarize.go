@@ -46,8 +46,8 @@ func SummarizeVoice(ctx context.Context, corpusText string, sources []types.Sour
 		}
 	}
 
-	// Clean markdown code blocks if present
-	responseText = cleanJSONBlock(responseText)
+	// Clean markdown code blocks if present using shared utility
+	responseText = llm.CleanJSONBlock(responseText)
 
 	// Parse JSON response
 	profile, err := parseJSONResponse(responseText)
@@ -93,22 +93,6 @@ func buildExtractionPrompt(corpusText string, sourceURLs []string) string {
 	sb.WriteString(corpusText)
 
 	return sb.String()
-}
-
-// cleanJSONBlock removes markdown code block wrappers from JSON
-func cleanJSONBlock(text string) string {
-	text = strings.TrimSpace(text)
-	if strings.HasPrefix(text, "```json") {
-		text = strings.TrimPrefix(text, "```json")
-		text = strings.TrimPrefix(text, "```")
-		text = strings.TrimSuffix(text, "```")
-		text = strings.TrimSpace(text)
-	} else if strings.HasPrefix(text, "```") {
-		text = strings.TrimPrefix(text, "```")
-		text = strings.TrimSuffix(text, "```")
-		text = strings.TrimSpace(text)
-	}
-	return text
 }
 
 // parseJSONResponse parses the JSON response into a CompanyProfile

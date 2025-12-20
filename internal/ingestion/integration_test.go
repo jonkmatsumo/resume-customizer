@@ -74,7 +74,7 @@ func TestEndToEnd_URL_MockServer(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Ingest from URL
-	cleanedText, metadata, err := IngestFromURL(server.URL)
+	cleanedText, metadata, err := IngestFromURL(context.Background(), server.URL, "", false)
 	require.NoError(t, err)
 
 	// Write output

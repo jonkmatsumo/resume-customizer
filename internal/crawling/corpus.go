@@ -4,14 +4,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
+	"github.com/jonathan/resume-customizer/internal/fetch"
 	"github.com/jonathan/resume-customizer/internal/ingestion"
 	"github.com/jonathan/resume-customizer/internal/types"
 )
@@ -23,7 +20,8 @@ const (
 	DefaultRateLimitDelay = 1 * time.Second
 )
 
-// CrawlBrandCorpus crawls a company website and builds a text corpus
+// CrawlBrandCorpus crawls a company website and builds a text corpus.
+// It now delegates to the generic fetch package for URL fetching and HTML extraction.
 func CrawlBrandCorpus(ctx context.Context, seedURLs []string, maxPages int, apiKey string) (*types.CompanyCorpus, error) {
 	if len(seedURLs) == 0 {
 		return nil, &CrawlError{
@@ -66,16 +64,16 @@ func CrawlBrandCorpus(ctx context.Context, seedURLs []string, maxPages int, apiK
 			continue
 		}
 
-		// Fetch seed page
-		html, err := fetchHTML(seed)
+		// Fetch seed page using the generic fetch package
+		result, err := fetch.URL(ctx, seed, nil)
 		if err != nil {
 			// Log error but continue
 			continue
 		}
 		visited[seed] = true
 
-		// Add text to corpus
-		text, err := extractTextFromHTML(html)
+		// Add text to corpus using company page selectors
+		text, err := fetch.ExtractMainText(result.HTML, fetch.CompanyPageSelectors())
 		if err == nil {
 			cleanedText := ingestion.CleanText(text)
 			hash := computeHash(cleanedText)
@@ -88,7 +86,7 @@ func CrawlBrandCorpus(ctx context.Context, seedURLs []string, maxPages int, apiK
 		}
 
 		// Extract links for Phase 2
-		pageLinks, err := ExtractLinks(html, seed)
+		pageLinks, err := ExtractLinks(result.HTML, seed)
 		if err == nil {
 			allLinks = append(allLinks, pageLinks...)
 		}
@@ -134,12 +132,12 @@ func CrawlBrandCorpus(ctx context.Context, seedURLs []string, maxPages int, apiK
 
 					time.Sleep(DefaultRateLimitDelay)
 
-					html, err := fetchHTML(pageURL)
+					result, err := fetch.URL(ctx, pageURL, nil)
 					if err != nil {
 						continue
 					}
 
-					text, err := extractTextFromHTML(html)
+					text, err := fetch.ExtractMainText(result.HTML, fetch.CompanyPageSelectors())
 					if err == nil {
 						cleanedText := ingestion.CleanText(text)
 						hash := computeHash(cleanedText)
@@ -189,10 +187,10 @@ func selectPages(classified []ClassifiedLink, maxPages int, homepageURL string) 
 		}
 		if urls, exists := categoryMap[category]; exists && len(urls) > 0 {
 			// Take first URL from this category
-			url := urls[0]
-			if !selectedSet[url] {
-				selected = append(selected, url)
-				selectedSet[url] = true
+			u := urls[0]
+			if !selectedSet[u] {
+				selected = append(selected, u)
+				selectedSet[u] = true
 			}
 		}
 	}
@@ -203,94 +201,19 @@ func selectPages(classified []ClassifiedLink, maxPages int, homepageURL string) 
 			break
 		}
 		if urls, exists := categoryMap[category]; exists {
-			for _, url := range urls {
+			for _, u := range urls {
 				if len(selected) >= maxPages-1 {
 					break
 				}
-				if !selectedSet[url] {
-					selected = append(selected, url)
-					selectedSet[url] = true
+				if !selectedSet[u] {
+					selected = append(selected, u)
+					selectedSet[u] = true
 				}
 			}
 		}
 	}
 
 	return selected
-}
-
-// fetchHTML fetches HTML content from a URL (reused from ingestion pattern)
-func fetchHTML(urlStr string) (string, error) {
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-
-	req, err := http.NewRequest("GET", urlStr, nil)
-	if err != nil {
-		return "", err
-	}
-
-	// Set user agent to avoid blocking
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ResumeAgent/1.0)")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("HTTP status %d", resp.StatusCode)
-	}
-
-	// Read response body
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	return string(bodyBytes), nil
-}
-
-// extractTextFromHTML extracts main content text from HTML (reused from ingestion pattern)
-func extractTextFromHTML(htmlContent string) (string, error) {
-	// Use goquery to extract text (same pattern as ingestion)
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
-	if err != nil {
-		return "", fmt.Errorf("failed to parse HTML: %w", err)
-	}
-
-	// Remove unwanted elements
-	doc.Find("nav, footer, header, script, style, .ad, .advertisement, .ads, .sidebar").Remove()
-
-	// Try to find main content using common selectors (in priority order)
-	var mainContent *goquery.Selection
-
-	selectors := []string{
-		"main",
-		"article",
-		".content",
-		"#content",
-	}
-
-	for _, selector := range selectors {
-		if selection := doc.Find(selector); selection.Length() > 0 {
-			mainContent = selection.First()
-			break
-		}
-	}
-
-	// Fallback to body (minus nav/footer which we already removed)
-	if mainContent == nil {
-		mainContent = doc.Find("body")
-	}
-
-	// Extract text content
-	text := mainContent.Text()
-
-	// Clean up extra whitespace
-	text = strings.TrimSpace(text)
-
-	return text, nil
 }
 
 // computeHash computes SHA256 hash of content and returns hex string

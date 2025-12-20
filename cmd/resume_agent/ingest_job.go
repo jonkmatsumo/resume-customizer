@@ -20,12 +20,14 @@ var (
 	textFile string
 	urlStr   string
 	outDir   string
+	verbose  bool
 )
 
 func init() {
 	ingestJobCmd.Flags().StringVarP(&textFile, "text-file", "t", "", "Path to text file containing job posting")
 	ingestJobCmd.Flags().StringVarP(&urlStr, "url", "u", "", "URL to fetch job posting from")
 	ingestJobCmd.Flags().StringVarP(&outDir, "out", "o", "", "Output directory (required)")
+	ingestJobCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Print detailed debug information")
 
 	ingestJobCmd.Flags().StringVar(&runAPIKey, "api-key", "", "Gemini API Key (optional, defaults to GEMINI_API_KEY env var) - required for HTML extraction")
 
@@ -63,14 +65,8 @@ func runIngestJob(cmd *cobra.Command, _ []string) error {
 			return fmt.Errorf("failed to ingest from file: %w", err)
 		}
 	} else {
-		// URL ingestion logic update (needs corresponding backend change)
-		// For now, URL ingestion likely doesn't support the new LLM extraction yet
-		// as IngestFromURL hasn't been updated in this plan.
-		// However, IngestFromURL is less critical for the current "HTML file" request.
-		// We'll leave it as is for now or update it if needed.
-		// Wait, IngestFromURL is not updated in text.go? Check url.go.
-		// For the purpose of this task (HTML file), we focus on IngestFromFile.
-		cleanedText, metadata, err = ingestion.IngestFromURL(urlStr)
+		// URL ingestion with platform detection and LLM extraction
+		cleanedText, metadata, err = ingestion.IngestFromURL(ctx, urlStr, apiKey, verbose)
 		if err != nil {
 			return fmt.Errorf("failed to ingest from URL: %w", err)
 		}

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/jonathan/resume-customizer/internal/fetch"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -63,7 +64,7 @@ func TestSelectPages_SkipsHomepage(t *testing.T) {
 	assert.Contains(t, selected, "https://example.com/other")
 }
 
-func TestExtractTextFromHTML_ExtractsMainContent(t *testing.T) {
+func TestExtractMainText_ExtractsMainContent(t *testing.T) {
 	html := `
 		<html>
 			<nav>Navigation</nav>
@@ -77,7 +78,7 @@ func TestExtractTextFromHTML_ExtractsMainContent(t *testing.T) {
 		</html>
 	`
 
-	text, err := extractTextFromHTML(html)
+	text, err := fetch.ExtractMainText(html, fetch.CompanyPageSelectors())
 	require.NoError(t, err)
 
 	assert.Contains(t, text, "Main Content")
@@ -86,7 +87,7 @@ func TestExtractTextFromHTML_ExtractsMainContent(t *testing.T) {
 	assert.NotContains(t, text, "Footer")
 }
 
-func TestExtractTextFromHTML_RemovesScriptsAndStyles(t *testing.T) {
+func TestExtractMainText_RemovesScriptsAndStyles(t *testing.T) {
 	html := `
 		<html>
 			<head>
@@ -99,7 +100,7 @@ func TestExtractTextFromHTML_RemovesScriptsAndStyles(t *testing.T) {
 		</html>
 	`
 
-	text, err := extractTextFromHTML(html)
+	text, err := fetch.ExtractMainText(html, fetch.DefaultTextSelectors())
 	require.NoError(t, err)
 
 	assert.Contains(t, text, "Content")

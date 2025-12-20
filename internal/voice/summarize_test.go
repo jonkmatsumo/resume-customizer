@@ -4,6 +4,7 @@ package voice
 import (
 	"testing"
 
+	"github.com/jonathan/resume-customizer/internal/llm"
 	"github.com/jonathan/resume-customizer/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,20 +40,20 @@ func TestBuildExtractionPrompt_NoSources(t *testing.T) {
 
 func TestCleanJSONBlock_PlainJSON(t *testing.T) {
 	text := `{"company": "Test", "tone": "direct"}`
-	result := cleanJSONBlock(text)
+	result := llm.CleanJSONBlock(text)
 	assert.Equal(t, text, result)
 }
 
 func TestCleanJSONBlock_WithCodeBlocks(t *testing.T) {
 	text := "```json\n{\"company\": \"Test\"}\n```"
-	result := cleanJSONBlock(text)
+	result := llm.CleanJSONBlock(text)
 	assert.Contains(t, result, "company")
 	assert.NotContains(t, result, "```")
 }
 
 func TestCleanJSONBlock_WithGenericCodeBlocks(t *testing.T) {
 	text := "```\n{\"company\": \"Test\"}\n```"
-	result := cleanJSONBlock(text)
+	result := llm.CleanJSONBlock(text)
 	assert.Contains(t, result, "company")
 	assert.NotContains(t, result, "```")
 }
