@@ -27,9 +27,9 @@ func ExtractWithLLM(ctx context.Context, text string, apiKey string) (*Extracted
 	if err != nil {
 		return nil, fmt.Errorf("failed to create genai client: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
-	model := client.GenerativeModel("gemini-1.5-flash")
+	model := client.GenerativeModel("gemini-2.5-flash-lite")
 	model.SetTemperature(0.1) // Low temperature for factual extraction
 	model.ResponseMIMEType = "application/json"
 

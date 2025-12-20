@@ -12,7 +12,7 @@ import (
 
 const (
 	// DefaultClassificationModel is the Gemini model to use for link classification
-	DefaultClassificationModel = "gemini-1.5-flash"
+	DefaultClassificationModel = "gemini-2.5-flash-lite"
 	// DefaultClassificationTemperature is the temperature setting for classification
 	DefaultClassificationTemperature = 0.1
 )

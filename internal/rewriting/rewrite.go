@@ -15,7 +15,7 @@ import (
 
 const (
 	// DefaultModel is the Gemini model to use for bullet rewriting
-	DefaultModel = "gemini-1.5-flash"
+	DefaultModel = "gemini-2.5-pro"
 	// DefaultTemperature is the temperature setting for structured output
 	DefaultTemperature = 0.1
 )

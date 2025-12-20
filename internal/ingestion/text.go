@@ -21,7 +21,7 @@ func CleanHTML(htmlContent string) (string, []string, error) {
 
 	// Extract links before removing elements
 	var links []string
-	doc.Find("a[href]").Each(func(i int, s *goquery.Selection) {
+	doc.Find("a[href]").Each(func(_ int, s *goquery.Selection) {
 		href, exists := s.Attr("href")
 		if exists && href != "" && !strings.HasPrefix(href, "javascript:") && !strings.HasPrefix(href, "#") {
 			links = append(links, strings.TrimSpace(href))
@@ -50,7 +50,7 @@ func CleanHTML(htmlContent string) (string, []string, error) {
 	// We want to preserve basic structure.
 	// Better approach: Iterate over relevant block elements and extract text with newlines.
 	var sb strings.Builder
-	doc.Find("body").Each(func(i int, s *goquery.Selection) {
+	doc.Find("body").Each(func(_ int, s *goquery.Selection) {
 		// Just getting all text often squashes things.
 		// Let's try reasonable approach: separate block tags with newlines.
 		text := s.Text()
