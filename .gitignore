@@ -45,3 +45,4 @@ artifacts/*
 # Coverage reports
 coverage.out
 coverage.html
+resume_agent
