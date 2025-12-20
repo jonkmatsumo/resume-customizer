@@ -1,4 +1,8 @@
-.PHONY: build test validate-schemas clean lint fmt fmt-check test-race test-coverage ci
+.PHONY: build test test-failures validate-schemas clean lint fmt fmt-check test-race test-coverage ci \
+	resume-validate resume-ingest-job resume-parse-job resume-load-experience \
+	resume-build-skill-targets resume-rank-stories resume-plan resume-materialize \
+	resume-crawl-brand resume-summarize-voice resume-rewrite resume-render-latex \
+	resume-validate-latex resume-repair
 
 # Build the binary
 build:
@@ -7,6 +11,10 @@ build:
 # Run all tests
 test:
 	go test -v ./...
+
+# Show only failing tests
+test-failures:
+	@make test 2>&1 | grep -A 5 "FAIL" || true
 
 # Run tests with coverage
 test-coverage:
@@ -60,4 +68,52 @@ clean:
 deps:
 	go mod tidy
 	go mod download
+
+# Resume Agent CLI command aliases
+# Usage: make resume-<command> ARGS="--flag value ..."
+# Example: make resume-plan ARGS="--ranked ranked.json --experience exp.json --out plan.json"
+
+BINARY := ./bin/resume_agent
+
+resume-validate:
+	@$(BINARY) validate $(ARGS)
+
+resume-ingest-job:
+	@$(BINARY) ingest-job $(ARGS)
+
+resume-parse-job:
+	@$(BINARY) parse-job $(ARGS)
+
+resume-load-experience:
+	@$(BINARY) load-experience $(ARGS)
+
+resume-build-skill-targets:
+	@$(BINARY) build-skill-targets $(ARGS)
+
+resume-rank-stories:
+	@$(BINARY) rank-stories $(ARGS)
+
+resume-plan:
+	@$(BINARY) plan $(ARGS)
+
+resume-materialize:
+	@$(BINARY) materialize $(ARGS)
+
+resume-crawl-brand:
+	@$(BINARY) crawl-brand $(ARGS)
+
+resume-summarize-voice:
+	@$(BINARY) summarize-voice $(ARGS)
+
+resume-rewrite:
+	@$(BINARY) rewrite $(ARGS)
+
+resume-render-latex:
+	@$(BINARY) render-latex $(ARGS)
+
+resume-validate-latex:
+	@$(BINARY) validate-latex $(ARGS)
+
+resume-repair:
+	@$(BINARY) repair $(ARGS)
 

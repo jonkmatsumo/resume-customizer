@@ -20,10 +20,10 @@ func TestRepairCommand_MissingRequiredFlags(t *testing.T) {
 	binaryPath := getBinaryPath(t)
 
 	tests := []struct {
-		name        string
-		args        []string
-		contains    string
-		flagName    string
+		name     string
+		args     []string
+		contains string
+		flagName string
 	}{
 		{
 			name:     "missing plan flag",
@@ -223,4 +223,3 @@ func TestRepairCommand_ValidInputs_NoViolations(t *testing.T) {
 		assert.NotContains(t, string(output), "failed to read")
 	}
 }
-

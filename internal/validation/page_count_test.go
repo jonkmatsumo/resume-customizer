@@ -94,4 +94,3 @@ func TestCountPDFPages_FileNotFound(t *testing.T) {
 	_, err := CountPDFPages("/nonexistent/file.pdf")
 	assert.Error(t, err)
 }
-

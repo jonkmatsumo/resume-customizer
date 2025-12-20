@@ -46,7 +46,7 @@ func TestValidateConstraints_WithLineViolations(t *testing.T) {
 
 	violations, err := ValidateConstraints(texFile, nil, 1, 90)
 	require.NoError(t, err)
-	
+
 	// Should have at least one line_too_long violation
 	hasLineViolation := false
 	for _, v := range violations.Violations {
@@ -74,7 +74,7 @@ I am a coding ninja
 
 	violations, err := ValidateConstraints(texFile, companyProfile, 1, 90)
 	require.NoError(t, err)
-	
+
 	// Should have forbidden_phrase violation
 	hasForbiddenViolation := false
 	for _, v := range violations.Violations {
@@ -100,10 +100,9 @@ Content
 	violations, err := ValidateConstraints(texFile, nil, 1, 90)
 	require.NoError(t, err)
 	assert.NotNil(t, violations)
-	
+
 	// Should not have forbidden_phrase violations
 	for _, v := range violations.Violations {
 		assert.NotEqual(t, "forbidden_phrase", v.Type)
 	}
 }
-

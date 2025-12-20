@@ -32,7 +32,7 @@ func ValidateConstraints(texPath string, companyProfile *types.CompanyProfile, m
 	// 3. Compile LaTeX and check page count
 	workDir := filepath.Dir(texPath)
 	pdfPath, logOutput, err := CompileLaTeX(texPath, workDir)
-	
+
 	// Handle compilation errors
 	if err != nil {
 		var compErr *CompilationError
@@ -79,4 +79,3 @@ func ValidateConstraints(texPath string, companyProfile *types.CompanyProfile, m
 
 	return &types.Violations{Violations: allViolations}, nil
 }
-

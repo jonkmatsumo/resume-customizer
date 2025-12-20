@@ -159,7 +159,7 @@ I am a coding ninja
 	var violations types.Violations
 	err = json.Unmarshal(contentBytes, &violations)
 	require.NoError(t, err)
-	
+
 	hasForbidden := false
 	for _, v := range violations.Violations {
 		if v.Type == "forbidden_phrase" {
@@ -193,4 +193,3 @@ func TestValidateLatexCommand_InvalidCompanyProfileJSON(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, string(output), "failed to unmarshal company profile JSON")
 }
-

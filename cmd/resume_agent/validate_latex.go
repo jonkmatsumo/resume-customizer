@@ -22,11 +22,11 @@ var validateLatexCmd = &cobra.Command{
 }
 
 var (
-	validateLatexInput        string
+	validateLatexInput          string
 	validateLatexCompanyProfile string
-	validateLatexMaxPages     int
-	validateLatexMaxChars     int
-	validateLatexOutput       string
+	validateLatexMaxPages       int
+	validateLatexMaxChars       int
+	validateLatexOutput         string
 )
 
 func init() {
@@ -129,4 +129,3 @@ func runValidateLatex(_ *cobra.Command, _ []string) error {
 	// Return error to indicate violations were found (exit code 1)
 	return fmt.Errorf("validation found %d violation(s)", len(violations.Violations))
 }
-

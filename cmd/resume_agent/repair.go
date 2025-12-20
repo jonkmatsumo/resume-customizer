@@ -23,22 +23,22 @@ var repairCmd = &cobra.Command{
 }
 
 var (
-	repairPlanFile          string
-	repairBulletsFile       string
-	repairViolationsFile    string
-	repairRankedFile        string
-	repairJobProfileFile    string
+	repairPlanFile           string
+	repairBulletsFile        string
+	repairViolationsFile     string
+	repairRankedFile         string
+	repairJobProfileFile     string
 	repairCompanyProfileFile string
-	repairExperienceFile    string
-	repairTemplateFile      string
-	repairName              string
-	repairEmail             string
-	repairPhone             string
-	repairMaxPages          int
-	repairMaxChars          int
-	repairMaxIterations     int
-	repairAPIKey            string
-	repairOutputDir         string
+	repairExperienceFile     string
+	repairTemplateFile       string
+	repairName               string
+	repairEmail              string
+	repairPhone              string
+	repairMaxPages           int
+	repairMaxChars           int
+	repairMaxIterations      int
+	repairAPIKey             string
+	repairOutputDir          string
 )
 
 func init() {
@@ -264,4 +264,3 @@ func runRepair(_ *cobra.Command, _ []string) error {
 
 	return nil
 }
-

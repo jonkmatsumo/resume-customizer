@@ -21,13 +21,13 @@ var renderLaTeXCmd = &cobra.Command{
 }
 
 var (
-	renderLaTeXPlanFile     string
-	renderLaTeXBulletsFile  string
-	renderLaTeXTemplateFile string
-	renderLaTeXName         string
-	renderLaTeXEmail        string
-	renderLaTeXPhone        string
-	renderLaTeXOutputFile   string
+	renderLaTeXPlanFile       string
+	renderLaTeXBulletsFile    string
+	renderLaTeXTemplateFile   string
+	renderLaTeXName           string
+	renderLaTeXEmail          string
+	renderLaTeXPhone          string
+	renderLaTeXOutputFile     string
 	renderLaTeXExperienceFile string
 )
 
@@ -123,4 +123,3 @@ func runRenderLaTeX(_ *cobra.Command, _ []string) error {
 
 	return nil
 }
-

@@ -1,17 +1,6 @@
 # Resume Customizer
 
-A **schema-first, CLI-driven, multi-step agent** that generates a **strictly formatted, one-page LaTeX resume** tailored to a specific job posting and company brand voice.
-
-This system is designed for **incremental development, determinism, and debuggability**—not free-form resume writing.
-
-## Architecture Overview
-
-The resume generation pipeline follows a deterministic, step-by-step process where each stage produces validated artifacts that feed into the next stage. The system emphasizes:
-
-- **Schema-First**: Every intermediate artifact conforms to JSON schemas and is validated
-- **CLI-Driven**: Each step runs independently from the command line with explicit inputs/outputs
-- **Deterministic**: Prefer explicit heuristics and deterministic logic over "the model will figure it out"
-- **Debuggable**: All intermediate artifacts are saved and can be inspected manually
+A **schema-first, CLI-driven, multi-step agent** that generates a **strictly formatted, one-page LaTeX resume** tailored to a specific job posting and company brand voice. The resume generation pipeline follows a deterministic, step-by-step process where each stage produces validated artifacts that feed into the next stage. The system emphasizes **schema-first design** (every intermediate artifact conforms to JSON schemas), **CLI-driven workflows** (each step runs independently with explicit inputs/outputs), **deterministic logic** (explicit heuristics over "the model will figure it out"), and **debuggability** (all intermediate artifacts are saved and inspectable).
 
 ## Pipeline Flow
 
@@ -24,9 +13,6 @@ graph TD
     
     CleanedText --> ParseJob[Parse Job Profile]
     ParseJob --> JobProfile[JobProfile JSON]
-    
-    JobProfile --> BuildSkills[Build Skill Targets]
-    BuildSkills --> SkillTargets[SkillTargets JSON]
     
     ExperienceBank[Experience Bank JSON] --> RankStories[Rank Stories]
     JobProfile --> RankStories
@@ -80,16 +66,17 @@ graph TD
 
 1. **Job Ingestion** (`ingest-job`): Cleans job posting text from file or URL
 2. **Job Parsing** (`parse-job`): Extracts structured JobProfile using LLM
-3. **Skill Targeting** (`build-skill-targets`): Creates weighted skill targets from JobProfile
-4. **Story Ranking** (`rank-stories`): Ranks experience stories by relevance to job
-5. **Plan Selection** (`plan`): Selects optimal stories and bullets using knapsack algorithm
-6. **Bullet Materialization** (`materialize`): Extracts selected bullet data from ExperienceBank
-7. **Brand Voice Acquisition** (`crawl-brand`): Crawls company website and builds text corpus
-8. **Voice Summarization** (`summarize-voice`): Extracts brand voice and style rules using LLM
-9. **Bullet Rewriting** (`rewrite`): Rewrites bullets to match job requirements and brand voice
-10. **LaTeX Rendering** (`render-latex`): Generates LaTeX resume from template
-11. **Validation** (`validate-latex`): Validates resume against constraints (page count, line length, forbidden phrases)
-12. **Repair Loop** (`repair`): Automatically fixes violations and re-validates (not yet implemented)
+3. **Story Ranking** (`rank-stories`): Ranks experience stories by relevance to job (internally builds weighted skill targets from JobProfile for scoring)
+4. **Plan Selection** (`plan`): Selects optimal stories and bullets using knapsack algorithm (internally builds weighted skill targets from JobProfile for coverage scoring)
+5. **Bullet Materialization** (`materialize`): Extracts selected bullet data from ExperienceBank
+6. **Brand Voice Acquisition** (`crawl-brand`): Crawls company website and builds text corpus
+7. **Voice Summarization** (`summarize-voice`): Extracts brand voice and style rules using LLM
+8. **Bullet Rewriting** (`rewrite`): Rewrites bullets to match job requirements and company brand voice
+9. **LaTeX Rendering** (`render-latex`): Generates LaTeX resume from template
+10. **Validation** (`validate-latex`): Validates resume against constraints (page count, line length, forbidden phrases)
+11. **Repair Loop** (`repair`): Automatically fixes violations and re-validates
+
+**Note**: The `build-skill-targets` command is available for inspection/debugging purposes to see the weighted skill targets, but it's not required in the pipeline flow since skill targets are built internally by `rank-stories` and `plan`.
 
 ## Quick Start
 
@@ -122,10 +109,10 @@ go build -o bin/resume_agent ./cmd/resume_agent
 
 ```bash
 # From text file
-./bin/resume_agent ingest-job --text-file posting.txt --out artifacts/
+make resume-ingest-job ARGS="--text-file posting.txt --out artifacts/"
 
 # From URL
-./bin/resume_agent ingest-job --url https://jobs.company.com/123 --out artifacts/
+make resume-ingest-job ARGS="--url https://jobs.company.com/123 --out artifacts/"
 ```
 
 #### 2. Parse Job Profile
@@ -133,106 +120,67 @@ go build -o bin/resume_agent ./cmd/resume_agent
 ```bash
 export GEMINI_API_KEY=your-api-key-here
 
-./bin/resume_agent parse-job \
-  --in artifacts/job_posting.cleaned.txt \
-  --out artifacts/job_profile.json
+make resume-parse-job ARGS="--in artifacts/job_posting.cleaned.txt --out artifacts/job_profile.json"
 
 # Validate output
-./bin/resume_agent validate \
-  --schema schemas/job_profile.schema.json \
-  --json artifacts/job_profile.json
+make resume-validate ARGS="--schema schemas/job_profile.schema.json --json artifacts/job_profile.json"
 ```
 
 #### 3. Build Skill Targets
 
 ```bash
-./bin/resume_agent build-skill-targets \
-  --job-profile artifacts/job_profile.json \
-  --out artifacts/skill_targets.json
+make resume-build-skill-targets ARGS="--job-profile artifacts/job_profile.json --out artifacts/skill_targets.json"
 ```
 
 #### 4. Rank Experience Stories
 
 ```bash
-./bin/resume_agent rank-stories \
-  --job-profile artifacts/job_profile.json \
-  --experience experience_bank.json \
-  --out artifacts/ranked_stories.json
+make resume-rank-stories ARGS="--job-profile artifacts/job_profile.json --experience experience_bank.json --out artifacts/ranked_stories.json"
 ```
 
 #### 5. Select Resume Plan
 
 ```bash
-./bin/resume_agent plan \
-  --ranked artifacts/ranked_stories.json \
-  --job-profile artifacts/job_profile.json \
-  --experience experience_bank.json \
-  --max-bullets 8 \
-  --max-lines 45 \
-  --out artifacts/resume_plan.json
+make resume-plan ARGS="--ranked artifacts/ranked_stories.json --job-profile artifacts/job_profile.json --experience experience_bank.json --max-bullets 8 --max-lines 45 --out artifacts/resume_plan.json"
 ```
 
 #### 6. Materialize Selected Bullets
 
 ```bash
-./bin/resume_agent materialize \
-  --plan artifacts/resume_plan.json \
-  --experience experience_bank.json \
-  --out artifacts/selected_bullets.json
+make resume-materialize ARGS="--plan artifacts/resume_plan.json --experience experience_bank.json --out artifacts/selected_bullets.json"
 ```
 
 #### 7. Acquire Company Brand Voice
 
 ```bash
 # Crawl company website
-./bin/resume_agent crawl-brand \
-  --seed-url https://company.com \
-  --max-pages 10 \
-  --out artifacts/
+make resume-crawl-brand ARGS="--seed-url https://company.com --max-pages 10 --out artifacts/"
 
 # Summarize brand voice
-./bin/resume_agent summarize-voice \
-  --in artifacts/company_corpus.txt \
-  --sources artifacts/company_corpus.sources.json \
-  --out artifacts/company_profile.json
+make resume-summarize-voice ARGS="--in artifacts/company_corpus.txt --sources artifacts/company_corpus.sources.json --out artifacts/company_profile.json"
 ```
 
 #### 8. Rewrite Bullets
 
 ```bash
-./bin/resume_agent rewrite \
-  --selected artifacts/selected_bullets.json \
-  --job-profile artifacts/job_profile.json \
-  --company-profile artifacts/company_profile.json \
-  --out artifacts/rewritten_bullets.json
+make resume-rewrite ARGS="--selected artifacts/selected_bullets.json --job-profile artifacts/job_profile.json --company-profile artifacts/company_profile.json --out artifacts/rewritten_bullets.json"
 ```
 
 #### 9. Render LaTeX Resume
 
 ```bash
-./bin/resume_agent render-latex \
-  --plan artifacts/resume_plan.json \
-  --bullets artifacts/rewritten_bullets.json \
-  --experience experience_bank.json \
-  --template templates/one_page_resume.tex \
-  --name "John Doe" \
-  --email "john@example.com" \
-  --phone "555-1234" \
-  --out artifacts/resume.tex
+make resume-render-latex ARGS="--plan artifacts/resume_plan.json --bullets artifacts/rewritten_bullets.json --experience experience_bank.json --template templates/one_page_resume.tex --name \"John Doe\" --email \"john@example.com\" --phone \"555-1234\" --out artifacts/resume.tex"
 ```
 
 #### 10. Validate Resume
 
 ```bash
-./bin/resume_agent validate-latex \
-  --in artifacts/resume.tex \
-  --company-profile artifacts/company_profile.json \
-  --max-pages 1 \
-  --max-chars 90 \
-  --out artifacts/violations.json
+make resume-validate-latex ARGS="--in artifacts/resume.tex --company-profile artifacts/company_profile.json --max-pages 1 --max-chars 90 --out artifacts/violations.json"
 ```
 
 ## CLI Commands Reference
+
+All commands can be run via Make aliases using `make resume-<command> ARGS="..."`. Replace example paths with your actual file paths.
 
 ### Core Commands
 
@@ -240,7 +188,7 @@ export GEMINI_API_KEY=your-api-key-here
 Validate a JSON file against a JSON Schema.
 
 ```bash
-resume_agent validate --schema <schema_path> --json <json_path>
+make resume-validate ARGS="--schema schemas/job_profile.schema.json --json artifacts/job_profile.json"
 ```
 
 **Flags:**
@@ -256,9 +204,9 @@ resume_agent validate --schema <schema_path> --json <json_path>
 Ingest a job posting from a text file or URL.
 
 ```bash
-resume_agent ingest-job --text-file <file_path> --out <output_dir>
+make resume-ingest-job ARGS="--text-file job_posting.txt --out artifacts/"
 # or
-resume_agent ingest-job --url <url> --out <output_dir>
+make resume-ingest-job ARGS="--url https://company.com/jobs/123 --out artifacts/"
 ```
 
 **Flags:**
@@ -270,7 +218,7 @@ resume_agent ingest-job --url <url> --out <output_dir>
 Parse a cleaned job posting into structured JobProfile JSON.
 
 ```bash
-resume_agent parse-job --in <input_file> --out <output_file> [--api-key <key>]
+make resume-parse-job ARGS="--in artifacts/job_posting.cleaned.txt --out artifacts/job_profile.json"
 ```
 
 **Flags:**
@@ -279,10 +227,10 @@ resume_agent parse-job --in <input_file> --out <output_file> [--api-key <key>]
 - `--api-key`: Gemini API key (overrides GEMINI_API_KEY env var)
 
 #### `build-skill-targets`
-Build weighted skill targets from a JobProfile.
+Build weighted skill targets from a JobProfile. This command is primarily for inspection/debugging purposes, as skill targets are built internally by `rank-stories` and `plan` commands.
 
 ```bash
-resume_agent build-skill-targets --job-profile <file> --out <output_file>
+make resume-build-skill-targets ARGS="--job-profile artifacts/job_profile.json --out artifacts/skill_targets.json"
 ```
 
 **Flags:**
@@ -293,7 +241,7 @@ resume_agent build-skill-targets --job-profile <file> --out <output_file>
 Load and normalize an ExperienceBank JSON file.
 
 ```bash
-resume_agent load-experience --in <input_file> --out <output_file>
+make resume-load-experience ARGS="--in experience_bank.json --out artifacts/experience_bank_normalized.json"
 ```
 
 **Flags:**
@@ -304,7 +252,7 @@ resume_agent load-experience --in <input_file> --out <output_file>
 Rank experience stories by relevance to a job posting.
 
 ```bash
-resume_agent rank-stories --job-profile <file> --experience <file> --out <output_file>
+make resume-rank-stories ARGS="--job-profile artifacts/job_profile.json --experience artifacts/experience_bank_normalized.json --out artifacts/ranked_stories.json"
 ```
 
 **Flags:**
@@ -316,13 +264,7 @@ resume_agent rank-stories --job-profile <file> --experience <file> --out <output
 Select optimal stories and bullets using knapsack algorithm.
 
 ```bash
-resume_agent plan \
-  --ranked <file> \
-  --job-profile <file> \
-  --experience <file> \
-  --max-bullets <n> \
-  --max-lines <n> \
-  --out <output_file>
+make resume-plan ARGS="--ranked artifacts/ranked_stories.json --job-profile artifacts/job_profile.json --experience artifacts/experience_bank_normalized.json --max-bullets 8 --max-lines 45 --out artifacts/resume_plan.json"
 ```
 
 **Flags:**
@@ -337,7 +279,7 @@ resume_agent plan \
 Extract selected bullets from ExperienceBank based on ResumePlan.
 
 ```bash
-resume_agent materialize --plan <file> --experience <file> --out <output_file>
+make resume-materialize ARGS="--plan artifacts/resume_plan.json --experience artifacts/experience_bank_normalized.json --out artifacts/selected_bullets.json"
 ```
 
 **Flags:**
@@ -349,7 +291,7 @@ resume_agent materialize --plan <file> --experience <file> --out <output_file>
 Crawl company website and build text corpus for brand voice analysis.
 
 ```bash
-resume_agent crawl-brand --seed-url <url> --max-pages <n> --out <output_dir>
+make resume-crawl-brand ARGS="--seed-url https://company.com --max-pages 10 --out artifacts/"
 ```
 
 **Flags:**
@@ -362,7 +304,7 @@ resume_agent crawl-brand --seed-url <url> --max-pages <n> --out <output_dir>
 Extract brand voice and style rules from company corpus.
 
 ```bash
-resume_agent summarize-voice --in <file> --sources <file> --out <output_file> [--api-key <key>]
+make resume-summarize-voice ARGS="--in artifacts/company_corpus.txt --sources artifacts/company_corpus.sources.json --out artifacts/company_profile.json"
 ```
 
 **Flags:**
@@ -375,11 +317,7 @@ resume_agent summarize-voice --in <file> --sources <file> --out <output_file> [-
 Rewrite selected bullets to match job requirements and company brand voice.
 
 ```bash
-resume_agent rewrite \
-  --selected <file> \
-  --job-profile <file> \
-  --company-profile <file> \
-  --out <output_file> [--api-key <key>]
+make resume-rewrite ARGS="--selected artifacts/selected_bullets.json --job-profile artifacts/job_profile.json --company-profile artifacts/company_profile.json --out artifacts/rewritten_bullets.json"
 ```
 
 **Flags:**
@@ -393,15 +331,7 @@ resume_agent rewrite \
 Render LaTeX resume from template.
 
 ```bash
-resume_agent render-latex \
-  --plan <file> \
-  --bullets <file> \
-  --template <file> \
-  --name <name> \
-  --email <email> \
-  --out <output_file> \
-  [--phone <phone>] \
-  [--experience <file>]
+make resume-render-latex ARGS="--plan artifacts/resume_plan.json --bullets artifacts/rewritten_bullets.json --template templates/one_page_resume.tex --name \"John Doe\" --email \"john@example.com\" --phone \"555-1234\" --out artifacts/resume.tex --experience artifacts/experience_bank_normalized.json"
 ```
 
 **Flags:**
@@ -418,12 +348,7 @@ resume_agent render-latex \
 Validate LaTeX resume against constraints.
 
 ```bash
-resume_agent validate-latex \
-  --in <file> \
-  --out <output_file> \
-  [--company-profile <file>] \
-  [--max-pages <n>] \
-  [--max-chars <n>]
+make resume-validate-latex ARGS="--in artifacts/resume.tex --out artifacts/violations.json --company-profile artifacts/company_profile.json --max-pages 1 --max-chars 90"
 ```
 
 **Flags:**
@@ -441,6 +366,31 @@ resume_agent validate-latex \
 **Dependencies:**
 - `pdflatex`: Required for LaTeX compilation
 - `pdfinfo` (preferred) or `ghostscript`: Required for PDF page counting
+
+#### `repair`
+Automatically repair LaTeX resume violations by proposing and applying repair actions iteratively.
+
+```bash
+make resume-repair ARGS="--plan artifacts/resume_plan.json --bullets artifacts/rewritten_bullets.json --violations artifacts/violations.json --ranked artifacts/ranked_stories.json --job-profile artifacts/job_profile.json --company-profile artifacts/company_profile.json --experience artifacts/experience_bank_normalized.json --name \"John Doe\" --email \"john@example.com\" --out artifacts/"
+```
+
+**Flags:**
+- `--plan`, `-p`: Path to ResumePlan JSON file (required)
+- `--bullets`, `-b`: Path to RewrittenBullets JSON file (required)
+- `--violations`, `-v`: Path to Violations JSON file (required)
+- `--ranked`, `-r`: Path to RankedStories JSON file (required)
+- `--job-profile`, `-j`: Path to JobProfile JSON file (required)
+- `--company-profile`, `-c`: Path to CompanyProfile JSON file (required)
+- `--experience`, `-e`: Path to ExperienceBank JSON file (required)
+- `--template`, `-t`: Path to LaTeX template file (default: `templates/one_page_resume.tex`)
+- `--name`, `-n`: Candidate name (required)
+- `--email`: Candidate email (required)
+- `--phone`: Candidate phone (optional)
+- `--max-pages`: Maximum page count (default: 1)
+- `--max-chars`: Maximum characters per line (default: 90)
+- `--max-iterations`: Maximum repair iterations (default: 5)
+- `--api-key`: Gemini API key (overrides GEMINI_API_KEY env var)
+- `--out`, `-o`: Output directory (required)
 
 ## Development
 
@@ -509,7 +459,7 @@ make ci
 All intermediate artifacts conform to JSON schemas defined in `schemas/`. Validate any artifact using:
 
 ```bash
-resume_agent validate --schema schemas/<artifact>.schema.json --json <artifact>.json
+make resume-validate ARGS="--schema schemas/job_profile.schema.json --json artifacts/job_profile.json"
 ```
 
 Available schemas:
@@ -532,10 +482,3 @@ Available schemas:
 - **Debuggable**: All intermediate artifacts are saved and inspectable
 - **Incremental**: Build and test each component before moving to the next
 
-## License
-
-[Add license information here]
-
-## Contributing
-
-[Add contributing guidelines here]
