@@ -7,17 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
-
+	"github.com/jonathan/resume-customizer/internal/llm"
 	"github.com/jonathan/resume-customizer/internal/types"
-)
-
-const (
-	// DefaultModel is the Gemini model to use for bullet rewriting
-	DefaultModel = "gemini-2.5-pro"
-	// DefaultTemperature is the temperature setting for structured output
-	DefaultTemperature = 0.1
 )
 
 // RewriteBullets rewrites selected bullets to match job requirements and company voice
@@ -26,18 +17,16 @@ func RewriteBullets(ctx context.Context, selectedBullets *types.SelectedBullets,
 		return nil, &APICallError{Message: "API key is required"}
 	}
 
-	// Initialize Gemini client
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	// Initialize LLM client with default config
+	config := llm.DefaultConfig()
+	client, err := llm.NewClient(ctx, config, apiKey)
 	if err != nil {
 		return nil, &APICallError{
-			Message: "failed to create Gemini client",
+			Message: "failed to create LLM client",
 			Cause:   err,
 		}
 	}
 	defer func() { _ = client.Close() }()
-
-	model := client.GenerativeModel(DefaultModel)
-	model.SetTemperature(DefaultTemperature)
 
 	// Rewrite each bullet
 	rewrittenBullets := make([]types.RewrittenBullet, 0, len(selectedBullets.Bullets))
@@ -46,20 +35,11 @@ func RewriteBullets(ctx context.Context, selectedBullets *types.SelectedBullets,
 		// Build rewriting prompt
 		prompt := buildRewritingPrompt(originalBullet, jobProfile, companyProfile)
 
-		// Call Gemini API
-		resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+		// Use TierAdvanced for bullet rewriting (requires nuance and style matching)
+		responseText, err := client.GenerateContent(ctx, prompt, llm.TierAdvanced)
 		if err != nil {
 			return nil, &APICallError{
 				Message: fmt.Sprintf("failed to generate content for bullet %s", originalBullet.ID),
-				Cause:   err,
-			}
-		}
-
-		// Extract text from response
-		responseText, err := extractTextFromResponse(resp)
-		if err != nil {
-			return nil, &APICallError{
-				Message: fmt.Sprintf("failed to extract text for bullet %s", originalBullet.ID),
 				Cause:   err,
 			}
 		}
@@ -153,35 +133,13 @@ func buildRewritingPrompt(bullet types.SelectedBullet, jobProfile *types.JobProf
 	return sb.String()
 }
 
-// extractTextFromResponse extracts text content from Gemini API response
-func extractTextFromResponse(resp *genai.GenerateContentResponse) (string, error) {
-	if len(resp.Candidates) == 0 {
-		return "", &ParseError{Message: "no candidates in API response"}
-	}
-
-	candidate := resp.Candidates[0]
-	if candidate.Content == nil || len(candidate.Content.Parts) == 0 {
-		return "", &ParseError{Message: "no content in API response"}
-	}
-
-	var parts []string
-	for _, part := range candidate.Content.Parts {
-		if textPart, ok := part.(genai.Text); ok {
-			parts = append(parts, string(textPart))
-		}
-	}
-
-	if len(parts) == 0 {
-		return "", &ParseError{Message: "no text content in response"}
-	}
-
-	// Join all text parts
-	text := strings.Join(parts, "")
+// parseBulletResponse parses the API response to extract rewritten text
+// The API should return just the text, but we handle JSON wrapper if present
+func parseBulletResponse(responseText string) (string, error) {
+	text := strings.TrimSpace(responseText)
 
 	// Remove markdown code blocks if present
-	text = strings.TrimSpace(text)
 	if strings.HasPrefix(text, "```") {
-		// Remove code block markers
 		lines := strings.Split(text, "\n")
 		if len(lines) > 0 && strings.HasPrefix(lines[0], "```") {
 			lines = lines[1:]
@@ -192,14 +150,6 @@ func extractTextFromResponse(resp *genai.GenerateContentResponse) (string, error
 		text = strings.Join(lines, "\n")
 		text = strings.TrimSpace(text)
 	}
-
-	return text, nil
-}
-
-// parseBulletResponse parses the API response to extract rewritten text
-// The API should return just the text, but we handle JSON wrapper if present
-func parseBulletResponse(responseText string) (string, error) {
-	text := strings.TrimSpace(responseText)
 
 	// Try to parse as JSON first (in case LLM returns wrapped JSON)
 	var jsonResp struct {

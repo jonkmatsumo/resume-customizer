@@ -6,15 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
-)
-
-const (
-	// DefaultClassificationModel is the Gemini model to use for link classification
-	DefaultClassificationModel = "gemini-2.5-flash-lite"
-	// DefaultClassificationTemperature is the temperature setting for classification
-	DefaultClassificationTemperature = 0.1
+	"github.com/jonathan/resume-customizer/internal/llm"
 )
 
 // ClassifiedLink represents a link with its classification category
@@ -33,36 +25,25 @@ func ClassifyLinks(ctx context.Context, links []string, apiKey string) ([]Classi
 		return []ClassifiedLink{}, nil
 	}
 
-	// Initialize Gemini client
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	// Initialize LLM client with default config
+	config := llm.DefaultConfig()
+	client, err := llm.NewClient(ctx, config, apiKey)
 	if err != nil {
 		return nil, &ClassificationError{
-			Message: "failed to create Gemini client",
+			Message: "failed to create LLM client",
 			Cause:   err,
 		}
 	}
 	defer func() { _ = client.Close() }()
 
-	model := client.GenerativeModel(DefaultClassificationModel)
-	model.SetTemperature(DefaultClassificationTemperature)
-
 	// Construct classification prompt
 	prompt := buildClassificationPrompt(links)
 
-	// Call Gemini API
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	// Use TierLite for simple classification task
+	responseText, err := client.GenerateContent(ctx, prompt, llm.TierLite)
 	if err != nil {
 		return nil, &ClassificationError{
-			Message: "failed to generate content from Gemini API",
-			Cause:   err,
-		}
-	}
-
-	// Extract text from response
-	responseText, err := extractTextFromResponse(resp)
-	if err != nil {
-		return nil, &ClassificationError{
-			Message: "failed to extract text from API response",
+			Message: "failed to generate content from LLM",
 			Cause:   err,
 		}
 	}
@@ -100,31 +81,6 @@ Return ONLY valid JSON array, no markdown, no explanation. Example format:
   {"url": "https://example.com/about", "category": "about"},
   {"url": "https://example.com/careers", "category": "careers"}
 ]`, linksList)
-}
-
-// extractTextFromResponse extracts text content from Gemini API response
-func extractTextFromResponse(resp *genai.GenerateContentResponse) (string, error) {
-	if len(resp.Candidates) == 0 {
-		return "", fmt.Errorf("no candidates in response")
-	}
-
-	candidate := resp.Candidates[0]
-	if candidate.Content == nil {
-		return "", fmt.Errorf("no content in candidate")
-	}
-
-	var textParts []string
-	for _, part := range candidate.Content.Parts {
-		if text, ok := part.(genai.Text); ok {
-			textParts = append(textParts, string(text))
-		}
-	}
-
-	if len(textParts) == 0 {
-		return "", fmt.Errorf("no text parts in response")
-	}
-
-	return strings.Join(textParts, ""), nil
 }
 
 // parseClassificationResponse parses the JSON response from classification

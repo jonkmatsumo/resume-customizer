@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
-	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
+	"github.com/jonathan/resume-customizer/internal/llm"
 )
 
 // ExtractedContent represents the structured output from the ingestion LLM
@@ -17,21 +15,18 @@ type ExtractedContent struct {
 	AdminInfo        map[string]string `json:"admin_info"` // Salary, Clearance, Citizenship, Location, etc.
 }
 
-// ExtractWithLLM uses Gemini to separate core content from administrative metadata
+// ExtractWithLLM uses LLM to separate core content from administrative metadata
 func ExtractWithLLM(ctx context.Context, text string, apiKey string) (*ExtractedContent, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("API key required for LLM extraction")
 	}
 
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	config := llm.DefaultConfig()
+	client, err := llm.NewClient(ctx, config, apiKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create genai client: %w", err)
+		return nil, fmt.Errorf("failed to create LLM client: %w", err)
 	}
 	defer func() { _ = client.Close() }()
-
-	model := client.GenerativeModel("gemini-2.5-flash-lite")
-	model.SetTemperature(0.1) // Low temperature for factual extraction
-	model.ResponseMIMEType = "application/json"
 
 	prompt := fmt.Sprintf(`
 You are an expert resume parsing assistant. Your task is to extract information from a raw job posting text.
@@ -64,35 +59,16 @@ Output JSON Schema:
 }
 `, text)
 
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	// Use TierLite for simple extraction task
+	jsonResp, err := client.GenerateJSON(ctx, prompt, llm.TierLite)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate content: %w", err)
 	}
 
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return nil, fmt.Errorf("empty response from LLM")
-	}
-
-	part, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type")
-	}
-
 	var extracted ExtractedContent
-	// Clean markdown block if present
-	cleanJSON := cleanJSONBlock(string(part))
-
-	if err := json.Unmarshal([]byte(cleanJSON), &extracted); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal JSON: %w (content: %s)", err, cleanJSON)
+	if err := json.Unmarshal([]byte(jsonResp), &extracted); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w (content: %s)", err, jsonResp)
 	}
 
 	return &extracted, nil
-}
-
-func cleanJSONBlock(text string) string {
-	text = strings.TrimSpace(text)
-	text = strings.TrimPrefix(text, "```json")
-	text = strings.TrimPrefix(text, "```")
-	text = strings.TrimSuffix(text, "```")
-	return strings.TrimSpace(text)
 }

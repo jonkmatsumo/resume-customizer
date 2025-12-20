@@ -7,17 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
-
+	"github.com/jonathan/resume-customizer/internal/llm"
 	"github.com/jonathan/resume-customizer/internal/types"
-)
-
-const (
-	// DefaultModel is the Gemini model to use for parsing
-	DefaultModel = "gemini-2.5-pro"
-	// DefaultTemperature is the temperature setting for structured output
-	DefaultTemperature = 0.1
 )
 
 // ParseJobProfile extracts a structured JobProfile from cleaned job posting text
@@ -26,44 +17,34 @@ func ParseJobProfile(ctx context.Context, cleanedText string, apiKey string) (*t
 		return nil, &APICallError{Message: "API key is required"}
 	}
 
-	// Initialize Gemini client
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	// Initialize LLM client with default config
+	config := llm.DefaultConfig()
+	client, err := llm.NewClient(ctx, config, apiKey)
 	if err != nil {
 		return nil, &APICallError{
-			Message: "failed to create Gemini client",
+			Message: "failed to create LLM client",
 			Cause:   err,
 		}
 	}
 	defer func() { _ = client.Close() }()
 
-	model := client.GenerativeModel(DefaultModel)
-	model.SetTemperature(DefaultTemperature)
-
 	// Construct extraction prompt
 	prompt := buildExtractionPrompt(cleanedText)
 
-	// Call Gemini API
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	// Use TierAdvanced for structured job parsing (requires reasoning)
+	responseText, err := client.GenerateContent(ctx, prompt, llm.TierAdvanced)
 	if err != nil {
 		return nil, &APICallError{
-			Message: "failed to generate content from Gemini API",
+			Message: "failed to generate content from LLM",
 			Cause:   err,
 		}
 	}
 
-	// Extract text from response
-	var responseText string
-	responseText, err = extractTextFromResponse(resp)
-	if err != nil {
-		return nil, &APICallError{
-			Message: "failed to extract text from API response",
-			Cause:   err,
-		}
-	}
+	// Clean markdown code blocks if present
+	responseText = cleanJSONBlock(responseText)
 
 	// Parse JSON response
-	var profile *types.JobProfile
-	profile, err = parseJSONResponse(responseText)
+	profile, err := parseJSONResponse(responseText)
 	if err != nil {
 		return nil, err
 	}
@@ -118,32 +99,8 @@ Job posting:
 %s`, jobText)
 }
 
-// extractTextFromResponse extracts text content from Gemini API response
-func extractTextFromResponse(resp *genai.GenerateContentResponse) (string, error) {
-	if len(resp.Candidates) == 0 {
-		return "", &ParseError{Message: "no candidates in API response"}
-	}
-
-	candidate := resp.Candidates[0]
-	if candidate.Content == nil || len(candidate.Content.Parts) == 0 {
-		return "", &ParseError{Message: "no content in API response"}
-	}
-
-	var parts []string
-	for _, part := range candidate.Content.Parts {
-		if textPart, ok := part.(genai.Text); ok {
-			parts = append(parts, string(textPart))
-		}
-	}
-
-	if len(parts) == 0 {
-		return "", &ParseError{Message: "no text content in API response"}
-	}
-
-	// Join all text parts
-	text := strings.Join(parts, "")
-
-	// Remove markdown code blocks if present
+// cleanJSONBlock removes markdown code block wrappers from JSON
+func cleanJSONBlock(text string) string {
 	text = strings.TrimSpace(text)
 	if strings.HasPrefix(text, "```json") {
 		text = strings.TrimPrefix(text, "```json")
@@ -155,8 +112,7 @@ func extractTextFromResponse(resp *genai.GenerateContentResponse) (string, error
 		text = strings.TrimSuffix(text, "```")
 		text = strings.TrimSpace(text)
 	}
-
-	return text, nil
+	return text
 }
 
 // parseJSONResponse parses the JSON response into a JobProfile

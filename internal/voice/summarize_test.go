@@ -4,7 +4,6 @@ package voice
 import (
 	"testing"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/jonathan/resume-customizer/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,90 +37,24 @@ func TestBuildExtractionPrompt_NoSources(t *testing.T) {
 	assert.NotContains(t, prompt, "Sources (for context):")
 }
 
-func TestExtractTextFromResponse_ValidResponse(t *testing.T) {
-	resp := &genai.GenerateContentResponse{
-		Candidates: []*genai.Candidate{
-			{
-				Content: &genai.Content{
-					Parts: []genai.Part{
-						genai.Text(`{"company": "Test", "tone": "direct"}`),
-					},
-				},
-			},
-		},
-	}
-
-	text, err := extractTextFromResponse(resp)
-	require.NoError(t, err)
-	assert.Contains(t, text, "company")
-	assert.Contains(t, text, "Test")
+func TestCleanJSONBlock_PlainJSON(t *testing.T) {
+	text := `{"company": "Test", "tone": "direct"}`
+	result := cleanJSONBlock(text)
+	assert.Equal(t, text, result)
 }
 
-func TestExtractTextFromResponse_WithMarkdownCodeBlocks(t *testing.T) {
-	resp := &genai.GenerateContentResponse{
-		Candidates: []*genai.Candidate{
-			{
-				Content: &genai.Content{
-					Parts: []genai.Part{
-						genai.Text("```json\n{\"company\": \"Test\"}\n```"),
-					},
-				},
-			},
-		},
-	}
-
-	text, err := extractTextFromResponse(resp)
-	require.NoError(t, err)
-	assert.Contains(t, text, "company")
-	assert.Contains(t, text, "Test")
-	assert.NotContains(t, text, "```")
+func TestCleanJSONBlock_WithCodeBlocks(t *testing.T) {
+	text := "```json\n{\"company\": \"Test\"}\n```"
+	result := cleanJSONBlock(text)
+	assert.Contains(t, result, "company")
+	assert.NotContains(t, result, "```")
 }
 
-func TestExtractTextFromResponse_WithJSONCodeBlock(t *testing.T) {
-	resp := &genai.GenerateContentResponse{
-		Candidates: []*genai.Candidate{
-			{
-				Content: &genai.Content{
-					Parts: []genai.Part{
-						genai.Text("```json\n{\"company\": \"Test\"}\n```"),
-					},
-				},
-			},
-		},
-	}
-
-	text, err := extractTextFromResponse(resp)
-	require.NoError(t, err)
-	assert.Contains(t, text, "company")
-	assert.NotContains(t, text, "```json")
-}
-
-func TestExtractTextFromResponse_NoCandidates(t *testing.T) {
-	resp := &genai.GenerateContentResponse{
-		Candidates: []*genai.Candidate{},
-	}
-
-	_, err := extractTextFromResponse(resp)
-	assert.Error(t, err)
-	var parseErr *ParseError
-	assert.ErrorAs(t, err, &parseErr)
-	assert.Contains(t, err.Error(), "no candidates")
-}
-
-func TestExtractTextFromResponse_NoContent(t *testing.T) {
-	resp := &genai.GenerateContentResponse{
-		Candidates: []*genai.Candidate{
-			{
-				Content: nil,
-			},
-		},
-	}
-
-	_, err := extractTextFromResponse(resp)
-	assert.Error(t, err)
-	var parseErr *ParseError
-	assert.ErrorAs(t, err, &parseErr)
-	assert.Contains(t, err.Error(), "no content")
+func TestCleanJSONBlock_WithGenericCodeBlocks(t *testing.T) {
+	text := "```\n{\"company\": \"Test\"}\n```"
+	result := cleanJSONBlock(text)
+	assert.Contains(t, result, "company")
+	assert.NotContains(t, result, "```")
 }
 
 func TestParseJSONResponse_ValidJSON(t *testing.T) {

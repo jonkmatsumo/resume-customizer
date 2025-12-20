@@ -7,17 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
-
+	"github.com/jonathan/resume-customizer/internal/llm"
 	"github.com/jonathan/resume-customizer/internal/types"
-)
-
-const (
-	// DefaultModel is the Gemini model to use for repair proposal
-	DefaultModel = "gemini-2.5-pro"
-	// DefaultTemperature is the temperature setting for structured output
-	DefaultTemperature = 0.1
 )
 
 // ProposeRepairs uses LLM to analyze violations and propose structured repair actions
@@ -26,36 +17,25 @@ func ProposeRepairs(ctx context.Context, violations *types.Violations, plan *typ
 		return nil, &ProposeError{Message: "API key is required"}
 	}
 
-	// Initialize Gemini client
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	// Initialize LLM client with default config
+	config := llm.DefaultConfig()
+	client, err := llm.NewClient(ctx, config, apiKey)
 	if err != nil {
 		return nil, &ProposeError{
-			Message: "failed to create Gemini client",
+			Message: "failed to create LLM client",
 			Cause:   err,
 		}
 	}
 	defer func() { _ = client.Close() }()
 
-	model := client.GenerativeModel(DefaultModel)
-	model.SetTemperature(DefaultTemperature)
-
 	// Build prompt
 	prompt := buildRepairPrompt(violations, plan, rewrittenBullets, rankedStories, jobProfile, companyProfile)
 
-	// Call Gemini API
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	// Use TierAdvanced for repair proposal (requires complex reasoning)
+	responseText, err := client.GenerateContent(ctx, prompt, llm.TierAdvanced)
 	if err != nil {
 		return nil, &ProposeError{
 			Message: "failed to generate content",
-			Cause:   err,
-		}
-	}
-
-	// Extract text from response
-	responseText, err := extractTextFromResponse(resp)
-	if err != nil {
-		return nil, &ProposeError{
-			Message: "failed to extract text from response",
 			Cause:   err,
 		}
 	}
@@ -172,31 +152,6 @@ func buildRepairPrompt(violations *types.Violations, plan *types.ResumePlan, rew
 }`)
 
 	return sb.String()
-}
-
-// extractTextFromResponse extracts text from Gemini API response
-func extractTextFromResponse(resp *genai.GenerateContentResponse) (string, error) {
-	if len(resp.Candidates) == 0 {
-		return "", fmt.Errorf("no candidates in response")
-	}
-
-	candidate := resp.Candidates[0]
-	if candidate.Content == nil {
-		return "", fmt.Errorf("candidate content is nil")
-	}
-
-	var parts []string
-	for _, part := range candidate.Content.Parts {
-		if text, ok := part.(genai.Text); ok {
-			parts = append(parts, string(text))
-		}
-	}
-
-	if len(parts) == 0 {
-		return "", fmt.Errorf("no text parts in response")
-	}
-
-	return strings.Join(parts, "\n"), nil
 }
 
 // parseRepairResponse parses JSON response into RepairActions

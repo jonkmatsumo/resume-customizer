@@ -117,3 +117,6 @@ resume-validate-latex:
 resume-repair:
 	@$(BINARY) repair $(ARGS)
 
+resume-run:
+	@$(BINARY) run $(ARGS)
+

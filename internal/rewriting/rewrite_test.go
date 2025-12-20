@@ -4,7 +4,6 @@ package rewriting
 import (
 	"testing"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/jonathan/resume-customizer/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,71 +55,6 @@ func TestBuildRewritingPrompt_NilProfiles(t *testing.T) {
 	assert.Contains(t, prompt, "15 characters")
 }
 
-func TestExtractTextFromResponse_ValidResponse(t *testing.T) {
-	resp := &genai.GenerateContentResponse{
-		Candidates: []*genai.Candidate{
-			{
-				Content: &genai.Content{
-					Parts: []genai.Part{
-						genai.Text("Built a scalable system"),
-					},
-				},
-			},
-		},
-	}
-
-	text, err := extractTextFromResponse(resp)
-	require.NoError(t, err)
-	assert.Equal(t, "Built a scalable system", text)
-}
-
-func TestExtractTextFromResponse_WithMarkdownCodeBlocks(t *testing.T) {
-	resp := &genai.GenerateContentResponse{
-		Candidates: []*genai.Candidate{
-			{
-				Content: &genai.Content{
-					Parts: []genai.Part{
-						genai.Text("```\nBuilt a scalable system\n```"),
-					},
-				},
-			},
-		},
-	}
-
-	text, err := extractTextFromResponse(resp)
-	require.NoError(t, err)
-	assert.Contains(t, text, "Built a scalable system")
-	assert.NotContains(t, text, "```")
-}
-
-func TestExtractTextFromResponse_NoCandidates(t *testing.T) {
-	resp := &genai.GenerateContentResponse{
-		Candidates: []*genai.Candidate{},
-	}
-
-	_, err := extractTextFromResponse(resp)
-	assert.Error(t, err)
-	var parseErr *ParseError
-	assert.ErrorAs(t, err, &parseErr)
-	assert.Contains(t, err.Error(), "no candidates")
-}
-
-func TestExtractTextFromResponse_NoContent(t *testing.T) {
-	resp := &genai.GenerateContentResponse{
-		Candidates: []*genai.Candidate{
-			{
-				Content: nil,
-			},
-		},
-	}
-
-	_, err := extractTextFromResponse(resp)
-	assert.Error(t, err)
-	var parseErr *ParseError
-	assert.ErrorAs(t, err, &parseErr)
-	assert.Contains(t, err.Error(), "no content")
-}
-
 func TestParseBulletResponse_PlainText(t *testing.T) {
 	responseText := "Built a scalable system handling 1M requests/day"
 
@@ -143,6 +77,15 @@ func TestParseBulletResponse_Whitespace(t *testing.T) {
 	text, err := parseBulletResponse(responseText)
 	require.NoError(t, err)
 	assert.Equal(t, "Built a system", text)
+}
+
+func TestParseBulletResponse_WithCodeBlocks(t *testing.T) {
+	responseText := "```\nBuilt a scalable system\n```"
+
+	text, err := parseBulletResponse(responseText)
+	require.NoError(t, err)
+	assert.Contains(t, text, "Built a scalable system")
+	assert.NotContains(t, text, "```")
 }
 
 func TestPostProcessBullet_ValidBullet(t *testing.T) {
