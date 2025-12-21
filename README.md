@@ -24,7 +24,7 @@ flowchart TD
     EXP[Experience Bank]
 
     %% ---------------- RESEARCH SUBSYSTEM ----------------
-    subgraph "Phase 1: Research & Context"
+    subgraph "Research"
         direction TB
         
         subgraph "Ingestion"
@@ -57,7 +57,7 @@ flowchart TD
     end
 
     %% ---------------- GENERATION SUBSYSTEM ----------------
-    subgraph "Phase 2: Resume Generation"
+    subgraph "Resume Generation"
         direction TB
         
         subgraph "Planning"
