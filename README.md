@@ -32,9 +32,9 @@ flowchart TD
             B --> C[LLM: Extract Structure]
             
             %% Reordered to minimize crossing lines
-            C --> S[Extracted Links]
             C --> D[Requirements]
             C --> E[Responsibilities]
+            C --> S[Extracted Links]
             C --> T[Team/Cultural Notes]
         end
         
