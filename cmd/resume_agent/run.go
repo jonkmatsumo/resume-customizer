@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/jonathan/resume-customizer/internal/config"
-	"github.com/jonathan/resume-customizer/internal/ingestion"
 	"github.com/jonathan/resume-customizer/internal/pipeline"
 	"github.com/spf13/cobra"
 )
@@ -164,29 +162,9 @@ func runPipelineCmd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("GEMINI_API_KEY environment variable or --api-key flag is required")
 	}
 
-	// If --job-url is provided, ingest the job posting first
-	jobPath := cfg.Job
-	if cfg.JobURL != "" {
-		_, _ = fmt.Fprintf(os.Stdout, "Ingesting job posting from URL: %s\n", cfg.JobURL)
-
-		ctx := context.Background()
-		cleanedText, metadata, err := ingestion.IngestFromURL(ctx, cfg.JobURL, cfg.APIKey, cfg.UseBrowser, cfg.Verbose)
-		if err != nil {
-			return fmt.Errorf("failed to ingest job from URL: %w", err)
-		}
-
-		// Write the ingested job to the output directory
-		if err := ingestion.WriteOutput(cfg.Output, cleanedText, metadata); err != nil {
-			return fmt.Errorf("failed to write ingested job: %w", err)
-		}
-
-		// Update jobPath to point to the ingested file
-		jobPath = filepath.Join(cfg.Output, "job_posting.cleaned.txt")
-		_, _ = fmt.Fprintf(os.Stdout, "Job posting ingested to: %s\n", jobPath)
-	}
-
 	opts := pipeline.RunOptions{
-		JobPath:        jobPath,
+		JobPath:        cfg.Job,
+		JobURL:         cfg.JobURL,
 		ExperiencePath: cfg.Experience,
 		CompanySeedURL: cfg.CompanySeed,
 		OutputDir:      cfg.Output,

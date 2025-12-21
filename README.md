@@ -32,9 +32,9 @@ flowchart TD
             B --> C[LLM: Extract Structure]
             
             C --> REQ[Requirements & Responsibilities]
-            C --> S[Extracted Links]
-            C --> T[Team/Cultural Notes]
             C --> EDU_REQ[LLM: Education Requirements]
+            C --> T[Team/Cultural Notes]
+            C --> S[Extracted Links]
         end
         
         subgraph "Company Research"
@@ -92,8 +92,7 @@ flowchart TD
             VIO -->|No| FIN[✅ Final Resume]
             VIO -->|Yes| RL[LLM: Repair Plan]
             
-            RL -->|Updates| PLAN
-            RL -->|Edits| RW
+            RL -->|Updates| MAT
         end
     end
     
