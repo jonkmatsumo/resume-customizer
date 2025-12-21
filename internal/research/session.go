@@ -35,77 +35,123 @@ func RunResearch(ctx context.Context, opts RunResearchOptions) (*Session, error)
 	}
 
 	session := &Session{
-		Company:      opts.Company,
-		Domain:       opts.Domain,
-		CrawledURLs:  []string{},
-		Frontier:     []RankedURL{},
-		SkippedURLs:  []SkippedURL{},
-		BrandSignals: []BrandSignal{},
-		Corpus:       opts.InitialCorpus,
+		Company:        opts.Company,
+		Domain:         opts.Domain,
+		CrawledURLs:    []string{},
+		Frontier:       []RankedURL{},
+		SkippedURLs:    []SkippedURL{},
+		BrandSignals:   []BrandSignal{},
+		Corpus:         opts.InitialCorpus,
+		CompanyDomains: []string{},
 	}
 
-	// Filter seed URLs first
+	// Step 1: Identify company domains from seed URLs
 	if opts.Verbose {
-		log.Printf("[RESEARCH] Filtering %d seed URLs...", len(opts.SeedURLs))
+		log.Printf("[RESEARCH] Identifying company domains from %d seed URLs...", len(opts.SeedURLs))
 	}
 
-	filterResult, err := FilterLinks(ctx, opts.SeedURLs, opts.Company, opts.Domain, opts.APIKey)
+	companyDomains, err := IdentifyCompanyDomains(ctx, opts.SeedURLs, opts.Company, opts.APIKey)
 	if err != nil {
-		// Fallback to basic filtering
+		if opts.Verbose {
+			log.Printf("[RESEARCH] Domain identification failed: %v, falling back to provided domain", err)
+		}
+		// Fallback to the provided domain if identification fails
+		if opts.Domain != "" {
+			companyDomains = []string{opts.Domain}
+		}
+	}
+
+	if len(companyDomains) > 0 {
+		session.CompanyDomains = companyDomains
+		if opts.Verbose {
+			log.Printf("[RESEARCH] Identified company domains: %v", companyDomains)
+		}
+	}
+
+	// Step 2: Pre-filter seeds to only company domains (if we have them)
+	filteredSeeds := opts.SeedURLs
+	if len(companyDomains) > 0 {
+		filteredSeeds = FilterToCompanyDomains(opts.SeedURLs, companyDomains)
+		if opts.Verbose {
+			log.Printf("[RESEARCH] Pre-filtered from %d to %d company domain URLs",
+				len(opts.SeedURLs), len(filteredSeeds))
+		}
+
+		// Track skipped non-company URLs
 		for _, u := range opts.SeedURLs {
+			if !IsFromCompanyDomain(u, companyDomains) && !IsThirdParty(u) {
+				session.SkippedURLs = append(session.SkippedURLs, SkippedURL{
+					URL:    u,
+					Reason: "not company domain",
+				})
+			} else if IsThirdParty(u) {
+				session.SkippedURLs = append(session.SkippedURLs, SkippedURL{
+					URL:    u,
+					Reason: "third-party platform",
+				})
+			}
+		}
+	}
+
+	// Step 3: LLM filter for relevance + priority
+	if opts.Verbose {
+		log.Printf("[RESEARCH] Filtering %d URLs for relevance...", len(filteredSeeds))
+	}
+
+	domainsStr := strings.Join(companyDomains, ", ")
+	filterResult, err := FilterLinks(ctx, filteredSeeds, opts.Company, domainsStr, opts.APIKey)
+	if err != nil {
+		// Fallback to basic filtering with path priority
+		if opts.Verbose {
+			log.Printf("[RESEARCH] LLM filtering failed: %v, using path-based priority", err)
+		}
+		for _, u := range filteredSeeds {
 			if IsThirdParty(u) {
 				session.SkippedURLs = append(session.SkippedURLs, SkippedURL{URL: u, Reason: "third-party"})
 			} else {
-				session.Frontier = append(session.Frontier, RankedURL{URL: u, Priority: 0.5, Reason: "seed"})
+				priority := AssignPathPriority(u)
+				session.Frontier = append(session.Frontier, RankedURL{
+					URL:      u,
+					Priority: priority,
+					Reason:   "fallback path-based",
+				})
 			}
 		}
 	} else {
 		session.Frontier = filterResult.Kept
-		session.SkippedURLs = filterResult.Skipped
+		session.SkippedURLs = append(session.SkippedURLs, filterResult.Skipped...)
 	}
 
 	if opts.Verbose {
-		log.Printf("[RESEARCH] Kept %d URLs, skipped %d", len(session.Frontier), len(session.SkippedURLs))
+		log.Printf("[RESEARCH] After filtering: kept %d URLs, skipped %d",
+			len(session.Frontier), len(session.SkippedURLs))
 	}
 
-	// Add search-based URLs (also filter them)
-	searchURLs, err := searchHighValuePages(ctx, opts.Company, opts.Domain, opts.APIKey)
-	if err == nil && len(searchURLs) > 0 {
-		// Convert to string list for filtering
-		searchLinks := make([]string, 0, len(searchURLs))
-		for _, u := range searchURLs {
-			if !isInList(u.URL, session.Frontier) && !isInList(u.URL, session.CrawledURLs) {
-				searchLinks = append(searchLinks, u.URL)
+	// Step 4: Add high-value pattern URLs for company domains
+	if len(companyDomains) > 0 {
+		patternURLs := generateHighValueURLs(companyDomains)
+		for _, pu := range patternURLs {
+			if !isInList(pu.URL, session.Frontier) && !isInList(pu.URL, session.CrawledURLs) {
+				session.Frontier = append(session.Frontier, pu)
 			}
 		}
-
-		// Filter search results through LLM
-		if len(searchLinks) > 0 {
-			filterResult, err = FilterLinks(ctx, searchLinks, opts.Company, opts.Domain, opts.APIKey)
-			if err == nil {
-				for _, kept := range filterResult.Kept {
-					if !isInList(kept.URL, session.Frontier) {
-						session.Frontier = append(session.Frontier, kept)
-					}
-				}
-				session.SkippedURLs = append(session.SkippedURLs, filterResult.Skipped...)
-				if opts.Verbose {
-					log.Printf("[RESEARCH] Filtered search URLs: kept %d, skipped %d",
-						len(filterResult.Kept), len(filterResult.Skipped))
-				}
-			} else {
-				// Fallback: use basic third-party filtering
-				for _, u := range searchURLs {
-					if !isInList(u.URL, session.Frontier) && !IsThirdParty(u.URL) {
-						session.Frontier = append(session.Frontier, u)
-					}
-				}
-			}
+		if opts.Verbose {
+			log.Printf("[RESEARCH] Added %d high-value pattern URLs", len(patternURLs))
 		}
 	}
 
-	// Sort frontier by priority
+	// Step 5: Sort frontier by priority (highest first)
 	sortFrontierByPriority(session)
+
+	if opts.Verbose && len(session.Frontier) > 0 {
+		log.Printf("[RESEARCH] Top 5 frontier URLs:")
+		for i, u := range session.Frontier {
+			if i >= 5 {
+				break
+			}
+			log.Printf("  [%.2f] %s (%s)", u.Priority, u.URL, u.Type)
+		}
+	}
 
 	// Crawl loop
 	pagesProcessed := 0
@@ -172,6 +218,26 @@ func RunResearch(ctx context.Context, opts RunResearchOptions) (*Session, error)
 	return session, nil
 }
 
+// generateHighValueURLs creates URLs for common high-value paths across company domains
+func generateHighValueURLs(companyDomains []string) []RankedURL {
+	patterns := HighValuePatterns()
+	var results []RankedURL
+
+	for _, domain := range companyDomains {
+		for pattern, priority := range patterns {
+			expectedURL := fmt.Sprintf("https://%s/%s", domain, pattern)
+			results = append(results, RankedURL{
+				URL:      expectedURL,
+				Priority: priority,
+				Reason:   "expected high-value pattern: " + pattern,
+				Type:     categorizePattern(pattern),
+			})
+		}
+	}
+
+	return results
+}
+
 func fetchPage(ctx context.Context, pageURL string, useBrowser bool, verbose bool) (string, error) {
 	result, err := fetch.URL(ctx, pageURL, nil)
 	if err != nil {
@@ -187,28 +253,6 @@ func fetchPage(ctx context.Context, pageURL string, useBrowser bool, verbose boo
 	return result.HTML, nil
 }
 
-func searchHighValuePages(_ context.Context, _ string, domain string, _ string) ([]RankedURL, error) {
-	if domain == "" {
-		return nil, nil
-	}
-	// This would use Google Custom Search API in production
-	// For now, generate expected URLs based on patterns
-	var results []RankedURL
-
-	patterns := HighValuePatterns()
-	for pattern, priority := range patterns {
-		expectedURL := fmt.Sprintf("https://%s/%s", domain, pattern)
-		results = append(results, RankedURL{
-			URL:      expectedURL,
-			Priority: priority,
-			Reason:   "expected pattern: " + pattern,
-			Type:     categorizePattern(pattern),
-		})
-	}
-
-	return results, nil
-}
-
 func categorizePattern(pattern string) string {
 	switch {
 	case strings.Contains(pattern, "values") || strings.Contains(pattern, "principles"):
@@ -219,6 +263,10 @@ func categorizePattern(pattern string) string {
 		return "engineering"
 	case strings.Contains(pattern, "about"):
 		return "about"
+	case strings.Contains(pattern, "mission"):
+		return "values"
+	case strings.Contains(pattern, "careers"):
+		return "careers"
 	default:
 		return "other"
 	}

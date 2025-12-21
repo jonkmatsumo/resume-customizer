@@ -133,14 +133,57 @@ cp .env.example .env
 ### Full Pipeline Run
 Use the `run` command to process all stages from ingestion to final PDF generation.
 
+**Option 1: Using a config file (recommended)**
+```bash
+# Copy and customize the example config
+cp config.example.json config.json
+
+# Run with config file
+./bin/resume_agent run --config config.json
+```
+
+**Option 2: Using command-line flags**
 ```bash
 make resume-run ARGS="--job job.txt \
                      --experience history.json \
-                     --company-seed https://company.com \
                      --out output/ \
                      --name \"Jane Smith\" \
                      --email \"jane@example.com\""
 ```
+
+**Option 3: Mixed (config + overrides)**
+```bash
+# Config provides defaults, CLI flags override specific values
+./bin/resume_agent run --config config.json --job-url https://... --verbose
+```
+
+### Config File Reference
+
+Create a `config.json` file to store common settings:
+
+```json
+{
+  "job_url": "https://job-boards.greenhouse.io/company/jobs/12345",
+  "experience": "history.json",
+  "output": "artifacts/",
+  "name": "Jane Smith",
+  "email": "jane@example.com",
+  "max_bullets": 25,
+  "max_lines": 35
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `job` | Path to job posting text file (mutually exclusive with `job_url`) |
+| `job_url` | URL to fetch job posting from (mutually exclusive with `job`) |
+| `experience` | Path to experience bank JSON file |
+| `output` | Output directory |
+| `template` | Path to LaTeX template |
+| `name`, `email`, `phone` | Candidate contact info |
+| `max_bullets`, `max_lines` | Layout constraints |
+| `api_key` | Gemini API key (or use `GEMINI_API_KEY` env var) |
+| `verbose` | Enable debug logging |
 
 ---
 

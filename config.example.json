@@ -1,0 +1,13 @@
+{
+    "job_url": "https://example.com/job-description",
+    "experience": "history.json",
+    "output": "artifacts/",
+    "template": "templates/one_page_resume.tex",
+    "name": "Jane Smith",
+    "email": "jane@example.com",
+    "phone": "555-0100",
+    "max_bullets": 25,
+    "max_lines": 35,
+    "verbose": true,
+    "_comment": "Use 'job' for a local file path OR 'job_url' to fetch from URL (mutually exclusive)"
+}

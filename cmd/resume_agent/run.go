@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/jonathan/resume-customizer/internal/config"
 	"github.com/jonathan/resume-customizer/internal/ingestion"
 	"github.com/jonathan/resume-customizer/internal/pipeline"
 	"github.com/spf13/cobra"
@@ -14,11 +15,14 @@ import (
 var runCommand = &cobra.Command{
 	Use:   "run",
 	Short: "Run the full resume generation pipeline end-to-end",
-	Long:  "Orchestrates the entire resume generation process: ingestion -> parsing -> planning -> selection -> crawling -> voice -> rewriting -> rendering -> validation -> repair.",
-	RunE:  runPipelineCmd,
+	Long: `Orchestrates the entire resume generation process: ingestion -> parsing -> planning -> selection -> crawling -> voice -> rewriting -> rendering -> validation -> repair.
+
+Configuration can be loaded from a JSON file using --config. Command-line arguments override config file values.`,
+	RunE: runPipelineCmd,
 }
 
 var (
+	runConfigPath  string
 	runJob         string
 	runJobURL      string
 	runExperience  string
@@ -36,87 +40,165 @@ var (
 )
 
 func init() {
+	// Config file flag (processed first)
+	runCommand.Flags().StringVar(&runConfigPath, "config", "", "Path to config.json file (values can be overridden by other flags)")
+
 	runCommand.Flags().StringVarP(&runJob, "job", "j", "", "Path to job posting text file (mutually exclusive with --job-url)")
 	runCommand.Flags().StringVar(&runJobURL, "job-url", "", "URL to fetch job posting from (mutually exclusive with --job)")
 	runCommand.Flags().StringVarP(&runExperience, "experience", "e", "", "Path to experience bank JSON file (required)")
 	runCommand.Flags().StringVarP(&runCompanySeed, "company-seed", "c", "", "Company seed URL (optional, auto-discovered if not provided)")
 	runCommand.Flags().StringVarP(&runOut, "out", "o", "", "Output directory (required)")
-	runCommand.Flags().StringVarP(&runName, "name", "n", "Candidate Name", "Candidate name")
-	runCommand.Flags().StringVar(&runEmail, "email", "email@example.com", "Candidate email")
-	runCommand.Flags().StringVar(&runPhone, "phone", "555-0100", "Candidate phone")
-	runCommand.Flags().StringVarP(&runTemplate, "template", "t", "templates/one_page_resume.tex", "Path to LaTeX template")
-	runCommand.Flags().IntVar(&runMaxBullets, "max-bullets", 25, "Maximum bullets allowed")
-	runCommand.Flags().IntVar(&runMaxLines, "max-lines", 35, "Maximum lines allowed")
+	runCommand.Flags().StringVarP(&runName, "name", "n", "", "Candidate name")
+	runCommand.Flags().StringVar(&runEmail, "email", "", "Candidate email")
+	runCommand.Flags().StringVar(&runPhone, "phone", "", "Candidate phone")
+	runCommand.Flags().StringVarP(&runTemplate, "template", "t", "", "Path to LaTeX template")
+	runCommand.Flags().IntVar(&runMaxBullets, "max-bullets", 0, "Maximum bullets allowed")
+	runCommand.Flags().IntVar(&runMaxLines, "max-lines", 0, "Maximum lines allowed")
 	runCommand.Flags().BoolVar(&runUseBrowser, "use-browser", false, "Use headless browser for SPA sites (requires Chrome)")
 	runCommand.Flags().BoolVarP(&runVerbose, "verbose", "v", false, "Print detailed debug information")
 
 	// API key can be passed as a flag, or read from env var GEMINI_API_KEY
 	runCommand.Flags().StringVar(&runAPIKey, "api-key", "", "Gemini API Key (optional, defaults to GEMINI_API_KEY env var)")
 
-	// Note: --job is no longer required; we validate mutual exclusivity in runPipelineCmd
-	// Note: --company-seed is now optional; auto-discovery via Google Search if not provided
-	if err := runCommand.MarkFlagRequired("experience"); err != nil {
-		panic(fmt.Sprintf("failed to mark experience flag as required: %v", err))
-	}
-	if err := runCommand.MarkFlagRequired("out"); err != nil {
-		panic(fmt.Sprintf("failed to mark out flag as required: %v", err))
-	}
+	// Note: --job is no longer required; we validate after merging config
+	// Note: --experience and --out may come from config file
 
 	rootCmd.AddCommand(runCommand)
 }
 
-func runPipelineCmd(_ *cobra.Command, _ []string) error {
-	// Validate mutual exclusivity of --job and --job-url
-	if runJob == "" && runJobURL == "" {
-		return fmt.Errorf("either --job or --job-url must be provided")
-	}
-	if runJob != "" && runJobURL != "" {
-		return fmt.Errorf("--job and --job-url are mutually exclusive; provide only one")
+func runPipelineCmd(cmd *cobra.Command, _ []string) error {
+	// Step 1: Load config file if provided
+	var cfg config.Config
+	if runConfigPath != "" {
+		loadedCfg, err := config.LoadConfig(runConfigPath)
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+
+		// Validate loaded config
+		if err := loadedCfg.Validate(); err != nil {
+			return err
+		}
+
+		cfg = *loadedCfg
+		if runVerbose {
+			_, _ = fmt.Fprintf(os.Stdout, "Loaded config from: %s\n", runConfigPath)
+		}
 	}
 
-	// API Key handling
-	if runAPIKey == "" {
-		runAPIKey = os.Getenv("GEMINI_API_KEY")
+	// Step 2: Apply CLI overrides (command-line args take priority)
+	// Only override if the flag was explicitly set
+	if cmd.Flags().Changed("job") {
+		cfg.Job = runJob
 	}
-	if runAPIKey == "" {
+	if cmd.Flags().Changed("job-url") {
+		cfg.JobURL = runJobURL
+	}
+	if cmd.Flags().Changed("experience") {
+		cfg.Experience = runExperience
+	}
+	if cmd.Flags().Changed("company-seed") {
+		cfg.CompanySeed = runCompanySeed
+	}
+	if cmd.Flags().Changed("out") {
+		cfg.Output = runOut
+	}
+	if cmd.Flags().Changed("name") {
+		cfg.Name = runName
+	}
+	if cmd.Flags().Changed("email") {
+		cfg.Email = runEmail
+	}
+	if cmd.Flags().Changed("phone") {
+		cfg.Phone = runPhone
+	}
+	if cmd.Flags().Changed("template") {
+		cfg.Template = runTemplate
+	}
+	if cmd.Flags().Changed("max-bullets") {
+		cfg.MaxBullets = runMaxBullets
+	}
+	if cmd.Flags().Changed("max-lines") {
+		cfg.MaxLines = runMaxLines
+	}
+	if cmd.Flags().Changed("api-key") {
+		cfg.APIKey = runAPIKey
+	}
+	if cmd.Flags().Changed("use-browser") {
+		cfg.UseBrowser = runUseBrowser
+	}
+	if cmd.Flags().Changed("verbose") {
+		cfg.Verbose = runVerbose
+	}
+
+	// Step 3: Apply defaults for unset values
+	defaults := config.Config{
+		Name:       "Candidate Name",
+		Email:      "email@example.com",
+		Phone:      "555-0100",
+		Template:   "templates/one_page_resume.tex",
+		MaxBullets: 25,
+		MaxLines:   35,
+	}
+	cfg = cfg.MergeWithDefaults(defaults)
+
+	// Step 4: Validate required fields
+	if cfg.Job == "" && cfg.JobURL == "" {
+		return fmt.Errorf("either --job or --job-url must be provided (via flag or config)")
+	}
+	if cfg.Job != "" && cfg.JobURL != "" {
+		return fmt.Errorf("--job and --job-url are mutually exclusive; provide only one")
+	}
+	if cfg.Experience == "" {
+		return fmt.Errorf("--experience is required (via flag or config)")
+	}
+	if cfg.Output == "" {
+		return fmt.Errorf("--out is required (via flag or config)")
+	}
+
+	// Step 5: API Key handling
+	if cfg.APIKey == "" {
+		cfg.APIKey = os.Getenv("GEMINI_API_KEY")
+	}
+	if cfg.APIKey == "" {
 		return fmt.Errorf("GEMINI_API_KEY environment variable or --api-key flag is required")
 	}
 
 	// If --job-url is provided, ingest the job posting first
-	jobPath := runJob
-	if runJobURL != "" {
-		_, _ = fmt.Fprintf(os.Stdout, "Ingesting job posting from URL: %s\n", runJobURL)
+	jobPath := cfg.Job
+	if cfg.JobURL != "" {
+		_, _ = fmt.Fprintf(os.Stdout, "Ingesting job posting from URL: %s\n", cfg.JobURL)
 
 		ctx := context.Background()
-		cleanedText, metadata, err := ingestion.IngestFromURL(ctx, runJobURL, runAPIKey, runUseBrowser, runVerbose)
+		cleanedText, metadata, err := ingestion.IngestFromURL(ctx, cfg.JobURL, cfg.APIKey, cfg.UseBrowser, cfg.Verbose)
 		if err != nil {
 			return fmt.Errorf("failed to ingest job from URL: %w", err)
 		}
 
 		// Write the ingested job to the output directory
-		if err := ingestion.WriteOutput(runOut, cleanedText, metadata); err != nil {
+		if err := ingestion.WriteOutput(cfg.Output, cleanedText, metadata); err != nil {
 			return fmt.Errorf("failed to write ingested job: %w", err)
 		}
 
 		// Update jobPath to point to the ingested file
-		jobPath = filepath.Join(runOut, "job_posting.cleaned.txt")
+		jobPath = filepath.Join(cfg.Output, "job_posting.cleaned.txt")
 		_, _ = fmt.Fprintf(os.Stdout, "Job posting ingested to: %s\n", jobPath)
 	}
 
 	opts := pipeline.RunOptions{
 		JobPath:        jobPath,
-		ExperiencePath: runExperience,
-		CompanySeedURL: runCompanySeed,
-		OutputDir:      runOut,
-		CandidateName:  runName,
-		CandidateEmail: runEmail,
-		CandidatePhone: runPhone,
-		TemplatePath:   runTemplate,
-		MaxBullets:     runMaxBullets,
-		MaxLines:       runMaxLines,
-		APIKey:         runAPIKey,
-		UseBrowser:     runUseBrowser,
-		Verbose:        runVerbose,
+		ExperiencePath: cfg.Experience,
+		CompanySeedURL: cfg.CompanySeed,
+		OutputDir:      cfg.Output,
+		CandidateName:  cfg.Name,
+		CandidateEmail: cfg.Email,
+		CandidatePhone: cfg.Phone,
+		TemplatePath:   cfg.Template,
+		MaxBullets:     cfg.MaxBullets,
+		MaxLines:       cfg.MaxLines,
+		APIKey:         cfg.APIKey,
+		UseBrowser:     cfg.UseBrowser,
+		Verbose:        cfg.Verbose,
 	}
 
 	// Create a context (could be cancellable if we wanted to add signal handling)

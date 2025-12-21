@@ -10,8 +10,9 @@ import (
 // Session tracks an iterative research process
 type Session struct {
 	// Company info
-	Company string `json:"company"`
-	Domain  string `json:"domain"`
+	Company        string   `json:"company"`
+	Domain         string   `json:"domain"`
+	CompanyDomains []string `json:"company_domains,omitempty"` // Identified company domains
 
 	// URL management
 	CrawledURLs []string     `json:"crawled_urls"`
