@@ -101,8 +101,6 @@ flowchart TD
     class JOB,EXP input;
 ```
 
-**Legend:** 🟠 Orange = LLM-powered | 🔵 Blue = Deterministic
-
 **Data Flow:**
 - **JobProfile** combines: Requirements, Responsibilities, Level/Signals, Team Notes
 - **Team Notes** are shared with Company Research for context enrichment
