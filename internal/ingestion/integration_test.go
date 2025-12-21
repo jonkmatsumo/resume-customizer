@@ -38,7 +38,7 @@ func TestEndToEnd_TextFile(t *testing.T) {
 	assert.Contains(t, string(cleanedFileContent), "Senior Software Engineer")
 	assert.Contains(t, string(cleanedFileContent), "Requirements")
 
-	metaPath := filepath.Join(outDir, "job_posting.meta.json")
+	metaPath := filepath.Join(outDir, "job_posting.cleaned.meta.json")
 	metaFileContent, err := os.ReadFile(metaPath)
 	require.NoError(t, err)
 	assert.Contains(t, string(metaFileContent), "timestamp")
@@ -91,7 +91,7 @@ func TestEndToEnd_URL_MockServer(t *testing.T) {
 	assert.NotContains(t, string(cleanedFileContent), "Nav")
 	assert.NotContains(t, string(cleanedFileContent), "Footer")
 
-	metaPath := filepath.Join(outDir, "job_posting.meta.json")
+	metaPath := filepath.Join(outDir, "job_posting.cleaned.meta.json")
 	metaFileContent, err := os.ReadFile(metaPath)
 	require.NoError(t, err)
 	assert.Contains(t, string(metaFileContent), server.URL)
@@ -105,7 +105,7 @@ func TestOutputFileFormat_ValidJSON(t *testing.T) {
 	err := WriteOutput(tmpDir, cleanedText, metadata)
 	require.NoError(t, err)
 
-	metaPath := filepath.Join(tmpDir, "job_posting.meta.json")
+	metaPath := filepath.Join(tmpDir, "job_posting.cleaned.meta.json")
 	metaFileContent, err := os.ReadFile(metaPath)
 	require.NoError(t, err)
 

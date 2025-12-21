@@ -90,9 +90,13 @@ func IngestFromURL(ctx context.Context, urlStr string, apiKey string, useBrowser
 		log.Printf("[VERBOSE] Cleaned text: %d chars", len(cleanedText))
 	}
 
+	// Extract links for research seeds
+	_, links, _ := CleanHTML(result.HTML)
+
 	// Generate metadata
 	metadata := NewMetadata(cleanedText, urlStr)
 	metadata.Platform = string(platform)
+	metadata.ExtractedLinks = links
 
 	// If API key is provided, use LLM to extract structured content
 	if apiKey != "" {
@@ -111,6 +115,8 @@ func IngestFromURL(ctx context.Context, urlStr string, apiKey string, useBrowser
 			// Format extracted content with team context
 			cleanedText = FormatExtractedContent(extracted)
 			metadata.AdminInfo = extracted.AdminInfo
+			metadata.Company = extracted.Company
+			metadata.AboutCompany = extracted.AboutCompany
 		} else {
 			if verbose {
 				log.Printf("[VERBOSE] LLM extraction failed: %v, using cleaned text", err)

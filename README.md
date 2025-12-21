@@ -71,77 +71,98 @@ graph TD
     UpdatedPlan --> Materialize
     UpdatedBullets --> Rewrite
     
-    style Start fill:#e1f5ff
-    style FinalResume fill:#d4edda
-    style Violations fill:#fff3cd
-    style CheckViolations fill:#fff3cd
+    style Start fill:#6f8bb3,stroke:#333,stroke-width:2px,color:#000
+    style FinalResume fill:#6f8bb3,stroke:#333,stroke-width:2px,color:#000
+    style Violations fill:#bba6c7,stroke:#333,stroke-width:1px,color:#000
+    style CheckViolations fill:#bba6c7,stroke:#333,stroke-width:1px,color:#000
     
-    %% LLM-powered steps (orange)
-    style ParseJob fill:#ffe6cc
-    style SummarizeVoice fill:#ffe6cc
-    style Rewrite fill:#ffe6cc
-    style Repair fill:#ffe6cc
+    %% LLM-powered steps (Medium Sage Green)
+    classDef llm fill:#88b090,stroke:#333,stroke-width:2px,color:#000;
+    class ParseJob,SummarizeVoice,Rewrite,Repair llm;
     
-    %% Deterministic tools (blue)
-    style IngestJob fill:#cce5ff
-    style RankStories fill:#cce5ff
-    style SelectPlan fill:#cce5ff
-    style RenderLaTeX fill:#cce5ff
-    style Validate fill:#cce5ff
+    %% Deterministic tools (Cool Grey)
+    classDef tool fill:#a0aab5,stroke:#333,stroke-width:1px,color:#000;
+    class IngestJob,RankStories,SelectPlan,Materialize,Research,CrawlBrand,RenderLaTeX,Validate tool;
 ```
 
-### Research Pipeline (Detail of IngestJob → Research)
+### Detailed System Breakdown
 
-This diagram expands the job ingestion and company research workflow from the main pipeline above:
+This diagram expands the two main subsystems: **Research Pipeline** (gathering context) and **Resume Generation** (producing the artifact).
 
 ```mermaid
 flowchart TD
-    subgraph "Job Ingestion"
-        A[Job Posting URL] --> B[IngestFromURL]
-        B --> C[LLM: Extract JobContext]
+    %% ---------------- RESEARCH SUBSYSTEM ----------------
+    subgraph "Phase 1: Research & Context"
+        direction TB
         
-        C --> D[Requirements]
-        C --> E[Responsibilities]
-        C --> F[Level & Signals]
-        C --> T[Team Notes]
-        C --> S[Seed URLs]
+        subgraph "Ingestion"
+            A[Job Posting] --> B[Ingest & Clean]
+            B --> C[LLM: Extract Structure]
+            C --> D[Requirements]
+            C --> E[Responsibilities]
+            C --> T[Team/Cultural Notes]
+            C --> S[Extracted Links]
+        end
         
-        D --> JP[JobProfile]
-        E --> JP
-        F --> JP
-        T --> JP
+        subgraph "Company Research"
+            S --> FL[LLM: Filter Seeds]
+            FL -->|Kept| FR[URL Frontier]
+            
+            FR --> FE[Fetch Page]
+            FE --> EX[LLM: Extract Signals]
+            EX --> BG{More Data Needed?}
+            
+            BG -->|Yes| SE[Search & Expand]
+            SE --> FL
+            BG -->|No| AG[Aggregate Corpus]
+            
+            T -.->|Context| AG
+            AG --> SV[LLM: Summarize Voice]
+            SV --> CP[Company Profile]
+        end
+    end
+
+    %% ---------------- GENERATION SUBSYSTEM ----------------
+    subgraph "Phase 2: Resume Generation"
+        direction TB
+        
+        subgraph "Planning"
+            EXP[Experience Bank] --> RK[Rank Stories]
+            D --> RK
+            E --> RK
+            RK --> RS[Ranked Stories]
+            
+            RS --> SP[Select Optimum Plan]
+            SP --> PLAN[Resume Plan]
+            PLAN --> MAT[Materialize Bullets]
+        end
+        
+        subgraph "Drafting & Refining"
+            MAT --> RW[LLM: Rewrite Bullets]
+            CP -.->|Voice| RW
+            D -.->|Keywords| RW
+            
+            RW --> TEX[Render LaTeX]
+            TEX --> PDF[Compile PDF]
+            PDF --> VAL[Validate Constraints]
+            
+            VAL --> VIO{Violations?}
+            VIO -->|No| FIN[✅ Final Resume]
+            VIO -->|Yes| RL[LLM: Repair Plan]
+            
+            RL -->|Updates| PLAN
+            RL -->|Edits| RW
+        end
     end
     
-    subgraph "Company Research"
-        S --> FL[LLM: Filter Links]
-        FL -->|Kept| FR[URL Frontier]
-        FL -->|Skip| SK[Skipped: third-party]
-        
-        FR --> FE[Fetch Page]
-        FE --> EX[LLM: Extract Brand Signals]
-        EX --> BG{Budget > 0?}
-        BG -->|Yes| SE[Search & Expand]
-        SE --> FL2[LLM: Filter New Links]
-        FL2 --> FR
-        BG -->|No| AG[Aggregate Corpus]
-        
-        T -.->|shared| AG
-        AG --> SV[LLM: Summarize Voice]
-        SV --> CP[Company Profile]
-    end
+    %% Styling - Mid-tone Neutrals
+    classDef llm fill:#88b090,stroke:#333,stroke-width:2px,color:#000;
+    classDef tool fill:#a0aab5,stroke:#333,stroke-width:1px,color:#000;
+    classDef data fill:#bba6c7,stroke:#666,stroke-width:1px,stroke-dasharray: 5 5,color:#000;
     
-    JP --> OUT[To Resume Pipeline]
-    CP --> OUT
-    
-    style C fill:#ffe6cc
-    style FL fill:#ffe6cc
-    style FL2 fill:#ffe6cc
-    style EX fill:#ffe6cc
-    style SV fill:#ffe6cc
-    
-    style B fill:#cce5ff
-    style FE fill:#cce5ff
-    style AG fill:#cce5ff
+    class C,FL,EX,SV,RW,RL llm;
+    class B,FE,SE,AG,RK,SP,MAT,TEX,PDF,VAL tool;
+    class D,E,T,S,FR,CP,EXP,RS,PLAN,FIN data;
 ```
 
 **Legend:** 🟠 Orange = LLM-powered | 🔵 Blue = Deterministic

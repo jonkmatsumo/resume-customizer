@@ -29,7 +29,7 @@ func TestIngestJobCommand_TextFileSuccess(t *testing.T) {
 
 	// Verify output files exist
 	cleanedPath := filepath.Join(outDir, "job_posting.cleaned.txt")
-	metaPath := filepath.Join(outDir, "job_posting.meta.json")
+	metaPath := filepath.Join(outDir, "job_posting.cleaned.meta.json")
 
 	_, err = os.Stat(cleanedPath)
 	assert.NoError(t, err, "cleaned text file should exist")
@@ -164,7 +164,7 @@ func TestIngestJobCommand_OutputFilesExist(t *testing.T) {
 	assert.NotEmpty(t, cleanedContent)
 	assert.Contains(t, string(cleanedContent), "Test Job")
 
-	metaPath := filepath.Join(outDir, "job_posting.meta.json")
+	metaPath := filepath.Join(outDir, "job_posting.cleaned.meta.json")
 	metaContent, err := os.ReadFile(metaPath)
 	require.NoError(t, err)
 	assert.NotEmpty(t, metaContent)

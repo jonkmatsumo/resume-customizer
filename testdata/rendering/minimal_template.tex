@@ -5,14 +5,17 @@ Email: {{.Email}}
 {{if .Phone}}Phone: {{.Phone}}{{end}}
 
 Experience:
-{{range .Experience}}
-\textbf{ {{- .Role -}} } at {{.Company}}
-{{if .StartDate}}{{.StartDate}}{{end}}{{if and .StartDate .EndDate}} - {{end}}{{if .EndDate}}{{.EndDate}}{{end}}
+{{range .Companies}}
+{{- .Company}}
+{{range .Roles}}
+\textbf{ {{- .Role -}} }
+{{.DateRanges}}
 
 \begin{itemize}
 {{range .Bullets}}
 \item {{.}}
 {{end}}
 \end{itemize}
+{{end}}
 {{end}}
 \end{document}

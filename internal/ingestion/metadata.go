@@ -14,6 +14,8 @@ type Metadata struct {
 	Timestamp      string            `json:"timestamp"`                 // RFC3339 format
 	Hash           string            `json:"hash"`                      // SHA256 hex digest
 	Platform       string            `json:"platform,omitempty"`        // Detected job board platform
+	Company        string            `json:"company,omitempty"`         // Detected company name
+	AboutCompany   string            `json:"about_company,omitempty"`   // Verbatim "About Us" text
 	AdminInfo      map[string]string `json:"admin_info,omitempty"`      // Salary, Clearance, Citizenship, etc.
 	ExtractedLinks []string          `json:"extracted_links,omitempty"` // Links found in the job posting
 }

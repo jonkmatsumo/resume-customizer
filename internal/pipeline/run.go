@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/jonathan/resume-customizer/internal/experience"
+	"github.com/jonathan/resume-customizer/internal/fetch"
 	"github.com/jonathan/resume-customizer/internal/ingestion"
 	"github.com/jonathan/resume-customizer/internal/parsing"
 	"github.com/jonathan/resume-customizer/internal/ranking"
@@ -35,6 +36,8 @@ type RunOptions struct {
 	MaxBullets     int
 	MaxLines       int
 	APIKey         string
+	UseBrowser     bool
+	Verbose        bool
 }
 
 // RunPipeline orchestrates the full resume generation pipeline
@@ -110,15 +113,35 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 
 	// Determine seeds and company info for research
 	var seeds []string
+	if jobMetadata != nil && len(jobMetadata.ExtractedLinks) > 0 {
+		seeds = append(seeds, jobMetadata.ExtractedLinks...)
+	}
+
+	// Build initial corpus from "About Company" section if available
+	initialCorpus := ""
+	if jobMetadata != nil && jobMetadata.AboutCompany != "" {
+		initialCorpus = "## About the Company\n" + jobMetadata.AboutCompany + "\n\n"
+	}
+
 	companyName := jobProfile.Company
+	if companyName == "" && jobMetadata != nil && jobMetadata.Company != "" {
+		companyName = jobMetadata.Company
+	}
+	if companyName == "" && jobMetadata != nil && jobMetadata.URL != "" {
+		companyName = fetch.ExtractCompanyFromURL(jobMetadata.URL)
+	}
 	companyDomain := ""
 
 	// If Google Search API keys are present, try discovery
 	googleKey := os.Getenv("GOOGLE_SEARCH_API_KEY")
 	googleCX := os.Getenv("GOOGLE_SEARCH_CX")
 
+	if googleKey == "" || googleCX == "" {
+		fmt.Printf("Debug: Google Search API keys not found in environment (GOOGLE_SEARCH_API_KEY: %t, GOOGLE_SEARCH_CX: %t)\n", googleKey != "", googleCX != "")
+	}
+
 	if googleKey != "" && googleCX != "" {
-		fmt.Printf("Using Google Search for discovery...\\n")
+		fmt.Printf("Using Google Search for discovery...\n")
 		researcher, err := research.NewResearcher(ctx, googleKey, googleCX)
 		if err == nil {
 			// 1. Discover website if not provided
@@ -126,9 +149,9 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 			if companyWebsite == "" && companyName != "" {
 				website, err := researcher.DiscoverCompanyWebsite(ctx, jobProfile)
 				if err != nil {
-					fmt.Printf("Warning: Failed to discover company website: %v\\n", err)
+					fmt.Printf("Warning: Failed to discover company website: %v\n", err)
 				} else {
-					fmt.Printf("Discovered company website: %s\\n", website)
+					fmt.Printf("Discovered company website: %s\n", website)
 					companyWebsite = website
 				}
 			}
@@ -143,14 +166,14 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 			if companyWebsite != "" || companyName != "" {
 				discoveredSeeds, err := researcher.FindVoiceSeeds(ctx, companyName, companyWebsite)
 				if err != nil {
-					fmt.Printf("Warning: Failed to find voice seeds: %v\\n", err)
+					fmt.Printf("Warning: Failed to find voice seeds: %v\n", err)
 				} else {
-					fmt.Printf("Discovered %d additional voice seeds\\n", len(discoveredSeeds))
+					fmt.Printf("Discovered %d additional voice seeds\n", len(discoveredSeeds))
 					seeds = append(seeds, discoveredSeeds...)
 				}
 			}
 		} else {
-			fmt.Printf("Warning: Failed to initialize researcher: %v\\n", err)
+			fmt.Printf("Warning: Failed to initialize researcher: %v\n", err)
 		}
 	}
 
@@ -176,17 +199,18 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		return fmt.Errorf("no company seed URL provided and discovery failed. Set GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CX env vars for auto-discovery, or provide --company-seed")
 	}
 
-	fmt.Printf("Researching company voice with LLM-guided crawling (seeds: %v)...\\n", seeds)
+	fmt.Printf("Researching company voice with LLM-guided crawling (seeds: %v)...\n", seeds)
 
 	// Use research module for smarter LLM-filtered crawling
 	researchSession, err := research.RunResearch(ctx, research.RunResearchOptions{
-		SeedURLs:   seeds,
-		Company:    companyName,
-		Domain:     companyDomain,
-		MaxPages:   5,
-		APIKey:     opts.APIKey,
-		Verbose:    true,
-		UseBrowser: false,
+		SeedURLs:      seeds,
+		Company:       companyName,
+		Domain:        companyDomain,
+		InitialCorpus: initialCorpus,
+		MaxPages:      5,
+		APIKey:        opts.APIKey,
+		Verbose:       opts.Verbose,
+		UseBrowser:    opts.UseBrowser,
 	})
 	if err != nil {
 		return fmt.Errorf("research failed: %w", err)

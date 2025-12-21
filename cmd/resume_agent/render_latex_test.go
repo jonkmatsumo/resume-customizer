@@ -324,7 +324,7 @@ func TestRenderLaTeXCommand_WithExperienceBank(t *testing.T) {
 	experienceBytes, _ := json.Marshal(experienceBank)
 	_ = os.WriteFile(experienceFile, experienceBytes, 0644)
 
-	templateContent := `\documentclass{article}\begin{document}Name: {{.Name}}{{range .Experience}}Company: {{.Company}}{{end}}\end{document}`
+	templateContent := `\documentclass{article}\begin{document}Name: {{.Name}}{{range .Companies}}Company: {{.Company}}{{end}}\end{document}`
 	_ = os.WriteFile(templateFile, []byte(templateContent), 0644)
 
 	cmd := exec.Command(binaryPath, "render-latex",

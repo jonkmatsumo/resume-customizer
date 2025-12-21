@@ -3,6 +3,7 @@ package ingestion
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -191,6 +192,63 @@ func IngestFromFile(ctx context.Context, path string, apiKey string) (string, *M
 	metadata.ExtractedLinks = links
 	metadata.AdminInfo = adminInfo
 
+	// Attempt to load corresponding metadata if it exists (e.g., job_posting.meta.json)
+	metaPath := strings.TrimSuffix(path, filepath.Ext(path)) + ".meta.json"
+	if _, err := os.Stat(metaPath); err == nil {
+		if metaData, err := os.ReadFile(metaPath); err == nil {
+			var m Metadata
+			if err := json.Unmarshal(metaData, &m); err == nil {
+				// Merge loaded metadata
+				if m.URL != "" {
+					metadata.URL = m.URL
+				}
+				if m.Platform != "" {
+					metadata.Platform = m.Platform
+				}
+				if m.Company != "" {
+					metadata.Company = m.Company
+				}
+				if m.AboutCompany != "" {
+					metadata.AboutCompany = m.AboutCompany
+				}
+				if len(m.ExtractedLinks) > 0 {
+					metadata.ExtractedLinks = m.ExtractedLinks
+				}
+				if len(m.AdminInfo) > 0 {
+					metadata.AdminInfo = m.AdminInfo
+				}
+			}
+		}
+	} else {
+		// Try .json if .meta.json doesn't exist
+		metaPath = strings.TrimSuffix(path, filepath.Ext(path)) + ".json"
+		if _, err := os.Stat(metaPath); err == nil {
+			if metaData, err := os.ReadFile(metaPath); err == nil {
+				var m Metadata
+				if err := json.Unmarshal(metaData, &m); err == nil {
+					if m.URL != "" {
+						metadata.URL = m.URL
+					}
+					if m.Platform != "" {
+						metadata.Platform = m.Platform
+					}
+					if m.Company != "" {
+						metadata.Company = m.Company
+					}
+					if m.AboutCompany != "" {
+						metadata.AboutCompany = m.AboutCompany
+					}
+					if len(m.ExtractedLinks) > 0 {
+						metadata.ExtractedLinks = m.ExtractedLinks
+					}
+					if len(m.AdminInfo) > 0 {
+						metadata.AdminInfo = m.AdminInfo
+					}
+				}
+			}
+		}
+	}
+
 	return cleanedText, metadata, nil
 }
 
@@ -208,7 +266,8 @@ func WriteOutput(outDir string, cleanedText string, metadata *Metadata) error {
 	}
 
 	// Write metadata JSON file
-	metaPath := filepath.Join(outDir, "job_posting.meta.json")
+	// Note: Must match the pattern IngestFromFile expects (stripped extension + .meta.json)
+	metaPath := filepath.Join(outDir, "job_posting.cleaned.meta.json")
 	metaJSON, err := metadata.ToJSON()
 	if err != nil {
 		return fmt.Errorf("failed to marshal metadata: %w", err)

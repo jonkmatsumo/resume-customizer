@@ -139,3 +139,39 @@ func PlatformNoiseSelectors(platform Platform) []string {
 		return common
 	}
 }
+
+// ExtractCompanyFromURL attempts to extract the company identifier from a known job board URL.
+func ExtractCompanyFromURL(urlStr string) string {
+	parsed, err := url.Parse(urlStr)
+	if err != nil {
+		return ""
+	}
+
+	platform := DetectPlatform(urlStr)
+	pathParts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+
+	switch platform {
+	case PlatformGreenhouse:
+		// Greenhouse usually has company in the first path part
+		// e.g., boards.greenhouse.io/doordashusa/jobs/...
+		if len(pathParts) > 0 {
+			return pathParts[0]
+		}
+	case PlatformLever:
+		// Lever usually has jobs.lever.co/company
+		if len(pathParts) > 0 {
+			return pathParts[0]
+		}
+	}
+
+	// Fallback: try to extract from host for Workday etc.
+	hostParts := strings.Split(strings.ToLower(parsed.Host), ".")
+	if len(hostParts) >= 3 {
+		// handle company.myworkdayjobs.com
+		if hostParts[len(hostParts)-2] == "myworkdayjobs" || hostParts[len(hostParts)-2] == "workday" {
+			return hostParts[0]
+		}
+	}
+
+	return ""
+}

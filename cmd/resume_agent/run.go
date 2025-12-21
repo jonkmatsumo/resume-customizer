@@ -115,6 +115,8 @@ func runPipelineCmd(_ *cobra.Command, _ []string) error {
 		MaxBullets:     runMaxBullets,
 		MaxLines:       runMaxLines,
 		APIKey:         runAPIKey,
+		UseBrowser:     runUseBrowser,
+		Verbose:        runVerbose,
 	}
 
 	// Create a context (could be cancellable if we wanted to add signal handling)

@@ -131,6 +131,12 @@ func JobRequirementsSchema() ExtractionSchema {
 				Required:    false,
 			},
 			{
+				Name:        "about_company",
+				Type:        "\"string\"",
+				Description: "Boilerplate/paragraphs about the company (About us, Our Mission, Who we are) - copy entire section verbatim",
+				Required:    false,
+			},
+			{
 				Name:        "admin_info",
 				Type:        "{\"key\": \"value\"}",
 				Description: "Salary, clearance, citizenship, location, job ID - extract key-value pairs",

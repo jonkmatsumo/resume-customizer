@@ -81,7 +81,7 @@ func runIngestJob(cmd *cobra.Command, _ []string) error {
 
 	_, _ = fmt.Fprintf(os.Stdout, "Successfully ingested job posting\n")
 	_, _ = fmt.Fprintf(os.Stdout, "Cleaned text: %s/job_posting.cleaned.txt\n", outDir)
-	_, _ = fmt.Fprintf(os.Stdout, "Metadata: %s/job_posting.meta.json\n", outDir)
+	_, _ = fmt.Fprintf(os.Stdout, "Metadata: %s/job_posting.cleaned.meta.json\n", outDir)
 
 	return nil
 }

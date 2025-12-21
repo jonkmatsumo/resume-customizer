@@ -18,7 +18,7 @@ func TestRunCommand_MissingFlags(t *testing.T) {
 	output, err := cmd.CombinedOutput()
 
 	assert.Error(t, err)
-	assert.Contains(t, string(output), "required flag(s) \"company-seed\", \"experience\", \"job\", \"out\" not set")
+	assert.Contains(t, string(output), "required flag(s) \"experience\", \"out\" not set")
 }
 
 func TestRunCommand_MissingAPIKey(t *testing.T) {

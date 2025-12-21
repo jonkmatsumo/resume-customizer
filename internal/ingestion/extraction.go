@@ -23,6 +23,7 @@ type ExtractedContent struct {
 	TeamContext string `json:"team_context,omitempty"`
 
 	// Core content
+	AboutCompany     string            `json:"about_company,omitempty"`
 	Requirements     []string          `json:"requirements"`
 	Responsibilities []string          `json:"responsibilities"`
 	NiceToHave       []string          `json:"nice_to_have,omitempty"`

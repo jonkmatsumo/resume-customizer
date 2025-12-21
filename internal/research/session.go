@@ -18,13 +18,14 @@ import (
 
 // RunResearchOptions configures the research session
 type RunResearchOptions struct {
-	SeedURLs   []string
-	Company    string
-	Domain     string
-	MaxPages   int
-	APIKey     string
-	Verbose    bool
-	UseBrowser bool
+	SeedURLs      []string
+	Company       string
+	Domain        string
+	InitialCorpus string // Pre-extracted company context (e.g., "About Us" from job post)
+	MaxPages      int
+	APIKey        string
+	Verbose       bool
+	UseBrowser    bool
 }
 
 // RunResearch executes an iterative research loop to build company corpus
@@ -40,6 +41,7 @@ func RunResearch(ctx context.Context, opts RunResearchOptions) (*Session, error)
 		Frontier:     []RankedURL{},
 		SkippedURLs:  []SkippedURL{},
 		BrandSignals: []BrandSignal{},
+		Corpus:       opts.InitialCorpus,
 	}
 
 	// Filter seed URLs first
@@ -186,6 +188,9 @@ func fetchPage(ctx context.Context, pageURL string, useBrowser bool, verbose boo
 }
 
 func searchHighValuePages(_ context.Context, _ string, domain string, _ string) ([]RankedURL, error) {
+	if domain == "" {
+		return nil, nil
+	}
 	// This would use Google Custom Search API in production
 	// For now, generate expected URLs based on patterns
 	var results []RankedURL
@@ -290,8 +295,17 @@ func summarizeFindingsBrief(session *Session) string {
 	return summary
 }
 
-// ExtractDomain extracts the domain from a URL
+// ExtractDomain extracts the domain from a URL. It handles schemeless URLs by prepending https://.
 func ExtractDomain(urlStr string) string {
+	if urlStr == "" {
+		return ""
+	}
+
+	// Prepend scheme if missing
+	if !strings.Contains(urlStr, "://") {
+		urlStr = "https://" + urlStr
+	}
+
 	parsed, err := url.Parse(urlStr)
 	if err != nil {
 		return ""
@@ -301,10 +315,11 @@ func ExtractDomain(urlStr string) string {
 	host = strings.TrimPrefix(host, "www.")
 
 	// Handle subdomains for job boards
-	if strings.Contains(host, "greenhouse.io") {
-		return ""
-	}
-	if strings.Contains(host, "lever.co") {
+	hostLower := strings.ToLower(host)
+	if strings.Contains(hostLower, "greenhouse.io") ||
+		strings.Contains(hostLower, "lever.co") ||
+		strings.Contains(hostLower, "workday.com") ||
+		strings.Contains(hostLower, "myworkdayjobs.com") {
 		return ""
 	}
 

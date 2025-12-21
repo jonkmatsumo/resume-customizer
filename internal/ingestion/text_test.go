@@ -176,7 +176,7 @@ func TestWriteOutput_Success(t *testing.T) {
 	assert.Equal(t, cleanedText, string(cleanedContent))
 
 	// Check metadata file exists
-	metaPath := filepath.Join(tmpDir, "job_posting.meta.json")
+	metaPath := filepath.Join(tmpDir, "job_posting.cleaned.meta.json")
 	metaContent, err := os.ReadFile(metaPath)
 	require.NoError(t, err)
 	assert.NotEmpty(t, metaContent)
@@ -226,4 +226,36 @@ func TestCleanText_ComplexFormatting(t *testing.T) {
 
 	// Should normalize whitespace but preserve structure
 	assert.NotEmpty(t, result)
+}
+
+func TestIngestFromFile_MergesCompanyFromMetadata(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create job file
+	testFile := filepath.Join(tmpDir, "job_posting.cleaned.txt")
+	err := os.WriteFile(testFile, []byte("Job content"), 0644)
+	require.NoError(t, err)
+
+	// Create metadata file with Company and AboutCompany
+	// Note: IngestFromFile strips the extension and adds .meta.json
+	// So job_posting.cleaned.txt looks for job_posting.cleaned.meta.json
+	metaFile := filepath.Join(tmpDir, "job_posting.cleaned.meta.json")
+	metaJSON := `{
+		"url": "https://example.com",
+		"timestamp": "2024-01-01T00:00:00Z",
+		"hash": "abc123",
+		"company": "TestCorp",
+		"about_company": "We build amazing things.",
+		"extracted_links": ["https://example.com/about"]
+	}`
+	err = os.WriteFile(metaFile, []byte(metaJSON), 0644)
+	require.NoError(t, err)
+
+	_, metadata, err := IngestFromFile(context.Background(), testFile, "")
+	require.NoError(t, err)
+
+	assert.Equal(t, "TestCorp", metadata.Company)
+	assert.Equal(t, "We build amazing things.", metadata.AboutCompany)
+	assert.Equal(t, "https://example.com", metadata.URL)
+	assert.Len(t, metadata.ExtractedLinks, 1)
 }
