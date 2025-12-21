@@ -23,9 +23,13 @@ type RunResearchOptions struct {
 	Domain        string
 	InitialCorpus string // Pre-extracted company context (e.g., "About Us" from job post)
 	MaxPages      int
-	APIKey        string
+	APIKey        string // Gemini API key for LLM operations
 	Verbose       bool
 	UseBrowser    bool
+
+	// Google Custom Search API (optional - enables search-based URL discovery)
+	GoogleAPIKey string // Google API key for Custom Search
+	GoogleCX     string // Google Custom Search engine ID
 }
 
 // RunResearch executes an iterative research loop to build company corpus
@@ -127,16 +131,64 @@ func RunResearch(ctx context.Context, opts RunResearchOptions) (*Session, error)
 			len(session.Frontier), len(session.SkippedURLs))
 	}
 
-	// Step 4: Add high-value pattern URLs for company domains
-	if len(companyDomains) > 0 {
+	// Step 4: Discover high-value URLs (search-first with pattern fallback)
+	highValueURLsFound := 0
+
+	// 4a: Try Google Search if API keys are available
+	if opts.GoogleAPIKey != "" && opts.GoogleCX != "" && len(companyDomains) > 0 {
+		if opts.Verbose {
+			log.Printf("[RESEARCH] Searching for high-value pages via Google Custom Search...")
+		}
+
+		researcher, err := NewResearcher(ctx, opts.GoogleAPIKey, opts.GoogleCX)
+		if err == nil {
+			// Use company domain as base for search
+			primaryDomain := companyDomains[0]
+			searchSeeds, err := researcher.FindVoiceSeeds(ctx, opts.Company, "https://"+primaryDomain)
+			if err == nil && len(searchSeeds) > 0 {
+				// Filter search results to company domains and add to frontier
+				validSearchURLs := FilterToCompanyDomains(searchSeeds, companyDomains)
+				for _, searchURL := range validSearchURLs {
+					if !isInList(searchURL, session.Frontier) && !isInList(searchURL, session.CrawledURLs) {
+						priority := AssignPathPriority(searchURL)
+						session.Frontier = append(session.Frontier, RankedURL{
+							URL:      searchURL,
+							Priority: priority,
+							Reason:   "discovered via search",
+							Type:     categorizePattern(searchURL),
+						})
+						highValueURLsFound++
+					}
+				}
+				if opts.Verbose {
+					log.Printf("[RESEARCH] Found %d high-value URLs via search", highValueURLsFound)
+				}
+			} else if opts.Verbose && err != nil {
+				log.Printf("[RESEARCH] Search failed: %v, falling back to pattern generation", err)
+			}
+		} else if opts.Verbose {
+			log.Printf("[RESEARCH] Could not create researcher: %v, falling back to patterns", err)
+		}
+	}
+
+	// 4b: Fall back to pattern-based URLs if search didn't find much
+	// Only use patterns if: no search API OR search found few URLs
+	if highValueURLsFound < 3 && len(companyDomains) > 0 {
+		if opts.Verbose {
+			log.Printf("[RESEARCH] Using pattern-based URL generation (fallback)...")
+		}
 		patternURLs := generateHighValueURLs(companyDomains)
+		patternCount := 0
 		for _, pu := range patternURLs {
 			if !isInList(pu.URL, session.Frontier) && !isInList(pu.URL, session.CrawledURLs) {
+				// Mark as speculative so we can track 404s differently
+				pu.Reason = "speculative pattern (may not exist)"
 				session.Frontier = append(session.Frontier, pu)
+				patternCount++
 			}
 		}
 		if opts.Verbose {
-			log.Printf("[RESEARCH] Added %d high-value pattern URLs", len(patternURLs))
+			log.Printf("[RESEARCH] Added %d pattern-based URLs (speculative)", patternCount)
 		}
 	}
 

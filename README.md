@@ -39,18 +39,22 @@ flowchart TD
         end
         
         subgraph "Company Research"
-            S --> FL[LLM: Filter Seeds]
+            S --> DI[LLM: Identify Company Domains]
+            DI --> DF[Filter to Company Domains]
+            DF --> FL[LLM: Filter & Prioritize Seeds]
             FL -->|Kept| FR[URL Frontier]
+            
+            FR --> SRCH{Search API Available?}
+            SRCH -->|Yes| GS[Google Search: Find Pages]
+            GS --> FR
+            SRCH -->|No| PAT[Generate Pattern URLs]
+            PAT --> FR
             
             FR --> FE[Fetch Page]
             FE --> EX[LLM: Extract Signals]
-            EX --> BG{More Data Needed?}
+            EX --> AG[Aggregate Corpus]
             
-            BG -->|Yes| SE[Search & Expand]
-            SE --> FL
-            BG -->|No| AG[Aggregate Corpus]
-            
-            T -.->|Context| AG
+            T -.-|Context| AG
             AG --> SV[LLM: Summarize Voice]
             SV --> CP[Company Profile]
         end

@@ -18,7 +18,8 @@ func TestRunCommand_MissingFlags(t *testing.T) {
 	output, err := cmd.CombinedOutput()
 
 	assert.Error(t, err)
-	assert.Contains(t, string(output), "required flag(s) \"experience\", \"out\" not set")
+	// After config file support, the error message changed
+	assert.Contains(t, string(output), "either --job or --job-url must be provided")
 }
 
 func TestRunCommand_MissingAPIKey(t *testing.T) {
