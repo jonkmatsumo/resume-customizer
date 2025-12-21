@@ -19,17 +19,23 @@ The pipeline orchestrates specialized agents that pass validated data between st
 
 ```mermaid
 flowchart TD
+    %% ---------------- USER INPUTS ----------------
+    JOB[Job Posting]
+    EXP[Experience Bank]
+
     %% ---------------- RESEARCH SUBSYSTEM ----------------
     subgraph "Phase 1: Research & Context"
         direction TB
         
         subgraph "Ingestion"
-            A[Job Posting] --> B[Ingest & Clean]
+            JOB --> B[Ingest & Clean]
             B --> C[LLM: Extract Structure]
+            
+            %% Reordered to minimize crossing lines
+            C --> S[Extracted Links]
             C --> D[Requirements]
             C --> E[Responsibilities]
             C --> T[Team/Cultural Notes]
-            C --> S[Extracted Links]
         end
         
         subgraph "Company Research"
@@ -55,7 +61,7 @@ flowchart TD
         direction TB
         
         subgraph "Planning"
-            EXP[Experience Bank] --> RK[Rank Stories]
+            EXP --> RK[Rank Stories]
             D --> RK
             E --> RK
             RK --> RS[Ranked Stories]
@@ -84,13 +90,15 @@ flowchart TD
     end
     
     %% Styling - Mid-tone Neutrals
+    classDef input fill:#6f8bb3,stroke:#333,stroke-width:2px,color:#000;
     classDef llm fill:#88b090,stroke:#333,stroke-width:2px,color:#000;
     classDef tool fill:#a0aab5,stroke:#333,stroke-width:1px,color:#000;
     classDef data fill:#bba6c7,stroke:#666,stroke-width:1px,stroke-dasharray: 5 5,color:#000;
     
     class C,FL,EX,SV,RW,RL llm;
     class B,FE,SE,AG,RK,SP,MAT,TEX,PDF,VAL tool;
-    class D,E,T,S,FR,CP,EXP,RS,PLAN,FIN data;
+    class D,E,T,S,FR,CP,RS,PLAN,FIN data;
+    class JOB,EXP input;
 ```
 
 **Legend:** 🟠 Orange = LLM-powered | 🔵 Blue = Deterministic
