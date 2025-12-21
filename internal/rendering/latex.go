@@ -158,11 +158,11 @@ func buildEducationSections(education []types.Education) []EducationSection {
 		// Format date range
 		dateRange := ""
 		if edu.StartDate != "" && edu.EndDate != "" {
-			dateRange = edu.StartDate + " -- " + edu.EndDate
+			dateRange = formatDate(edu.StartDate) + " -- " + formatDate(edu.EndDate)
 		} else if edu.EndDate != "" {
-			dateRange = edu.EndDate // Just graduation date
+			dateRange = formatDate(edu.EndDate) // Just graduation date
 		} else if edu.StartDate != "" {
-			dateRange = edu.StartDate + " -- Present"
+			dateRange = formatDate(edu.StartDate) + " -- Present"
 		}
 
 		// Format degree display
@@ -391,12 +391,36 @@ func mergeDateRanges(bullets []bulletWithMeta) string {
 	// Format as comma-separated
 	parts := make([]string, len(ranges))
 	for i, r := range ranges {
-		if r.EndDate == "present" {
-			parts[i] = EscapeLaTeX(r.StartDate) + " -- Present"
+		if strings.ToLower(r.EndDate) == "present" {
+			parts[i] = EscapeLaTeX(formatDate(r.StartDate)) + " -- Present"
 		} else {
-			parts[i] = EscapeLaTeX(r.StartDate) + " -- " + EscapeLaTeX(r.EndDate)
+			parts[i] = EscapeLaTeX(formatDate(r.StartDate)) + " -- " + EscapeLaTeX(formatDate(r.EndDate))
 		}
 	}
 
 	return strings.Join(parts, ", ")
+}
+
+// formatDate converts "YYYY-MM" to "MM-YYYY" for display
+func formatDate(dateStr string) string {
+	if dateStr == "" {
+		return ""
+	}
+	if strings.ToLower(dateStr) == "present" {
+		return "Present"
+	}
+
+	// Handle YYYY-MM-DD or other formats if they leak through,
+	// but primary focus is YYYY-MM to MM-YYYY
+	parts := strings.Split(dateStr, "-")
+	if len(parts) >= 2 {
+		// Take year and month
+		year := parts[0]
+		month := parts[1]
+		if len(year) == 4 && len(month) <= 2 {
+			return month + "-" + year
+		}
+	}
+
+	return dateStr
 }

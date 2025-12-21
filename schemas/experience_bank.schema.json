@@ -36,12 +36,12 @@
           "start_date": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}$",
-            "description": "Start date in YYYY-MM format"
+            "description": "Start date (internal format: YYYY-MM; displayed as: MM-YYYY)"
           },
           "end_date": {
             "type": "string",
             "pattern": "^(\\d{4}-\\d{2}|present)$",
-            "description": "End date in YYYY-MM format or 'present'"
+            "description": "End date (internal format: YYYY-MM or 'present'; displayed as: MM-YYYY or 'Present')"
           },
           "bullets": {
             "type": "array",
@@ -140,12 +140,12 @@
           "start_date": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}$",
-            "description": "Start date in YYYY-MM format (optional)"
+            "description": "Start date (internal format: YYYY-MM; displayed as: MM-YYYY)"
           },
           "end_date": {
             "type": "string",
             "pattern": "^(\\d{4}-\\d{2}|present)$",
-            "description": "End date/graduation date in YYYY-MM format or 'present' (optional)"
+            "description": "End date/graduation date (internal format: YYYY-MM or 'present'; displayed as: MM-YYYY or 'Present')"
           },
           "gpa": {
             "type": "string",
