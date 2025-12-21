@@ -39,7 +39,7 @@ func init() {
 	runCommand.Flags().StringVarP(&runJob, "job", "j", "", "Path to job posting text file (mutually exclusive with --job-url)")
 	runCommand.Flags().StringVar(&runJobURL, "job-url", "", "URL to fetch job posting from (mutually exclusive with --job)")
 	runCommand.Flags().StringVarP(&runExperience, "experience", "e", "", "Path to experience bank JSON file (required)")
-	runCommand.Flags().StringVarP(&runCompanySeed, "company-seed", "c", "", "Company seed URL (required)")
+	runCommand.Flags().StringVarP(&runCompanySeed, "company-seed", "c", "", "Company seed URL (optional, auto-discovered if not provided)")
 	runCommand.Flags().StringVarP(&runOut, "out", "o", "", "Output directory (required)")
 	runCommand.Flags().StringVarP(&runName, "name", "n", "Candidate Name", "Candidate name")
 	runCommand.Flags().StringVar(&runEmail, "email", "email@example.com", "Candidate email")
@@ -54,11 +54,9 @@ func init() {
 	runCommand.Flags().StringVar(&runAPIKey, "api-key", "", "Gemini API Key (optional, defaults to GEMINI_API_KEY env var)")
 
 	// Note: --job is no longer required; we validate mutual exclusivity in runPipelineCmd
+	// Note: --company-seed is now optional; auto-discovery via Google Search if not provided
 	if err := runCommand.MarkFlagRequired("experience"); err != nil {
 		panic(fmt.Sprintf("failed to mark experience flag as required: %v", err))
-	}
-	if err := runCommand.MarkFlagRequired("company-seed"); err != nil {
-		panic(fmt.Sprintf("failed to mark company-seed flag as required: %v", err))
 	}
 	if err := runCommand.MarkFlagRequired("out"); err != nil {
 		panic(fmt.Sprintf("failed to mark out flag as required: %v", err))

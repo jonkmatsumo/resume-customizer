@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jonathan/resume-customizer/internal/crawling"
 	"github.com/jonathan/resume-customizer/internal/experience"
 	"github.com/jonathan/resume-customizer/internal/ingestion"
 	"github.com/jonathan/resume-customizer/internal/parsing"
@@ -107,43 +106,51 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		return err
 	}
 
-	fmt.Printf("Step 7/12: Researching company voice...\n")
+	fmt.Printf("Step 7/12: Researching company voice...\\n")
 
-	// Determine seeds
+	// Determine seeds and company info for research
 	var seeds []string
+	companyName := jobProfile.Company
+	companyDomain := ""
 
 	// If Google Search API keys are present, try discovery
 	googleKey := os.Getenv("GOOGLE_SEARCH_API_KEY")
 	googleCX := os.Getenv("GOOGLE_SEARCH_CX")
 
 	if googleKey != "" && googleCX != "" {
-		fmt.Printf("Using Google Search for discovery...\n")
+		fmt.Printf("Using Google Search for discovery...\\n")
 		researcher, err := research.NewResearcher(ctx, googleKey, googleCX)
 		if err == nil {
-			// 1. Discover website if missing
+			// 1. Discover website if not provided
 			companyWebsite := opts.CompanySeedURL
-			if companyWebsite == "" {
+			if companyWebsite == "" && companyName != "" {
 				website, err := researcher.DiscoverCompanyWebsite(ctx, jobProfile)
 				if err != nil {
-					fmt.Printf("Warning: Failed to discover company website: %v\n", err)
+					fmt.Printf("Warning: Failed to discover company website: %v\\n", err)
 				} else {
-					fmt.Printf("Discovered company website: %s\n", website)
+					fmt.Printf("Discovered company website: %s\\n", website)
 					companyWebsite = website
 				}
 			}
 
-			// 2. Find voice seeds
-			if companyWebsite != "" || jobProfile.Company != "" {
-				discoveredSeeds, err := researcher.FindVoiceSeeds(ctx, jobProfile.Company, companyWebsite)
+			// Extract domain for research
+			if companyWebsite != "" {
+				companyDomain = research.ExtractDomain(companyWebsite)
+				seeds = append(seeds, companyWebsite)
+			}
+
+			// 2. Find voice seeds (About, Culture, Values pages)
+			if companyWebsite != "" || companyName != "" {
+				discoveredSeeds, err := researcher.FindVoiceSeeds(ctx, companyName, companyWebsite)
 				if err != nil {
-					fmt.Printf("Warning: Failed to find voice seeds: %v\n", err)
+					fmt.Printf("Warning: Failed to find voice seeds: %v\\n", err)
 				} else {
-					fmt.Printf("Discovered %d additional voice seeds\n", len(discoveredSeeds))
+					fmt.Printf("Discovered %d additional voice seeds\\n", len(discoveredSeeds))
 					seeds = append(seeds, discoveredSeeds...)
 				}
 			}
 		} else {
-			fmt.Printf("Warning: Failed to initialize researcher: %v\n", err)
+			fmt.Printf("Warning: Failed to initialize researcher: %v\\n", err)
 		}
 	}
 
@@ -159,18 +166,38 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		if !found {
 			seeds = append(seeds, opts.CompanySeedURL)
 		}
+		// Ensure domain is set
+		if companyDomain == "" {
+			companyDomain = research.ExtractDomain(opts.CompanySeedURL)
+		}
 	}
 
 	if len(seeds) == 0 {
-		return fmt.Errorf("no company seed URL provided and discovery failed (or disabled)")
+		return fmt.Errorf("no company seed URL provided and discovery failed. Set GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CX env vars for auto-discovery, or provide --company-seed")
 	}
 
-	fmt.Printf("Crawling company voice (seeds: %v)...\n", seeds)
-	// Default max pages to 5 (slightly higher due to better targeting)
-	companyCorpus, err := crawling.CrawlBrandCorpus(ctx, seeds, 5, opts.APIKey)
+	fmt.Printf("Researching company voice with LLM-guided crawling (seeds: %v)...\\n", seeds)
+
+	// Use research module for smarter LLM-filtered crawling
+	researchSession, err := research.RunResearch(ctx, research.RunResearchOptions{
+		SeedURLs:   seeds,
+		Company:    companyName,
+		Domain:     companyDomain,
+		MaxPages:   5,
+		APIKey:     opts.APIKey,
+		Verbose:    true,
+		UseBrowser: false,
+	})
 	if err != nil {
-		return fmt.Errorf("crawling company failed: %w", err)
+		return fmt.Errorf("research failed: %w", err)
 	}
+
+	// Build corpus from research session
+	companyCorpus := &types.CompanyCorpus{
+		Corpus:  researchSession.Corpus,
+		Sources: researchSession.ToSources(),
+	}
+
 	// Save sources
 	if err := saveJSON(filepath.Join(opts.OutputDir, "sources.json"), companyCorpus.Sources); err != nil {
 		return err
@@ -178,6 +205,10 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	// Save corpus text for debug
 	if err := os.WriteFile(filepath.Join(opts.OutputDir, "company_corpus.txt"), []byte(companyCorpus.Corpus), 0644); err != nil {
 		return fmt.Errorf("failed to save company corpus text: %w", err)
+	}
+	// Save research session for debug
+	if err := saveJSON(filepath.Join(opts.OutputDir, "research_session.json"), researchSession); err != nil {
+		return err
 	}
 
 	fmt.Printf("Step 8/12: Summarizing company voice...\n")

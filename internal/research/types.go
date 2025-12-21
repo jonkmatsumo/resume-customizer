@@ -1,6 +1,12 @@
 // Package research provides types for company research and brand discovery.
 package research
 
+import (
+	"time"
+
+	"github.com/jonathan/resume-customizer/internal/types"
+)
+
 // Session tracks an iterative research process
 type Session struct {
 	// Company info
@@ -15,6 +21,19 @@ type Session struct {
 	// Extracted content
 	BrandSignals []BrandSignal `json:"brand_signals"`
 	Corpus       string        `json:"corpus"`
+}
+
+// ToSources converts crawled URLs to types.Source slice for compatibility
+func (s *Session) ToSources() []types.Source {
+	sources := make([]types.Source, 0, len(s.CrawledURLs))
+	for _, url := range s.CrawledURLs {
+		sources = append(sources, types.Source{
+			URL:       url,
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+			Hash:      "", // Hash not available from research session
+		})
+	}
+	return sources
 }
 
 // RankedURL is a URL with priority for crawl ordering
