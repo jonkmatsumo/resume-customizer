@@ -378,7 +378,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	}
 
 	fmt.Printf("Step 11/12: Validating LaTeX constraints...\n")
-	violations, err := validation.ValidateConstraints(latexPath, companyProfile, 1, 120) // Default max 1 page, 120 chars per line (approx)
+	violations, err := validation.ValidateConstraints(latexPath, companyProfile, 1, 100) // Default max 1 page, 100 chars per line (approx)
 	if err != nil {
 		return fmt.Errorf("validating latex failed: %w", err)
 	}
@@ -412,7 +412,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 			candidateInfo,
 			selectedEducation,
 			1,   // max pages
-			120, // max chars per line
+			100, // max chars per line
 			5,   // max iterations
 			opts.APIKey,
 		)

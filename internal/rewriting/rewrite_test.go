@@ -39,7 +39,7 @@ func TestBuildRewritingPrompt(t *testing.T) {
 	assert.Contains(t, prompt, "direct, metric-driven")
 	assert.Contains(t, prompt, "Lead with metrics")
 	assert.Contains(t, prompt, "synergy")
-	assert.Contains(t, prompt, "15 characters")
+	assert.Contains(t, prompt, "200 characters")
 }
 
 func TestBuildRewritingPrompt_NilProfiles(t *testing.T) {
@@ -52,7 +52,7 @@ func TestBuildRewritingPrompt_NilProfiles(t *testing.T) {
 	prompt := buildRewritingPrompt(bullet, nil, nil, []string{})
 
 	assert.Contains(t, prompt, "Built a system")
-	assert.Contains(t, prompt, "15 characters")
+	assert.Contains(t, prompt, "200 characters")
 }
 
 func TestParseBulletResponse_PlainText(t *testing.T) {
