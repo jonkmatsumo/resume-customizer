@@ -205,8 +205,14 @@ func groupByCompanyAndRole(plan *types.ResumePlan, rewrittenBullets *types.Rewri
 
 	// Build output structure
 	companies := make([]CompanySection, 0, len(companyOrder))
+
+	// Track latest end date for each company (for sorting)
+	companyEndDates := make(map[string]string)
+
 	for _, companyName := range companyOrder {
 		roles := make([]RoleSection, 0)
+		latestEndDate := ""
+
 		for _, roleName := range companyRoleOrder[companyName] {
 			key := roleKey{Company: companyName, Role: roleName}
 			bullets := roleData[key]
@@ -216,6 +222,13 @@ func groupByCompanyAndRole(plan *types.ResumePlan, rewrittenBullets *types.Rewri
 
 			// Collect and merge date ranges
 			dateRanges := mergeDateRanges(bullets)
+
+			// Track the latest end date for this company
+			for _, b := range bullets {
+				if b.EndDate > latestEndDate || b.EndDate == "present" {
+					latestEndDate = b.EndDate
+				}
+			}
 
 			// Extract bullet texts
 			bulletTexts := make([]string, len(bullets))
@@ -230,11 +243,31 @@ func groupByCompanyAndRole(plan *types.ResumePlan, rewrittenBullets *types.Rewri
 			})
 		}
 
+		companyEndDates[companyName] = latestEndDate
+
 		companies = append(companies, CompanySection{
 			Company: EscapeLaTeX(companyName),
 			Roles:   roles,
 		})
 	}
+
+	// Sort companies by end date (most recent first)
+	// "present" is treated as the latest possible date
+	sort.Slice(companies, func(i, j int) bool {
+		endI := companyEndDates[companies[i].Company]
+		endJ := companyEndDates[companies[j].Company]
+
+		// "present" or empty string treated as most recent
+		if endI == "present" || endI == "" {
+			return true
+		}
+		if endJ == "present" || endJ == "" {
+			return false
+		}
+
+		// Compare dates (YYYY-MM format, lexicographic comparison works)
+		return endI > endJ
+	})
 
 	return companies, nil
 }
