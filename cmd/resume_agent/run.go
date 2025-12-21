@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
+	"github.com/jonathan/resume-customizer/internal/ingestion"
 	"github.com/jonathan/resume-customizer/internal/pipeline"
 	"github.com/spf13/cobra"
 )
@@ -18,6 +20,7 @@ var runCommand = &cobra.Command{
 
 var (
 	runJob         string
+	runJobURL      string
 	runExperience  string
 	runCompanySeed string
 	runOut         string
@@ -28,10 +31,13 @@ var (
 	runMaxBullets  int
 	runMaxLines    int
 	runAPIKey      string
+	runUseBrowser  bool
+	runVerbose     bool
 )
 
 func init() {
-	runCommand.Flags().StringVarP(&runJob, "job", "j", "", "Path to job posting text file (required)")
+	runCommand.Flags().StringVarP(&runJob, "job", "j", "", "Path to job posting text file (mutually exclusive with --job-url)")
+	runCommand.Flags().StringVar(&runJobURL, "job-url", "", "URL to fetch job posting from (mutually exclusive with --job)")
 	runCommand.Flags().StringVarP(&runExperience, "experience", "e", "", "Path to experience bank JSON file (required)")
 	runCommand.Flags().StringVarP(&runCompanySeed, "company-seed", "c", "", "Company seed URL (required)")
 	runCommand.Flags().StringVarP(&runOut, "out", "o", "", "Output directory (required)")
@@ -41,13 +47,13 @@ func init() {
 	runCommand.Flags().StringVarP(&runTemplate, "template", "t", "templates/one_page_resume.tex", "Path to LaTeX template")
 	runCommand.Flags().IntVar(&runMaxBullets, "max-bullets", 25, "Maximum bullets allowed")
 	runCommand.Flags().IntVar(&runMaxLines, "max-lines", 35, "Maximum lines allowed")
+	runCommand.Flags().BoolVar(&runUseBrowser, "use-browser", false, "Use headless browser for SPA sites (requires Chrome)")
+	runCommand.Flags().BoolVarP(&runVerbose, "verbose", "v", false, "Print detailed debug information")
 
 	// API key can be passed as a flag, or read from env var GEMINI_API_KEY
 	runCommand.Flags().StringVar(&runAPIKey, "api-key", "", "Gemini API Key (optional, defaults to GEMINI_API_KEY env var)")
 
-	if err := runCommand.MarkFlagRequired("job"); err != nil {
-		panic(fmt.Sprintf("failed to mark job flag as required: %v", err))
-	}
+	// Note: --job is no longer required; we validate mutual exclusivity in runPipelineCmd
 	if err := runCommand.MarkFlagRequired("experience"); err != nil {
 		panic(fmt.Sprintf("failed to mark experience flag as required: %v", err))
 	}
@@ -62,6 +68,14 @@ func init() {
 }
 
 func runPipelineCmd(_ *cobra.Command, _ []string) error {
+	// Validate mutual exclusivity of --job and --job-url
+	if runJob == "" && runJobURL == "" {
+		return fmt.Errorf("either --job or --job-url must be provided")
+	}
+	if runJob != "" && runJobURL != "" {
+		return fmt.Errorf("--job and --job-url are mutually exclusive; provide only one")
+	}
+
 	// API Key handling
 	if runAPIKey == "" {
 		runAPIKey = os.Getenv("GEMINI_API_KEY")
@@ -70,8 +84,29 @@ func runPipelineCmd(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("GEMINI_API_KEY environment variable or --api-key flag is required")
 	}
 
+	// If --job-url is provided, ingest the job posting first
+	jobPath := runJob
+	if runJobURL != "" {
+		_, _ = fmt.Fprintf(os.Stdout, "Ingesting job posting from URL: %s\n", runJobURL)
+
+		ctx := context.Background()
+		cleanedText, metadata, err := ingestion.IngestFromURL(ctx, runJobURL, runAPIKey, runUseBrowser, runVerbose)
+		if err != nil {
+			return fmt.Errorf("failed to ingest job from URL: %w", err)
+		}
+
+		// Write the ingested job to the output directory
+		if err := ingestion.WriteOutput(runOut, cleanedText, metadata); err != nil {
+			return fmt.Errorf("failed to write ingested job: %w", err)
+		}
+
+		// Update jobPath to point to the ingested file
+		jobPath = filepath.Join(runOut, "job_posting.cleaned.txt")
+		_, _ = fmt.Fprintf(os.Stdout, "Job posting ingested to: %s\n", jobPath)
+	}
+
 	opts := pipeline.RunOptions{
-		JobPath:        runJob,
+		JobPath:        jobPath,
 		ExperiencePath: runExperience,
 		CompanySeedURL: runCompanySeed,
 		OutputDir:      runOut,

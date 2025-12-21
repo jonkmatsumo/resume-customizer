@@ -4,6 +4,7 @@ package rendering
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -12,19 +13,29 @@ import (
 
 // TemplateData represents the data structure passed to the LaTeX template
 type TemplateData struct {
-	Name       string
-	Email      string
-	Phone      string
-	Experience []ExperienceEntry
+	Name      string
+	Email     string
+	Phone     string
+	Companies []CompanySection
 }
 
-// ExperienceEntry represents a single experience entry in the resume
-type ExperienceEntry struct {
-	Company   string
-	Role      string
+// CompanySection represents a company with one or more roles
+type CompanySection struct {
+	Company string
+	Roles   []RoleSection
+}
+
+// RoleSection represents a role within a company with merged date ranges
+type RoleSection struct {
+	Role       string
+	DateRanges string // e.g., "08/2020 - 10/2021, 07/2023 - 10/2023"
+	Bullets    []string
+}
+
+// dateRange represents a single date range for sorting
+type dateRange struct {
 	StartDate string
 	EndDate   string
-	Bullets   []string
 }
 
 // RenderLaTeX renders a LaTeX resume from a template using ResumePlan and RewrittenBullets
@@ -97,34 +108,47 @@ func buildTemplateData(plan *types.ResumePlan, rewrittenBullets *types.Rewritten
 	escapedEmail := EscapeLaTeX(email)
 	escapedPhone := EscapeLaTeX(phone)
 
-	// Format experience section
-	experience, err := formatExperience(plan, rewrittenBullets, experienceBank)
+	// Format experience section with grouping
+	companies, err := groupByCompanyAndRole(plan, rewrittenBullets, experienceBank)
 	if err != nil {
 		return nil, fmt.Errorf("failed to format experience: %w", err)
 	}
 
 	return &TemplateData{
-		Name:       escapedName,
-		Email:      escapedEmail,
-		Phone:      escapedPhone,
-		Experience: experience,
+		Name:      escapedName,
+		Email:     escapedEmail,
+		Phone:     escapedPhone,
+		Companies: companies,
 	}, nil
 }
 
-// formatExperience formats the experience section from ResumePlan and RewrittenBullets
-func formatExperience(plan *types.ResumePlan, rewrittenBullets *types.RewrittenBullets, experienceBank *types.ExperienceBank) ([]ExperienceEntry, error) {
+// roleKey is used for grouping bullets by company and role
+type roleKey struct {
+	Company string
+	Role    string
+}
+
+// bulletWithMeta holds bullet text along with its date range info
+type bulletWithMeta struct {
+	Text      string
+	StartDate string
+	EndDate   string
+}
+
+// groupByCompanyAndRole groups bullets by Company, then by Role, merging date ranges
+func groupByCompanyAndRole(plan *types.ResumePlan, rewrittenBullets *types.RewrittenBullets, experienceBank *types.ExperienceBank) ([]CompanySection, error) {
 	if plan == nil || len(plan.SelectedStories) == 0 {
-		return []ExperienceEntry{}, nil
+		return []CompanySection{}, nil
 	}
 
-	// Build a map of rewritten bullets by original bullet ID for quick lookup
+	// Build a map of rewritten bullets by original bullet ID
 	bulletMap := make(map[string]*types.RewrittenBullet)
 	for i := range rewrittenBullets.Bullets {
 		bullet := &rewrittenBullets.Bullets[i]
 		bulletMap[bullet.OriginalBulletID] = bullet
 	}
 
-	// Build a map of stories by story ID for quick lookup (if experienceBank provided)
+	// Build a map of stories by story ID
 	storyMap := make(map[string]*types.Story)
 	if experienceBank != nil {
 		for i := range experienceBank.Stories {
@@ -133,43 +157,122 @@ func formatExperience(plan *types.ResumePlan, rewrittenBullets *types.RewrittenB
 		}
 	}
 
-	// Format each selected story
-	experience := make([]ExperienceEntry, 0, len(plan.SelectedStories))
-	for _, selectedStory := range plan.SelectedStories {
-		// Get story details from experienceBank if available
-		var company, role, startDate, endDate string
-		if story, found := storyMap[selectedStory.StoryID]; found {
-			company = EscapeLaTeX(story.Company)
-			role = EscapeLaTeX(story.Role)
-			startDate = EscapeLaTeX(story.StartDate)
-			endDate = EscapeLaTeX(story.EndDate)
-		} else {
-			// Fallback: use story ID if experienceBank not provided
-			// This is a limitation - ideally we'd always have experienceBank
-			company = EscapeLaTeX(selectedStory.StoryID)
-			role = EscapeLaTeX("Role") // Placeholder, escaped
-			startDate = ""
-			endDate = ""
-		}
+	// Collect all bullets with their metadata, grouped by (Company, Role)
+	roleData := make(map[roleKey][]bulletWithMeta)
+	companyOrder := []string{}                    // Track order companies appear
+	companyRoleOrder := make(map[string][]string) // Track order roles appear within each company
+	seenCompanies := make(map[string]bool)
+	seenRoles := make(map[roleKey]bool)
 
-		// Collect bullets for this story
-		bullets := make([]string, 0)
-		for _, bulletID := range selectedStory.BulletIDs {
-			if bullet, found := bulletMap[bulletID]; found {
-				// Bullet text is already escaped when building TemplateData
-				escapedText := EscapeLaTeX(bullet.FinalText)
-				bullets = append(bullets, escapedText)
+	for _, selectedStory := range plan.SelectedStories {
+		story, found := storyMap[selectedStory.StoryID]
+		if !found {
+			// Fallback if story not in bank
+			story = &types.Story{
+				ID:        selectedStory.StoryID,
+				Company:   selectedStory.StoryID,
+				Role:      "Role",
+				StartDate: "",
+				EndDate:   "",
 			}
 		}
 
-		experience = append(experience, ExperienceEntry{
-			Company:   company,
-			Role:      role,
-			StartDate: startDate,
-			EndDate:   endDate,
-			Bullets:   bullets,
+		key := roleKey{Company: story.Company, Role: story.Role}
+
+		// Track company order
+		if !seenCompanies[story.Company] {
+			seenCompanies[story.Company] = true
+			companyOrder = append(companyOrder, story.Company)
+		}
+
+		// Track role order within company
+		if !seenRoles[key] {
+			seenRoles[key] = true
+			companyRoleOrder[story.Company] = append(companyRoleOrder[story.Company], story.Role)
+		}
+
+		// Add bullets for this story
+		for _, bulletID := range selectedStory.BulletIDs {
+			if bullet, ok := bulletMap[bulletID]; ok {
+				roleData[key] = append(roleData[key], bulletWithMeta{
+					Text:      EscapeLaTeX(bullet.FinalText),
+					StartDate: story.StartDate,
+					EndDate:   story.EndDate,
+				})
+			}
+		}
+	}
+
+	// Build output structure
+	companies := make([]CompanySection, 0, len(companyOrder))
+	for _, companyName := range companyOrder {
+		roles := make([]RoleSection, 0)
+		for _, roleName := range companyRoleOrder[companyName] {
+			key := roleKey{Company: companyName, Role: roleName}
+			bullets := roleData[key]
+			if len(bullets) == 0 {
+				continue
+			}
+
+			// Collect and merge date ranges
+			dateRanges := mergeDateRanges(bullets)
+
+			// Extract bullet texts
+			bulletTexts := make([]string, len(bullets))
+			for i, b := range bullets {
+				bulletTexts[i] = b.Text
+			}
+
+			roles = append(roles, RoleSection{
+				Role:       EscapeLaTeX(roleName),
+				DateRanges: dateRanges,
+				Bullets:    bulletTexts,
+			})
+		}
+
+		companies = append(companies, CompanySection{
+			Company: EscapeLaTeX(companyName),
+			Roles:   roles,
 		})
 	}
 
-	return experience, nil
+	return companies, nil
+}
+
+// mergeDateRanges collects unique date ranges from bullets, sorts them, and formats as comma-separated string
+func mergeDateRanges(bullets []bulletWithMeta) string {
+	// Collect unique date ranges
+	seen := make(map[string]bool)
+	ranges := []dateRange{}
+	for _, b := range bullets {
+		if b.StartDate == "" && b.EndDate == "" {
+			continue
+		}
+		key := b.StartDate + "-" + b.EndDate
+		if !seen[key] {
+			seen[key] = true
+			ranges = append(ranges, dateRange{StartDate: b.StartDate, EndDate: b.EndDate})
+		}
+	}
+
+	if len(ranges) == 0 {
+		return ""
+	}
+
+	// Sort by start date (chronologically)
+	sort.Slice(ranges, func(i, j int) bool {
+		return ranges[i].StartDate < ranges[j].StartDate
+	})
+
+	// Format as comma-separated
+	parts := make([]string, len(ranges))
+	for i, r := range ranges {
+		if r.EndDate == "present" {
+			parts[i] = EscapeLaTeX(r.StartDate) + " -- Present"
+		} else {
+			parts[i] = EscapeLaTeX(r.StartDate) + " -- " + EscapeLaTeX(r.EndDate)
+		}
+	}
+
+	return strings.Join(parts, ", ")
 }

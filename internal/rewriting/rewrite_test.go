@@ -31,7 +31,7 @@ func TestBuildRewritingPrompt(t *testing.T) {
 		TabooPhrases: []string{"synergy"},
 	}
 
-	prompt := buildRewritingPrompt(bullet, jobProfile, companyProfile)
+	prompt := buildRewritingPrompt(bullet, jobProfile, companyProfile, []string{})
 
 	assert.Contains(t, prompt, "Built a system")
 	assert.Contains(t, prompt, "Go")
@@ -49,7 +49,7 @@ func TestBuildRewritingPrompt_NilProfiles(t *testing.T) {
 		LengthChars: 15,
 	}
 
-	prompt := buildRewritingPrompt(bullet, nil, nil)
+	prompt := buildRewritingPrompt(bullet, nil, nil, []string{})
 
 	assert.Contains(t, prompt, "Built a system")
 	assert.Contains(t, prompt, "15 characters")

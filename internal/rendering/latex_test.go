@@ -89,12 +89,13 @@ func TestBuildTemplateData_ValidInput(t *testing.T) {
 	assert.Equal(t, "John Doe", data.Name)
 	assert.Equal(t, "john@example.com", data.Email)
 	assert.Equal(t, "555-1234", data.Phone)
-	assert.Len(t, data.Experience, 1)
-	assert.Equal(t, "Test Company", data.Experience[0].Company)
-	assert.Equal(t, "Engineer", data.Experience[0].Role)
+	require.Len(t, data.Companies, 1)
+	assert.Equal(t, "Test Company", data.Companies[0].Company)
+	require.Len(t, data.Companies[0].Roles, 1)
+	assert.Equal(t, "Engineer", data.Companies[0].Roles[0].Role)
 }
 
-func TestFormatExperience_ValidInput(t *testing.T) {
+func TestGroupByCompanyAndRole_ValidInput(t *testing.T) {
 	plan := &types.ResumePlan{
 		SelectedStories: []types.SelectedStory{
 			{
@@ -144,25 +145,27 @@ func TestFormatExperience_ValidInput(t *testing.T) {
 		},
 	}
 
-	experience, err := formatExperience(plan, rewrittenBullets, experienceBank)
+	companies, err := groupByCompanyAndRole(plan, rewrittenBullets, experienceBank)
 	require.NoError(t, err)
-	require.Len(t, experience, 2)
+	require.Len(t, companies, 2)
 
-	// Check first story
-	assert.Equal(t, "Company A", experience[0].Company)
-	assert.Equal(t, "Engineer", experience[0].Role)
-	assert.Len(t, experience[0].Bullets, 2)
-	assert.Contains(t, experience[0].Bullets, "First bullet")
-	assert.Contains(t, experience[0].Bullets, "Second bullet")
+	// Check first company
+	assert.Equal(t, "Company A", companies[0].Company)
+	require.Len(t, companies[0].Roles, 1)
+	assert.Equal(t, "Engineer", companies[0].Roles[0].Role)
+	assert.Len(t, companies[0].Roles[0].Bullets, 2)
+	assert.Contains(t, companies[0].Roles[0].Bullets, "First bullet")
+	assert.Contains(t, companies[0].Roles[0].Bullets, "Second bullet")
 
-	// Check second story
-	assert.Equal(t, "Company B", experience[1].Company)
-	assert.Equal(t, "Lead", experience[1].Role)
-	assert.Len(t, experience[1].Bullets, 1)
-	assert.Contains(t, experience[1].Bullets, "Third bullet")
+	// Check second company
+	assert.Equal(t, "Company B", companies[1].Company)
+	require.Len(t, companies[1].Roles, 1)
+	assert.Equal(t, "Lead", companies[1].Roles[0].Role)
+	assert.Len(t, companies[1].Roles[0].Bullets, 1)
+	assert.Contains(t, companies[1].Roles[0].Bullets, "Third bullet")
 }
 
-func TestFormatExperience_NoExperienceBank(t *testing.T) {
+func TestGroupByCompanyAndRole_NoExperienceBank(t *testing.T) {
 	plan := &types.ResumePlan{
 		SelectedStories: []types.SelectedStory{
 			{
@@ -182,14 +185,14 @@ func TestFormatExperience_NoExperienceBank(t *testing.T) {
 	}
 
 	// No experienceBank provided
-	experience, err := formatExperience(plan, rewrittenBullets, nil)
+	companies, err := groupByCompanyAndRole(plan, rewrittenBullets, nil)
 	require.NoError(t, err)
-	require.Len(t, experience, 1)
+	require.Len(t, companies, 1)
 	// Should use story ID as fallback (escaped for LaTeX)
-	assert.Equal(t, "story\\_001", experience[0].Company)
+	assert.Equal(t, "story\\_001", companies[0].Company)
 }
 
-func TestFormatExperience_EmptyPlan(t *testing.T) {
+func TestGroupByCompanyAndRole_EmptyPlan(t *testing.T) {
 	plan := &types.ResumePlan{
 		SelectedStories: []types.SelectedStory{},
 	}
@@ -198,9 +201,9 @@ func TestFormatExperience_EmptyPlan(t *testing.T) {
 		Bullets: []types.RewrittenBullet{},
 	}
 
-	experience, err := formatExperience(plan, rewrittenBullets, nil)
+	companies, err := groupByCompanyAndRole(plan, rewrittenBullets, nil)
 	require.NoError(t, err)
-	assert.Empty(t, experience)
+	assert.Empty(t, companies)
 }
 
 func TestRenderLaTeX_Success(t *testing.T) {
@@ -211,7 +214,7 @@ func TestRenderLaTeX_Success(t *testing.T) {
 \begin{document}
 Name: {{.Name}}
 Email: {{.Email}}
-{{range .Experience}}
+{{range .Companies}}
 Company: {{.Company}}
 {{end}}
 \end{document}`
@@ -291,9 +294,11 @@ func TestRenderLaTeX_EscapesBulletText(t *testing.T) {
 	templatePath := filepath.Join(tmpDir, "test.tex")
 	templateContent := `\documentclass{article}
 \begin{document}
-{{range .Experience}}
+{{range .Companies}}
+{{range .Roles}}
 {{range .Bullets}}
 Bullet: {{.}}
+{{end}}
 {{end}}
 {{end}}
 \end{document}`

@@ -29,12 +29,15 @@ func RewriteBullets(ctx context.Context, selectedBullets *types.SelectedBullets,
 	}
 	defer func() { _ = client.Close() }()
 
+	// Track used verbs across the entire resume for diversity
+	usedVerbs := []string{}
+
 	// Rewrite each bullet
 	rewrittenBullets := make([]types.RewrittenBullet, 0, len(selectedBullets.Bullets))
 
 	for _, originalBullet := range selectedBullets.Bullets {
-		// Build rewriting prompt
-		prompt := buildRewritingPrompt(originalBullet, jobProfile, companyProfile)
+		// Build rewriting prompt with verbs to avoid
+		prompt := buildRewritingPrompt(originalBullet, jobProfile, companyProfile, usedVerbs)
 
 		// Use TierAdvanced for bullet rewriting (requires nuance and style matching)
 		responseText, err := client.GenerateContent(ctx, prompt, llm.TierAdvanced)
@@ -51,6 +54,11 @@ func RewriteBullets(ctx context.Context, selectedBullets *types.SelectedBullets,
 			return nil, fmt.Errorf("failed to parse response for bullet %s: %w", originalBullet.ID, err)
 		}
 
+		// Extract leading verb and add to used verbs list
+		if verb := extractLeadingVerb(rewrittenText); verb != "" {
+			usedVerbs = append(usedVerbs, verb)
+		}
+
 		// Post-process bullet
 		rewrittenBullet, err := postProcessBullet(rewrittenText, originalBullet, companyProfile)
 		if err != nil {
@@ -65,8 +73,22 @@ func RewriteBullets(ctx context.Context, selectedBullets *types.SelectedBullets,
 	}, nil
 }
 
+// extractLeadingVerb extracts the first word (assumed to be a verb) from a bullet point
+func extractLeadingVerb(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+	// Split on first space to get first word
+	parts := strings.SplitN(text, " ", 2)
+	if len(parts) > 0 {
+		return strings.TrimSuffix(parts[0], ",") // Remove trailing comma if present
+	}
+	return ""
+}
+
 // buildRewritingPrompt constructs the prompt for bullet rewriting
-func buildRewritingPrompt(bullet types.SelectedBullet, jobProfile *types.JobProfile, companyProfile *types.CompanyProfile) string {
+func buildRewritingPrompt(bullet types.SelectedBullet, jobProfile *types.JobProfile, companyProfile *types.CompanyProfile, usedVerbs []string) string {
 	var sb strings.Builder
 
 	// Add intro from external prompt
@@ -122,10 +144,17 @@ func buildRewritingPrompt(bullet types.SelectedBullet, jobProfile *types.JobProf
 		sb.WriteString("\n")
 	}
 
+	// Add verbs to avoid for diversity
+	usedVerbsStr := ""
+	if len(usedVerbs) > 0 {
+		usedVerbsStr = strings.Join(usedVerbs, ", ")
+	}
+
 	// Add requirements from external prompt
 	reqsTemplate := prompts.MustGet("rewriting.json", "rewrite-bullet-requirements")
 	sb.WriteString(prompts.Format(reqsTemplate, map[string]string{
 		"TargetLength": fmt.Sprintf("%d", bullet.LengthChars),
+		"UsedVerbs":    usedVerbsStr,
 	}))
 
 	return sb.String()
