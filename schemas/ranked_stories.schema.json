@@ -4,13 +4,23 @@
   "title": "Ranked Stories",
   "description": "Deterministically scored candidate stories",
   "type": "object",
-  "required": ["ranked"],
+  "required": [
+    "ranked"
+  ],
   "properties": {
     "ranked": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["story_id", "relevance_score", "skill_overlap", "keyword_overlap", "evidence_strength", "matched_skills", "notes"],
+        "required": [
+          "story_id",
+          "relevance_score",
+          "skill_overlap",
+          "keyword_overlap",
+          "evidence_strength",
+          "matched_skills",
+          "notes"
+        ],
         "properties": {
           "story_id": {
             "type": "string",
@@ -50,10 +60,25 @@
           "notes": {
             "type": "string",
             "description": "Brief explanation of ranking"
+          },
+          "heuristic_score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Heuristic component of relevance score (0-1)"
+          },
+          "llm_score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "LLM-judged relevance score (0-1), present only when LLM scoring is used"
+          },
+          "llm_reasoning": {
+            "type": "string",
+            "description": "LLM's reasoning for the score"
           }
         }
       }
     }
   }
 }
-

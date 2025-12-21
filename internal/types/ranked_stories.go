@@ -17,4 +17,10 @@ type RankedStory struct {
 	EvidenceStrength float64  `json:"evidence_strength"`
 	MatchedSkills    []string `json:"matched_skills"`
 	Notes            string   `json:"notes"`
+	// HeuristicScore is the score from deterministic heuristic evaluation
+	HeuristicScore float64 `json:"heuristic_score,omitempty"`
+	// LLMScore is the score from LLM relevance evaluation (nil if not evaluated)
+	LLMScore *float64 `json:"llm_score,omitempty"`
+	// LLMReasoning is the LLM's explanation for the score
+	LLMReasoning string `json:"llm_reasoning,omitempty"`
 }

@@ -61,7 +61,7 @@ flowchart TD
         direction TB
         
         subgraph "Planning"
-            EXP --> RK[Rank Stories]
+            EXP --> RK[LLM: Rank Stories]
             D --> RK
             E --> RK
             RK --> RS[Ranked Stories]
@@ -95,8 +95,8 @@ flowchart TD
     classDef tool fill:#a0aab5,stroke:#333,stroke-width:1px,color:#000;
     classDef data fill:#bba6c7,stroke:#666,stroke-width:1px,stroke-dasharray: 5 5,color:#000;
     
-    class C,FL,EX,SV,RW,RL llm;
-    class B,FE,SE,AG,RK,SP,MAT,TEX,PDF,VAL tool;
+    class C,FL,EX,SV,RW,RL,RK llm;
+    class B,FE,SE,AG,SP,MAT,TEX,PDF,VAL tool;
     class D,E,T,S,FR,CP,RS,PLAN,FIN data;
     class JOB,EXP input;
 ```
@@ -192,8 +192,8 @@ Iteratively adjusts content to fix layout overflows or style violations.
 
 ### Architecture
 Resume Customizer uses a **hybrid architecture** that combines deterministic algorithms with large language models (LLMs).
-*   **Deterministic Logic**: Ranking and selection use explicit Go algorithms to ensure consistency and prevent "hallucinations" in experience selection.
-*   **LLM Integration**: LLMs are used for semantic tasks like summarization and content tailoring.
+*   **Hybrid Ranking**: Story ranking uses both deterministic heuristics (skill overlap, keywords, recency) and LLM semantic evaluation, weighted 50/50 for optimal relevance scoring.
+*   **LLM Integration**: LLMs are used for semantic tasks like summarization, relevance judging, and content tailoring.
 *   **Validation Loops**: The system verifies its own output by compiling the LaTeX source and checking the resulting PDF against physical constraints.
 
 ### Key Constraints

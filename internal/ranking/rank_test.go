@@ -1,6 +1,7 @@
 package ranking
 
 import (
+	"context"
 	"testing"
 
 	"github.com/jonathan/resume-customizer/internal/types"
@@ -260,4 +261,115 @@ func TestRankStories_ScoreRange(t *testing.T) {
 	assert.LessOrEqual(t, story.KeywordOverlap, 1.0)
 	assert.GreaterOrEqual(t, story.EvidenceStrength, 0.0)
 	assert.LessOrEqual(t, story.EvidenceStrength, 1.0)
+}
+
+func TestRankStories_HeuristicScorePopulated(t *testing.T) {
+	jobProfile := &types.JobProfile{
+		HardRequirements: []types.Requirement{
+			{Skill: "Go", Evidence: "Required"},
+		},
+	}
+
+	experienceBank := &types.ExperienceBank{
+		Stories: []types.Story{
+			{
+				ID:        "story_001",
+				StartDate: "2023-01",
+				Bullets: []types.Bullet{
+					{
+						Skills:           []string{"Go"},
+						EvidenceStrength: "high",
+					},
+				},
+			},
+		},
+	}
+
+	ranked, err := RankStories(jobProfile, experienceBank)
+	require.NoError(t, err)
+	require.Len(t, ranked.Ranked, 1)
+
+	story := ranked.Ranked[0]
+	// HeuristicScore should equal RelevanceScore in heuristic-only mode
+	assert.InDelta(t, story.RelevanceScore, story.HeuristicScore, 0.001)
+	// LLMScore should be nil
+	assert.Nil(t, story.LLMScore)
+	assert.Empty(t, story.LLMReasoning)
+}
+
+func TestRankStoriesWithLLM_EmptyAPIKey(t *testing.T) {
+	jobProfile := &types.JobProfile{
+		HardRequirements: []types.Requirement{
+			{Skill: "Go", Evidence: "Required"},
+		},
+	}
+
+	experienceBank := &types.ExperienceBank{
+		Stories: []types.Story{
+			{
+				ID:        "story_001",
+				StartDate: "2023-01",
+				Bullets: []types.Bullet{
+					{
+						Skills:           []string{"Go"},
+						EvidenceStrength: "high",
+					},
+				},
+			},
+		},
+	}
+
+	ctx := context.Background()
+	// Empty API key should fall back to heuristic-only
+	ranked, err := RankStoriesWithLLM(ctx, jobProfile, experienceBank, "")
+	require.NoError(t, err)
+	require.Len(t, ranked.Ranked, 1)
+
+	story := ranked.Ranked[0]
+	// Should use heuristic scoring only
+	assert.Greater(t, story.HeuristicScore, 0.0)
+	assert.Nil(t, story.LLMScore) // No LLM score with empty key
+}
+
+func TestComputeHeuristicScore_Integration(t *testing.T) {
+	// Test the internal computeHeuristicScore function
+	jobProfile := &types.JobProfile{
+		HardRequirements: []types.Requirement{
+			{Skill: "Go", Evidence: "Required"},
+		},
+		Keywords: []string{"microservices"},
+	}
+
+	story := &types.Story{
+		ID:        "story_001",
+		StartDate: "2023-01",
+		Bullets: []types.Bullet{
+			{
+				Skills:           []string{"Go"},
+				Text:             "Built microservices",
+				EvidenceStrength: "high",
+			},
+		},
+	}
+
+	// Build skill targets
+	skillTargets := &types.SkillTargets{
+		Skills: []types.Skill{
+			{Name: "Go", Weight: 1.0},
+		},
+	}
+
+	result := computeHeuristicScore(story, jobProfile, skillTargets)
+
+	// HeuristicScore should be populated
+	assert.Greater(t, result.HeuristicScore, 0.0)
+	assert.LessOrEqual(t, result.HeuristicScore, 1.0)
+
+	// Component scores should be populated
+	assert.Greater(t, result.SkillOverlap, 0.0)
+	assert.Greater(t, result.KeywordOverlap, 0.0)
+	assert.Greater(t, result.EvidenceStrength, 0.0)
+
+	// Notes should be generated
+	assert.NotEmpty(t, result.Notes)
 }
