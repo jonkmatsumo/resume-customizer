@@ -108,7 +108,11 @@ func runRenderLaTeX(_ *cobra.Command, _ []string) error {
 	}
 
 	// Render LaTeX
-	latex, err := rendering.RenderLaTeX(&plan, &rewrittenBullets, templatePath, renderLaTeXName, renderLaTeXEmail, renderLaTeXPhone, experienceBank)
+	var selectedEducation []types.Education
+	if experienceBank != nil {
+		selectedEducation = experienceBank.Education
+	}
+	latex, err := rendering.RenderLaTeX(&plan, &rewrittenBullets, templatePath, renderLaTeXName, renderLaTeXEmail, renderLaTeXPhone, experienceBank, selectedEducation)
 	if err != nil {
 		return fmt.Errorf("failed to render LaTeX: %w", err)
 	}

@@ -21,7 +21,7 @@ type CandidateInfo struct {
 }
 
 // RunRepairLoop runs the repair loop to fix violations iteratively
-func RunRepairLoop(ctx context.Context, initialPlan *types.ResumePlan, initialBullets *types.RewrittenBullets, violations *types.Violations, rankedStories *types.RankedStories, jobProfile *types.JobProfile, companyProfile *types.CompanyProfile, experienceBank *types.ExperienceBank, templatePath string, candidateInfo CandidateInfo, maxPages int, maxCharsPerLine int, maxIterations int, apiKey string) (finalPlan *types.ResumePlan, finalBullets *types.RewrittenBullets, finalLaTeX string, finalViolations *types.Violations, iterations int, err error) {
+func RunRepairLoop(ctx context.Context, initialPlan *types.ResumePlan, initialBullets *types.RewrittenBullets, violations *types.Violations, rankedStories *types.RankedStories, jobProfile *types.JobProfile, companyProfile *types.CompanyProfile, experienceBank *types.ExperienceBank, templatePath string, candidateInfo CandidateInfo, selectedEducation []types.Education, maxPages int, maxCharsPerLine int, maxIterations int, apiKey string) (finalPlan *types.ResumePlan, finalBullets *types.RewrittenBullets, finalLaTeX string, finalViolations *types.Violations, iterations int, err error) {
 	// Initialize loop state
 	currentPlan := initialPlan
 	currentBullets := initialBullets
@@ -69,7 +69,7 @@ func RunRepairLoop(ctx context.Context, initialPlan *types.ResumePlan, initialBu
 		// If not needsRewrite and plan didn't change, use updatedBullets from ApplyRepairs (which may have dropped bullets)
 
 		// 5. Render LaTeX
-		latex, err := rendering.RenderLaTeX(updatedPlan, updatedBullets, templatePath, candidateInfo.Name, candidateInfo.Email, candidateInfo.Phone, experienceBank)
+		latex, err := rendering.RenderLaTeX(updatedPlan, updatedBullets, templatePath, candidateInfo.Name, candidateInfo.Email, candidateInfo.Phone, experienceBank, selectedEducation)
 		if err != nil {
 			return nil, nil, "", currentViolations, iterationsUsed, fmt.Errorf("failed to render LaTeX at iteration %d: %w", iterationsUsed, err)
 		}

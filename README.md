@@ -31,8 +31,7 @@ flowchart TD
             JOB --> B[Ingest & Clean]
             B --> C[LLM: Extract Structure]
             
-            C --> D[Requirements]
-            C --> E[Responsibilities]
+            C --> REQ[Requirements & Responsibilities]
             C --> S[Extracted Links]
             C --> T[Team/Cultural Notes]
             C --> EDU_REQ[LLM: Education Requirements]
@@ -67,8 +66,7 @@ flowchart TD
         
         subgraph "Planning"
             EXP --> RK[LLM: Rank Stories]
-            D --> RK
-            E --> RK
+            REQ --> RK
             RK --> RS[Ranked Stories]
             
             EXP --> ES[LLM: Score Education]
@@ -83,7 +81,7 @@ flowchart TD
         subgraph "Drafting & Refining"
             MAT --> RW[LLM: Rewrite Bullets]
             CP -.-|Voice| RW
-            D -.-|Keywords| RW
+            REQ -.-|Keywords| RW
             
             RW --> TEX[Render LaTeX]
             SE --> TEX
@@ -107,12 +105,12 @@ flowchart TD
     
     class C,DI,DF,FL,EX,SV,RW,RL,RK,ES,EDU_REQ llm;
     class B,FE,GS,PAT,AG,SP,MAT,TEX,PDF,VAL tool;
-    class D,E,T,S,FR,CP,RS,PLAN,FIN,SE data;
+    class REQ,T,S,FR,CP,RS,PLAN,FIN,SE data;
     class JOB,EXP input;
 ```
 
 **Data Flow:**
-- **JobProfile** combines: Requirements, Responsibilities, Level/Signals, Team Notes
+- **JobProfile** combines: Requirements & Responsibilities, Level/Signals, Team Notes
 - **Team Notes** are shared with Company Research for context enrichment
 - **Company Profile** feeds into bullet rewriting for voice matching
 
@@ -175,7 +173,7 @@ Create a `config.json` file to store common settings:
 {
   "job_url": "https://job-boards.greenhouse.io/company/jobs/12345",
   "experience": "history.json",
-  "output": "artifacts/",
+  "out": "artifacts/",
   "name": "Jane Smith",
   "email": "jane@example.com",
   "max_bullets": 25,
@@ -188,7 +186,7 @@ Create a `config.json` file to store common settings:
 | `job` | Path to job posting text file (mutually exclusive with `job_url`) |
 | `job_url` | URL to fetch job posting from (mutually exclusive with `job`) |
 | `experience` | Path to experience bank JSON file |
-| `output` | Output directory |
+| `out` | Output directory |
 | `template` | Path to LaTeX template |
 | `name`, `email`, `phone` | Candidate contact info |
 | `max_bullets`, `max_lines` | Layout constraints |

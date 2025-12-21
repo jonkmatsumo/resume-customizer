@@ -100,6 +100,31 @@ func ScoreEducation(
 		scores[i] = score
 	}
 
+	// Fallback: If no education is included, include the most recent one
+	anyIncluded := false
+	for _, s := range scores {
+		if s.Included {
+			anyIncluded = true
+			break
+		}
+	}
+
+	if !anyIncluded && len(scores) > 0 {
+		// Find most recent education
+		mostRecentIdx := 0
+		latestEnd := ""
+
+		for i, edu := range education {
+			if edu.EndDate == "present" || (edu.EndDate > latestEnd && latestEnd != "present") {
+				latestEnd = edu.EndDate
+				mostRecentIdx = i
+			}
+		}
+
+		scores[mostRecentIdx].Included = true
+		scores[mostRecentIdx].Reason = "fallback: included most recent education (none met relevance threshold)"
+	}
+
 	return scores, nil
 }
 

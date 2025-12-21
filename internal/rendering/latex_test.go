@@ -249,7 +249,7 @@ Company: {{.Company}}
 		},
 	}
 
-	latex, err := RenderLaTeX(plan, rewrittenBullets, templatePath, "John Doe", "john@example.com", "555-1234", experienceBank)
+	latex, err := RenderLaTeX(plan, rewrittenBullets, templatePath, "John Doe", "john@example.com", "555-1234", experienceBank, nil)
 	require.NoError(t, err)
 	assert.NotEmpty(t, latex)
 	assert.Contains(t, latex, "John Doe")
@@ -260,7 +260,7 @@ func TestRenderLaTeX_MissingTemplate(t *testing.T) {
 	plan := &types.ResumePlan{SelectedStories: []types.SelectedStory{}}
 	rewrittenBullets := &types.RewrittenBullets{Bullets: []types.RewrittenBullet{}}
 
-	_, err := RenderLaTeX(plan, rewrittenBullets, "/nonexistent/template.tex", "John", "john@example.com", "", nil)
+	_, err := RenderLaTeX(plan, rewrittenBullets, "/nonexistent/template.tex", "John", "john@example.com", "", nil, nil)
 	assert.Error(t, err)
 	var templateErr *TemplateError
 	assert.ErrorAs(t, err, &templateErr)
@@ -281,7 +281,7 @@ Name: {{.Name}}
 	rewrittenBullets := &types.RewrittenBullets{Bullets: []types.RewrittenBullet{}}
 
 	// Name with special LaTeX characters
-	latex, err := RenderLaTeX(plan, rewrittenBullets, templatePath, "John & Jane", "test@example.com", "", nil)
+	latex, err := RenderLaTeX(plan, rewrittenBullets, templatePath, "John & Jane", "test@example.com", "", nil, nil)
 	require.NoError(t, err)
 	// Should escape the ampersand
 	assert.Contains(t, latex, `\&`)
@@ -333,11 +333,42 @@ Bullet: {{.}}
 		},
 	}
 
-	latex, err := RenderLaTeX(plan, rewrittenBullets, templatePath, "Name", "email@example.com", "", experienceBank)
+	latex, err := RenderLaTeX(plan, rewrittenBullets, templatePath, "Name", "email@example.com", "", experienceBank, nil)
 	require.NoError(t, err)
 	// Should escape the dollar sign - verify escaped version exists
 	assert.Contains(t, latex, `\$1M`, "should contain escaped dollar sign before '1M'")
 	// Check that we don't have unescaped pattern "with $1M" (dollar sign not preceded by backslash)
 	unescapedPattern := "with $1M"
 	assert.NotContains(t, latex, unescapedPattern, "should not contain unescaped dollar sign")
+}
+
+func TestRenderLaTeX_WithEducation(t *testing.T) {
+	// Create a minimal test template
+	tmpDir := t.TempDir()
+	templatePath := filepath.Join(tmpDir, "test.tex")
+	templateContent := `\documentclass{article}
+\begin{document}
+{{range .Education}}
+School: {{.School}}
+Degree: {{.Degree}}
+{{end}}
+\end{document}`
+	err := os.WriteFile(templatePath, []byte(templateContent), 0644)
+	require.NoError(t, err)
+
+	plan := &types.ResumePlan{SelectedStories: []types.SelectedStory{}}
+	bullets := &types.RewrittenBullets{Bullets: []types.RewrittenBullet{}}
+	education := []types.Education{
+		{
+			ID:     "edu_001",
+			School: "MIT",
+			Degree: "master",
+			Field:  "CS",
+		},
+	}
+
+	latex, err := RenderLaTeX(plan, bullets, templatePath, "Name", "email@example.com", "", nil, education)
+	require.NoError(t, err)
+	assert.Contains(t, latex, "School: MIT")
+	assert.Contains(t, latex, "Degree: Master") // Should be normalized/capitalized if your code does that
 }

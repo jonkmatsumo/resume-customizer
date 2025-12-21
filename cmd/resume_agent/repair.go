@@ -183,6 +183,10 @@ func runRepair(_ *cobra.Command, _ []string) error {
 
 	// Run repair loop
 	ctx := context.Background()
+	var selectedEducation []types.Education
+	if experienceBank != nil {
+		selectedEducation = experienceBank.Education
+	}
 	finalPlan, finalBullets, finalLaTeX, finalViolations, iterations, err := repair.RunRepairLoop(
 		ctx,
 		&plan,
@@ -194,6 +198,7 @@ func runRepair(_ *cobra.Command, _ []string) error {
 		experienceBank,
 		repairTemplateFile,
 		candidateInfo,
+		selectedEducation,
 		repairMaxPages,
 		repairMaxChars,
 		repairMaxIterations,

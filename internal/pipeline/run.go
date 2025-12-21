@@ -66,6 +66,18 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		return err
 	}
 
+	fmt.Printf("Step 2a/12: Extracting education requirements...\n")
+	eduReq, err := parsing.ExtractEducationRequirements(ctx, cleanedText, opts.APIKey)
+	if err != nil {
+		fmt.Printf("Warning: Failed to extract education requirements: %v\n", err)
+		// Non-critical, continue with nil requirements
+	} else {
+		jobProfile.EducationRequirements = eduReq
+		if err := saveJSON(filepath.Join(opts.OutputDir, "education_requirements.json"), eduReq); err != nil {
+			return err
+		}
+	}
+
 	fmt.Printf("Step 3/12: Loading and normalizing experience bank from %s...\n", opts.ExperiencePath)
 	experienceBank, err := experience.LoadExperienceBank(opts.ExperiencePath)
 	if err != nil {
@@ -85,6 +97,28 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	}
 	if err := saveJSON(filepath.Join(opts.OutputDir, "ranked_stories.json"), rankedStories); err != nil {
 		return err
+	}
+
+	fmt.Printf("Step 4a/12: Scoring education relevance...\n")
+	var selectedEducation []types.Education
+	eduScores, err := ranking.ScoreEducation(ctx, experienceBank.Education, jobProfile.EducationRequirements, cleanedText, opts.APIKey)
+	if err != nil {
+		fmt.Printf("Warning: Education scoring failed: %v. Including all education.\n", err)
+		selectedEducation = experienceBank.Education
+	} else {
+		if err := saveJSON(filepath.Join(opts.OutputDir, "education_scores.json"), eduScores); err != nil {
+			return err
+		}
+		// Filter based on Included flag
+		for _, score := range eduScores {
+			if score.Included {
+				for _, edu := range experienceBank.Education {
+					if edu.ID == score.EducationID {
+						selectedEducation = append(selectedEducation, edu)
+					}
+				}
+			}
+		}
 	}
 
 	fmt.Printf("Step 5/12: Selecting optimum resume plan...\n")
@@ -254,7 +288,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	}
 
 	fmt.Printf("Step 10/12: Rendering LaTeX resume...\n")
-	latex, err := rendering.RenderLaTeX(resumePlan, rewrittenBullets, opts.TemplatePath, opts.CandidateName, opts.CandidateEmail, opts.CandidatePhone, experienceBank)
+	latex, err := rendering.RenderLaTeX(resumePlan, rewrittenBullets, opts.TemplatePath, opts.CandidateName, opts.CandidateEmail, opts.CandidatePhone, experienceBank, selectedEducation)
 	if err != nil {
 		return fmt.Errorf("rendering latex failed: %w", err)
 	}
@@ -292,6 +326,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 			experienceBank,
 			opts.TemplatePath,
 			candidateInfo,
+			selectedEducation,
 			1,   // max pages
 			120, // max chars per line
 			5,   // max iterations

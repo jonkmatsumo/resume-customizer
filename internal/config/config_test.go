@@ -13,7 +13,7 @@ func TestLoadConfig_ValidJSON(t *testing.T) {
 	// Create temp config file
 	content := `{
 		"experience": "history.json",
-		"output": "artifacts/",
+		"out": "artifacts/",
 		"name": "Test User",
 		"max_bullets": 20,
 		"verbose": true

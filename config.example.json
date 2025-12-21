@@ -1,7 +1,7 @@
 {
     "job_url": "https://example.com/job-description",
     "experience": "history.json",
-    "output": "artifacts/",
+    "out": "artifacts/",
     "template": "templates/one_page_resume.tex",
     "name": "Jane Smith",
     "email": "jane@example.com",

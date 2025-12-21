@@ -50,36 +50,9 @@ type dateRange struct {
 }
 
 // RenderLaTeX renders a LaTeX resume from a template using ResumePlan and RewrittenBullets
-// Note: This function requires access to ExperienceBank to get story details (company, role, dates).
-// The caller is responsible for providing this information or loading the ExperienceBank.
-// For now, we'll work with what's available in ResumePlan and RewrittenBullets.
-func RenderLaTeX(plan *types.ResumePlan, rewrittenBullets *types.RewrittenBullets, templatePath string, name, email, phone string, experienceBank *types.ExperienceBank) (string, error) {
-	// Read and parse template
-	tmpl, err := parseTemplate(templatePath)
-	if err != nil {
-		return "", err
-	}
-
-	// Build template data
-	data, err := buildTemplateData(plan, rewrittenBullets, name, email, phone, experienceBank)
-	if err != nil {
-		return "", &RenderError{
-			Message: "failed to build template data",
-			Cause:   err,
-		}
-	}
-
-	// Execute template
-	var result strings.Builder
-	err = tmpl.Execute(&result, data)
-	if err != nil {
-		return "", &TemplateError{
-			Message: "failed to execute template",
-			Cause:   err,
-		}
-	}
-
-	return result.String(), nil
+// This function is backwards compatible but now supports an optional education section.
+func RenderLaTeX(plan *types.ResumePlan, rewrittenBullets *types.RewrittenBullets, templatePath string, name, email, phone string, experienceBank *types.ExperienceBank, selectedEducation []types.Education) (string, error) {
+	return RenderLaTeXWithEducation(plan, rewrittenBullets, templatePath, name, email, phone, experienceBank, selectedEducation)
 }
 
 // parseTemplate reads and parses a LaTeX template file
@@ -357,7 +330,7 @@ func groupByCompanyAndRole(plan *types.ResumePlan, rewrittenBullets *types.Rewri
 			})
 		}
 
-		companyEndDates[companyName] = latestEndDate
+		companyEndDates[EscapeLaTeX(companyName)] = latestEndDate
 
 		companies = append(companies, CompanySection{
 			Company: EscapeLaTeX(companyName),
@@ -371,11 +344,15 @@ func groupByCompanyAndRole(plan *types.ResumePlan, rewrittenBullets *types.Rewri
 		endI := companyEndDates[companies[i].Company]
 		endJ := companyEndDates[companies[j].Company]
 
+		if endI == endJ {
+			return false
+		}
+
 		// "present" or empty string treated as most recent
-		if endI == "present" || endI == "" {
+		if endI == "present" || (endI == "" && endJ != "present" && endJ != "") {
 			return true
 		}
-		if endJ == "present" || endJ == "" {
+		if endJ == "present" || (endJ == "" && endI != "present" && endI != "") {
 			return false
 		}
 

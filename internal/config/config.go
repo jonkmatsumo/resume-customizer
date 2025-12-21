@@ -16,7 +16,7 @@ type Config struct {
 	JobURL      string `json:"job_url,omitempty"`      // URL to fetch job posting from
 	Experience  string `json:"experience,omitempty"`   // Path to experience bank JSON
 	CompanySeed string `json:"company_seed,omitempty"` // Company seed URL for brand research
-	Output      string `json:"output,omitempty"`       // Output directory
+	Output      string `json:"out,omitempty"`          // Output directory
 	Template    string `json:"template,omitempty"`     // Path to LaTeX template
 
 	// Candidate Info
