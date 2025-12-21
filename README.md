@@ -31,28 +31,29 @@ flowchart TD
             JOB --> B[Ingest & Clean]
             B --> C[LLM: Extract Structure]
             
-            %% Reordered to minimize crossing lines
             C --> D[Requirements]
             C --> E[Responsibilities]
             C --> S[Extracted Links]
             C --> T[Team/Cultural Notes]
+            C --> EDU_REQ[LLM: Education Requirements]
         end
         
         subgraph "Company Research"
             S --> DI[LLM: Identify Company Domains]
-            DI --> DF[Filter to Company Domains]
-            DF --> FL[LLM: Filter & Prioritize Seeds]
-            FL -->|Kept| FR[URL Frontier]
+            DI --> DF[LLM: Filter to Company Domains]
             
-            FR --> SRCH{Search API Available?}
-            SRCH -->|Yes| GS[Google Search: Find Pages]
-            GS --> FR
-            SRCH -->|No| PAT[Generate Pattern URLs]
-            PAT --> FR
+            DF --> SRCH{Search API?}
+            SRCH -->|Yes| GS[Google Search]
+            SRCH -->|No| PAT[Pattern URLs]
+            GS --> FL[LLM: Filter & Prioritize]
+            PAT --> FL
             
-            FR --> FE[Fetch Page]
-            FE --> EX[LLM: Extract Signals]
-            EX --> AG[Aggregate Corpus]
+            FL --> FR[URL Frontier]
+            FR --> FE[Fetch Pages]
+            FE --> LIMIT{Page Limit?}
+            LIMIT -->|No| EX[LLM: Extract Signals]
+            EX --> FR
+            LIMIT -->|Yes| AG[Aggregate Corpus]
             
             T -.-|Context| AG
             AG --> SV[LLM: Summarize Voice]
@@ -70,6 +71,10 @@ flowchart TD
             E --> RK
             RK --> RS[Ranked Stories]
             
+            EXP --> ES[LLM: Score Education]
+            EDU_REQ --> ES
+            ES --> SE[Selected Education]
+            
             RS --> SP[Select Optimum Plan]
             SP --> PLAN[Resume Plan]
             PLAN --> MAT[Materialize Bullets]
@@ -77,10 +82,11 @@ flowchart TD
         
         subgraph "Drafting & Refining"
             MAT --> RW[LLM: Rewrite Bullets]
-            CP -.->|Voice| RW
-            D -.->|Keywords| RW
+            CP -.-|Voice| RW
+            D -.-|Keywords| RW
             
             RW --> TEX[Render LaTeX]
+            SE --> TEX
             TEX --> PDF[Compile PDF]
             PDF --> VAL[Validate Constraints]
             
@@ -93,15 +99,15 @@ flowchart TD
         end
     end
     
-    %% Styling - Mid-tone Neutrals
+    %% Styling
     classDef input fill:#6f8bb3,stroke:#333,stroke-width:2px,color:#000;
     classDef llm fill:#88b090,stroke:#333,stroke-width:2px,color:#000;
     classDef tool fill:#a0aab5,stroke:#333,stroke-width:1px,color:#000;
     classDef data fill:#bba6c7,stroke:#666,stroke-width:1px,stroke-dasharray: 5 5,color:#000;
     
-    class C,FL,EX,SV,RW,RL,RK llm;
-    class B,FE,SE,AG,SP,MAT,TEX,PDF,VAL tool;
-    class D,E,T,S,FR,CP,RS,PLAN,FIN data;
+    class C,DI,DF,FL,EX,SV,RW,RL,RK,ES,EDU_REQ llm;
+    class B,FE,GS,PAT,AG,SP,MAT,TEX,PDF,VAL tool;
+    class D,E,T,S,FR,CP,RS,PLAN,FIN,SE data;
     class JOB,EXP input;
 ```
 

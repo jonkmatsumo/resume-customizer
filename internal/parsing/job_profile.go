@@ -141,3 +141,71 @@ func postProcessProfile(profile *types.JobProfile) error {
 
 	return nil
 }
+
+// ExtractEducationRequirements extracts education requirements from job posting text.
+// This is called separately from ParseJobProfile to allow for graceful degradation.
+func ExtractEducationRequirements(ctx context.Context, jobText string, apiKey string) (*types.EducationRequirements, error) {
+	if apiKey == "" {
+		return nil, &APICallError{Message: "API key is required"}
+	}
+
+	// Initialize LLM client
+	config := llm.DefaultConfig()
+	client, err := llm.NewClient(ctx, config, apiKey)
+	if err != nil {
+		return nil, &APICallError{
+			Message: "failed to create LLM client",
+			Cause:   err,
+		}
+	}
+	defer func() { _ = client.Close() }()
+
+	// Build prompt
+	template := prompts.MustGet("parsing.json", "extract-education-requirements")
+	prompt := prompts.Format(template, map[string]string{
+		"JobText": jobText,
+	})
+
+	// Use TierLite for simple extraction
+	responseText, err := client.GenerateContent(ctx, prompt, llm.TierLite)
+	if err != nil {
+		return nil, &APICallError{
+			Message: "failed to extract education requirements",
+			Cause:   err,
+		}
+	}
+
+	// Clean and parse response
+	responseText = cleanJSONBlock(responseText)
+
+	var eduReq types.EducationRequirements
+	if err := json.Unmarshal([]byte(responseText), &eduReq); err != nil {
+		return nil, &ParseError{
+			Message: "failed to parse education requirements JSON",
+			Cause:   err,
+		}
+	}
+
+	// Normalize degree level
+	eduReq.MinDegree = normalizeDegreeLevel(eduReq.MinDegree)
+
+	return &eduReq, nil
+}
+
+// normalizeDegreeLevel normalizes degree level strings to standard values
+func normalizeDegreeLevel(degree string) string {
+	degree = strings.ToLower(strings.TrimSpace(degree))
+
+	switch {
+	case strings.Contains(degree, "phd") || strings.Contains(degree, "doctor"):
+		return "phd"
+	case strings.Contains(degree, "master"):
+		return "master"
+	case strings.Contains(degree, "bachelor"):
+		return "bachelor"
+	case strings.Contains(degree, "associate"):
+		return "associate"
+	default:
+		return degree
+	}
+}

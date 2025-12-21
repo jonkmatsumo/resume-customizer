@@ -58,6 +58,25 @@
 \vspace{0.15cm}
 {{ end }}
 
+{{ if .Education }}
+% Education Section
+\section*{Education}
+
+{{ range .Education }}
+{\large\textbf{ {{- .School -}} }} \hfill {{ .DateRange }}
+
+\textit{ {{- .Degree }} in {{ .Field -}} }{{ if .GPA }} | GPA: {{ .GPA }}{{ end }}
+
+{{ if .Highlights }}
+\begin{itemize}
+{{ range .Highlights }}
+    \item {{ . }}
+{{ end }}
+\end{itemize}
+{{ end }}
+
+\vspace{0.1cm}
+{{ end }}
+{{ end }}
+
 \end{document}
-
-

@@ -4,7 +4,15 @@
   "title": "Job Profile",
   "description": "Structured job requirements extracted from a job posting",
   "type": "object",
-  "required": ["company", "role_title", "responsibilities", "hard_requirements", "nice_to_haves", "keywords", "eval_signals"],
+  "required": [
+    "company",
+    "role_title",
+    "responsibilities",
+    "hard_requirements",
+    "nice_to_haves",
+    "keywords",
+    "eval_signals"
+  ],
   "properties": {
     "company": {
       "type": "string",
@@ -45,12 +53,19 @@
     "eval_signals": {
       "$ref": "#/$defs/EvalSignals",
       "description": "Inferred evaluation criteria"
+    },
+    "education_requirements": {
+      "$ref": "#/$defs/EducationRequirements",
+      "description": "Education requirements extracted from job posting"
     }
   },
   "$defs": {
     "Requirement": {
       "type": "object",
-      "required": ["skill", "evidence"],
+      "required": [
+        "skill",
+        "evidence"
+      ],
       "properties": {
         "skill": {
           "type": "string",
@@ -90,7 +105,38 @@
           "description": "Collaboration is an evaluation criterion"
         }
       }
+    },
+    "EducationRequirements": {
+      "type": "object",
+      "description": "Education requirements from job posting",
+      "properties": {
+        "min_degree": {
+          "type": "string",
+          "enum": [
+            "bachelor",
+            "master",
+            "phd",
+            "associate",
+            ""
+          ],
+          "description": "Minimum degree level required or preferred"
+        },
+        "preferred_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Preferred fields of study (e.g., Computer Science)"
+        },
+        "evidence": {
+          "type": "string",
+          "description": "Quote from job posting supporting requirements"
+        },
+        "is_required": {
+          "type": "boolean",
+          "description": "Whether degree is required vs preferred"
+        }
+      }
     }
   }
 }
-

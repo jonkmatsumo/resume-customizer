@@ -17,6 +17,17 @@ type TemplateData struct {
 	Email     string
 	Phone     string
 	Companies []CompanySection
+	Education []EducationSection
+}
+
+// EducationSection represents a single education entry for the template
+type EducationSection struct {
+	School     string
+	Degree     string   // e.g., "Bachelor of Science"
+	Field      string   // e.g., "Computer Science"
+	DateRange  string   // e.g., "2018 -- 2022" or "2022" (graduation only)
+	GPA        string   // Optional
+	Highlights []string // Optional bullet points
 }
 
 // CompanySection represents a company with one or more roles
@@ -119,7 +130,110 @@ func buildTemplateData(plan *types.ResumePlan, rewrittenBullets *types.Rewritten
 		Email:     escapedEmail,
 		Phone:     escapedPhone,
 		Companies: companies,
+		Education: nil, // Use RenderLaTeXWithEducation for education support
 	}, nil
+}
+
+// RenderLaTeXWithEducation renders a LaTeX resume with education section
+func RenderLaTeXWithEducation(
+	plan *types.ResumePlan,
+	rewrittenBullets *types.RewrittenBullets,
+	templatePath string,
+	name, email, phone string,
+	experienceBank *types.ExperienceBank,
+	selectedEducation []types.Education,
+) (string, error) {
+	// Read and parse template
+	tmpl, err := parseTemplate(templatePath)
+	if err != nil {
+		return "", err
+	}
+
+	// Build template data
+	data, err := buildTemplateData(plan, rewrittenBullets, name, email, phone, experienceBank)
+	if err != nil {
+		return "", &RenderError{
+			Message: "failed to build template data",
+			Cause:   err,
+		}
+	}
+
+	// Add education data
+	data.Education = buildEducationSections(selectedEducation)
+
+	// Execute template
+	var result strings.Builder
+	err = tmpl.Execute(&result, data)
+	if err != nil {
+		return "", &TemplateError{
+			Message: "failed to execute template",
+			Cause:   err,
+		}
+	}
+
+	return result.String(), nil
+}
+
+// buildEducationSections converts Education types to EducationSection for template rendering
+func buildEducationSections(education []types.Education) []EducationSection {
+	if len(education) == 0 {
+		return nil
+	}
+
+	sections := make([]EducationSection, len(education))
+	for i, edu := range education {
+		// Format date range
+		dateRange := ""
+		if edu.StartDate != "" && edu.EndDate != "" {
+			dateRange = edu.StartDate + " -- " + edu.EndDate
+		} else if edu.EndDate != "" {
+			dateRange = edu.EndDate // Just graduation date
+		} else if edu.StartDate != "" {
+			dateRange = edu.StartDate + " -- Present"
+		}
+
+		// Format degree display
+		degreeDisplay := formatDegree(edu.Degree)
+
+		// Escape all text for LaTeX
+		escapedHighlights := make([]string, len(edu.Highlights))
+		for j, h := range edu.Highlights {
+			escapedHighlights[j] = EscapeLaTeX(h)
+		}
+
+		sections[i] = EducationSection{
+			School:     EscapeLaTeX(edu.School),
+			Degree:     EscapeLaTeX(degreeDisplay),
+			Field:      EscapeLaTeX(edu.Field),
+			DateRange:  EscapeLaTeX(dateRange),
+			GPA:        EscapeLaTeX(edu.GPA),
+			Highlights: escapedHighlights,
+		}
+	}
+
+	// Sort by end date (most recent first)
+	sort.Slice(sections, func(i, j int) bool {
+		// Simple string comparison works for YYYY-MM format
+		return sections[i].DateRange > sections[j].DateRange
+	})
+
+	return sections
+}
+
+// formatDegree converts degree code to display format
+func formatDegree(degree string) string {
+	switch strings.ToLower(degree) {
+	case "bachelor":
+		return "Bachelor of Science"
+	case "master":
+		return "Master of Science"
+	case "phd":
+		return "Doctor of Philosophy"
+	case "associate":
+		return "Associate Degree"
+	default:
+		return degree
+	}
 }
 
 // roleKey is used for grouping bullets by company and role
