@@ -29,9 +29,10 @@ type Config struct {
 	MaxLines   int `json:"max_lines,omitempty"`   // Maximum lines allowed
 
 	// Behavior
-	APIKey     string `json:"api_key,omitempty"`     // Gemini API key
-	UseBrowser bool   `json:"use_browser,omitempty"` // Use headless browser for SPA sites
-	Verbose    bool   `json:"verbose,omitempty"`     // Print detailed debug information
+	APIKey          string  `json:"api_key,omitempty"`           // Gemini API key
+	UseBrowser      bool    `json:"use_browser,omitempty"`       // Use headless browser for SPA sites
+	Verbose         bool    `json:"verbose,omitempty"`           // Print detailed debug information
+	SkillMatchRatio float64 `json:"skill_match_ratio,omitempty"` // Ratio of space reserved for skill matching (0.0-1.0)
 }
 
 // LoadConfig loads configuration from a JSON file.
@@ -145,6 +146,15 @@ func (c *Config) MergeWithDefaults(defaults Config) Config {
 	}
 	if result.MaxLines == 0 {
 		result.MaxLines = defaults.MaxLines
+	}
+
+	// Float fields
+	if result.SkillMatchRatio == 0 {
+		if defaults.SkillMatchRatio > 0 {
+			result.SkillMatchRatio = defaults.SkillMatchRatio
+		} else {
+			result.SkillMatchRatio = 0.8 // Default to 80% skill match
+		}
 	}
 
 	// Bool fields: cannot distinguish unset from false, so we don't merge

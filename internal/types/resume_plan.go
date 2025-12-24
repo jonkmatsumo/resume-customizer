@@ -20,9 +20,10 @@ type SelectedStory struct {
 
 // SpaceBudget represents space budget constraints for the resume
 type SpaceBudget struct {
-	MaxBullets int            `json:"max_bullets"`
-	MaxLines   int            `json:"max_lines"`
-	Sections   map[string]int `json:"sections,omitempty"`
+	MaxBullets      int            `json:"max_bullets"`
+	MaxLines        int            `json:"max_lines"`
+	SkillMatchRatio float64        `json:"skill_match_ratio"` // Ratio of space reserved for skill matching (0.0-1.0)
+	Sections        map[string]int `json:"sections,omitempty"`
 }
 
 // Coverage represents skill coverage metrics for the selected plan

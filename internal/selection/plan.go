@@ -2,6 +2,8 @@
 package selection
 
 import (
+	"fmt"
+
 	"github.com/jonathan/resume-customizer/internal/skills"
 	"github.com/jonathan/resume-customizer/internal/types"
 )
@@ -79,16 +81,17 @@ func SelectPlan(
 		storyValues[i] = values
 	}
 
-	// Solve knapsack problem
-	selections, _, err := solveKnapsack(stories, storyValues, spaceBudget.MaxBullets, spaceBudget.MaxLines)
+	// Use Hybrid Selection Strategy (Greedy + Knapsack)
+	ratio := spaceBudget.SkillMatchRatio
+	if ratio == 0 {
+		ratio = 0.8 // Safety default
+	}
+	selections, _, err := SelectHybrid(stories, rankedStories, skillTargets, spaceBudget.MaxLines, ratio)
 	if err != nil {
-		return nil, &Error{
-			Message: "failed to solve knapsack problem",
-			Cause:   err,
-		}
+		return nil, fmt.Errorf("failed to select content: %w", err)
 	}
 
-	// Build selected stories with metadata
+	// Materialize the plan from selections
 	selectedStories := make([]types.SelectedStory, 0, len(selections))
 	allSelectedBullets := make([]types.Bullet, 0)
 
