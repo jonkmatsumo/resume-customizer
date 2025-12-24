@@ -86,8 +86,7 @@ func TestSelectHybrid(t *testing.T) {
 	}
 }
 
-func TestSelectHybrid_AllGreedy(t *testing.T) {
-	// Setup same as above...
+func TestSelectHybrid_AllGreedy(_ *testing.T) {
+	// TODO: Implement test for ratio=1.0 (pure greedy mode)
 	// If ratio is 1.0, it should behave exactly like SelectGreedy
-	// ...
 }

@@ -29,10 +29,11 @@ type Config struct {
 	MaxLines   int `json:"max_lines,omitempty"`   // Maximum lines allowed
 
 	// Behavior
-	APIKey          string  `json:"api_key,omitempty"`           // Gemini API key
-	UseBrowser      bool    `json:"use_browser,omitempty"`       // Use headless browser for SPA sites
-	Verbose         bool    `json:"verbose,omitempty"`           // Print detailed debug information
-	SkillMatchRatio float64 `json:"skill_match_ratio,omitempty"` // Ratio of space reserved for skill matching (0.0-1.0)
+	APIKey            string  `json:"api_key,omitempty"`            // Gemini API key
+	UseBrowser        bool    `json:"use_browser,omitempty"`        // Use headless browser for SPA sites
+	Verbose           bool    `json:"verbose,omitempty"`            // Print detailed debug information
+	SkillMatchRatio   float64 `json:"skill_match_ratio,omitempty"`  // Ratio of space reserved for skill matching (0.0-1.0)
+	SpecificityWeight float64 `json:"specificity_weight,omitempty"` // Weight for specificity vs requirement level (0.0-1.0)
 }
 
 // LoadConfig loads configuration from a JSON file.

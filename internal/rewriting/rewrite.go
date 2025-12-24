@@ -144,6 +144,10 @@ func buildRewritingPrompt(bullet types.SelectedBullet, jobProfile *types.JobProf
 		sb.WriteString("\n")
 	}
 
+	// Add preservation constraints to prevent hallucination
+	preservationTemplate := prompts.MustGet("rewriting.json", "rewrite-bullet-preservation")
+	sb.WriteString(preservationTemplate)
+
 	// Add verbs to avoid for diversity
 	usedVerbsStr := ""
 	if len(usedVerbs) > 0 {

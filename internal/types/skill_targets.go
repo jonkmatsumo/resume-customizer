@@ -10,7 +10,8 @@ type SkillTargets struct {
 
 // Skill represents a single target skill with weight and source
 type Skill struct {
-	Name   string  `json:"name"`
-	Weight float64 `json:"weight"`
-	Source string  `json:"source"`
+	Name        string  `json:"name"`
+	Weight      float64 `json:"weight"`
+	Source      string  `json:"source"`
+	Specificity float64 `json:"specificity,omitempty"` // 0.0 (generic) to 1.0 (highly specific)
 }

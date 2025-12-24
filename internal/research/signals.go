@@ -8,6 +8,7 @@ import (
 
 	"github.com/jonathan/resume-customizer/internal/llm"
 	"github.com/jonathan/resume-customizer/internal/prompts"
+	"github.com/jonathan/resume-customizer/internal/validation"
 )
 
 // ExtractBrandSignals extracts brand-relevant information from page text
@@ -52,10 +53,17 @@ func buildSignalPrompt(pageText string, url string) string {
 		pageText = pageText[:8000] + "..."
 	}
 
+	// Check for potential injection attempts and log warning (but continue processing)
+	checkResult := validation.CheckBasicHeuristics(pageText)
+	validation.LogInjectionWarning(checkResult, "brand signal page: "+url)
+
+	// Wrap content in quote markers to signal non-executable content
+	quotedContent := validation.QuoteExternalContentWithLabel(pageText, "WEB PAGE CONTENT")
+
 	template := prompts.MustGet("research.json", "extract-brand-signals")
 	return prompts.Format(template, map[string]string{
 		"URL":         url,
-		"PageContent": pageText,
+		"PageContent": quotedContent,
 	})
 }
 

@@ -388,13 +388,20 @@ func mergeDateRanges(bullets []bulletWithMeta) string {
 		return ranges[i].StartDate < ranges[j].StartDate
 	})
 
-	// Format as comma-separated
-	parts := make([]string, len(ranges))
-	for i, r := range ranges {
+	// Format as comma-separated with additional deduplication on formatted output
+	seenFormatted := make(map[string]bool)
+	parts := make([]string, 0, len(ranges))
+	for _, r := range ranges {
+		var formatted string
 		if strings.ToLower(r.EndDate) == "present" {
-			parts[i] = EscapeLaTeX(formatDate(r.StartDate)) + " -- Present"
+			formatted = EscapeLaTeX(formatDate(r.StartDate)) + " -- Present"
 		} else {
-			parts[i] = EscapeLaTeX(formatDate(r.StartDate)) + " -- " + EscapeLaTeX(formatDate(r.EndDate))
+			formatted = EscapeLaTeX(formatDate(r.StartDate)) + " -- " + EscapeLaTeX(formatDate(r.EndDate))
+		}
+		// Dedupe on formatted string to catch any edge cases
+		if !seenFormatted[formatted] {
+			seenFormatted[formatted] = true
+			parts = append(parts, formatted)
 		}
 	}
 

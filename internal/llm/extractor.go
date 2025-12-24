@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/jonathan/resume-customizer/internal/prompts"
+	"github.com/jonathan/resume-customizer/internal/validation"
 )
 
 // ExtractionSchema defines the structure for LLM-based content extraction.
@@ -27,6 +28,10 @@ type SchemaField struct {
 // BuildExtractionPrompt constructs the LLM prompt from schema and input text.
 func BuildExtractionPrompt(schema ExtractionSchema, inputText string) string {
 	var sb strings.Builder
+
+	// Check for potential injection attempts and log warning (but continue processing)
+	checkResult := validation.CheckBasicHeuristics(inputText)
+	validation.LogInjectionWarning(checkResult, "extraction input for "+schema.Name)
 
 	// System description
 	sb.WriteString(schema.Description)
@@ -59,10 +64,10 @@ func BuildExtractionPrompt(schema ExtractionSchema, inputText string) string {
 	sb.WriteString("- Extract information directly from the text, do not invent or summarize.\n")
 	sb.WriteString("- Return ONLY the JSON object, no markdown, no explanation, no code blocks.\n\n")
 
-	// Input text
-	sb.WriteString("Input text:\n\"\"\"\n")
-	sb.WriteString(inputText)
-	sb.WriteString("\n\"\"\"\n")
+	// Input text - wrapped in quote markers for security
+	sb.WriteString("Input text:\n")
+	sb.WriteString(validation.QuoteExternalContentWithLabel(inputText, "JOB POSTING"))
+	sb.WriteString("\n")
 
 	return sb.String()
 }

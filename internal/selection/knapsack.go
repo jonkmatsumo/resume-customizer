@@ -15,11 +15,11 @@ type dpState struct {
 	storyIndex  int
 	bulletsUsed int
 	linesUsed   int
-	selection   *storySelection // Selection that led to this state
+	selection   *StorySelection // Selection that led to this state
 }
 
-// storySelection represents which bullets were selected from a story
-type storySelection struct {
+// StorySelection represents which bullets were selected from a story
+type StorySelection struct {
 	storyID   string
 	bulletIDs []string
 }
@@ -30,7 +30,7 @@ func solveKnapsack(
 	stories []*types.Story,
 	storyValues map[int][]storyValue, // story index -> list of value options
 	maxBullets, maxLines int,
-) ([]storySelection, float64, error) {
+) ([]StorySelection, float64, error) {
 	if len(stories) == 0 {
 		return nil, 0.0, nil
 	}
@@ -92,7 +92,7 @@ func solveKnapsack(
 									storyIndex:  i,
 									bulletsUsed: newBullets,
 									linesUsed:   newLines,
-									selection: &storySelection{
+									selection: &StorySelection{
 										storyID:   stories[i].ID,
 										bulletIDs: valueOption.BulletIDs,
 									},
@@ -166,8 +166,8 @@ func findBestState(finalLayer map[int]map[int]*dpState, maxBullets, maxLines int
 }
 
 // backtrack reconstructs the solution by following parent pointers
-func backtrack(finalState *dpState) []storySelection {
-	var selections []storySelection
+func backtrack(finalState *dpState) []StorySelection {
+	var selections []StorySelection
 
 	current := finalState
 	for current != nil && current.selection != nil {

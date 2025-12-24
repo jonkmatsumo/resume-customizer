@@ -15,7 +15,7 @@ func SelectHybrid(
 	skillTargets *types.SkillTargets,
 	maxLines int,
 	skillMatchRatio float64,
-) ([]storySelection, float64, error) {
+) ([]StorySelection, float64, error) {
 
 	// Calculate line budget for each phase
 	greedyBudget := int(math.Floor(float64(maxLines) * skillMatchRatio))
@@ -131,24 +131,38 @@ func SelectHybrid(
 
 	// Merge selections
 	// We need to merge knapsack selections back into greedy selections.
-	// Since both return []storySelection (storyID -> bullets), we need to consolidate.
+	// Since both return []StorySelection (storyID -> bullets), we need to consolidate.
 
-	finalMap := make(map[string][]string)
+	finalMap := make(map[string]map[string]bool) // storyID -> bulletID set
 
 	// Add Greedy
 	for _, sel := range greedySelections {
-		finalMap[sel.storyID] = append(finalMap[sel.storyID], sel.bulletIDs...)
+		if finalMap[sel.storyID] == nil {
+			finalMap[sel.storyID] = make(map[string]bool)
+		}
+		for _, bid := range sel.bulletIDs {
+			finalMap[sel.storyID][bid] = true
+		}
 	}
 
 	// Add Knapsack
 	for _, sel := range knapsackSelections {
-		finalMap[sel.storyID] = append(finalMap[sel.storyID], sel.bulletIDs...)
+		if finalMap[sel.storyID] == nil {
+			finalMap[sel.storyID] = make(map[string]bool)
+		}
+		for _, bid := range sel.bulletIDs {
+			finalMap[sel.storyID][bid] = true
+		}
 	}
 
-	// Convert back to slice
-	finalSelections := make([]storySelection, 0, len(finalMap))
-	for sID, bIDs := range finalMap {
-		finalSelections = append(finalSelections, storySelection{
+	// Convert back to slice with deduplicated bullet IDs
+	finalSelections := make([]StorySelection, 0, len(finalMap))
+	for sID, bIDSet := range finalMap {
+		bIDs := make([]string, 0, len(bIDSet))
+		for bid := range bIDSet {
+			bIDs = append(bIDs, bid)
+		}
+		finalSelections = append(finalSelections, StorySelection{
 			storyID:   sID,
 			bulletIDs: bIDs,
 		})

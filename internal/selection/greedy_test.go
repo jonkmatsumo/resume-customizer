@@ -60,7 +60,7 @@ func TestSelectGreedy(t *testing.T) {
 	checkSelections(t, selections, expectedIDs)
 }
 
-func checkSelections(t *testing.T, selections []storySelection, expectedIDs map[string]bool) {
+func checkSelections(t *testing.T, selections []StorySelection, expectedIDs map[string]bool) {
 	count := 0
 	for _, sel := range selections {
 		for _, bid := range sel.bulletIDs {

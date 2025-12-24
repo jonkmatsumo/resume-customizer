@@ -18,7 +18,7 @@ func SelectGreedy(
 	stories []*types.Story,
 	skillTargets *types.SkillTargets,
 	maxLines int,
-) ([]storySelection, float64, error) {
+) ([]StorySelection, float64, error) {
 
 	// 1. Flatten all bullets from all stories into a candidate list
 	// Map bullet ID to its story ID and the bullet object for easy lookup
@@ -121,10 +121,10 @@ func SelectGreedy(
 		}
 	}
 
-	// 4. Convert selectionMap to []storySelection
-	selections := make([]storySelection, 0, len(selectionMap))
+	// 4. Convert selectionMap to []StorySelection
+	selections := make([]StorySelection, 0, len(selectionMap))
 	for sID, bIDs := range selectionMap {
-		selections = append(selections, storySelection{
+		selections = append(selections, StorySelection{
 			storyID:   sID,
 			bulletIDs: bIDs,
 		})

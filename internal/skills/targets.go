@@ -2,15 +2,18 @@
 package skills
 
 import (
+	"context"
 	"fmt"
 	"sort"
+	"strings"
 
+	"github.com/jonathan/resume-customizer/internal/llm"
 	"github.com/jonathan/resume-customizer/internal/parsing"
 	"github.com/jonathan/resume-customizer/internal/types"
 )
 
 const (
-	// Weight constants for skill sources
+	// Weight constants for skill sources (requirement level)
 	weightHardRequirement = 1.0
 	weightNiceToHave      = 0.5
 	weightKeyword         = 0.3
@@ -75,6 +78,64 @@ func BuildSkillTargets(jobProfile *types.JobProfile) (*types.SkillTargets, error
 	})
 
 	return &types.SkillTargets{Skills: skills}, nil
+}
+
+// BuildSkillTargetsWithSpecificity builds skill targets and applies LLM-judged specificity.
+// specificityWeight controls the blend: FinalWeight = ReqWeight * (1-ratio) + Specificity * ratio.
+func BuildSkillTargetsWithSpecificity(
+	ctx context.Context,
+	jobProfile *types.JobProfile,
+	client llm.Client,
+	specificityWeight float64,
+) (*types.SkillTargets, error) {
+	// Build base targets first
+	targets, err := BuildSkillTargets(jobProfile)
+	if err != nil {
+		return nil, err
+	}
+
+	if client == nil || specificityWeight <= 0 {
+		// No LLM or specificity disabled, return base targets
+		return targets, nil
+	}
+
+	// Collect skill names for LLM evaluation
+	skillNames := make([]string, len(targets.Skills))
+	for i, skill := range targets.Skills {
+		skillNames[i] = skill.Name
+	}
+
+	// Get specificity scores from LLM
+	specificityScores, err := JudgeSkillSpecificity(ctx, skillNames, client)
+	if err != nil {
+		// Log warning but continue with base weights (graceful degradation)
+		// In production, you might want to log this error
+		return targets, nil
+	}
+
+	// Apply blended weights
+	for i := range targets.Skills {
+		skill := &targets.Skills[i]
+		normalized := strings.ToLower(strings.TrimSpace(skill.Name))
+		specificity := specificityScores[normalized]
+
+		// Store raw specificity
+		skill.Specificity = specificity
+
+		// Blend: FinalWeight = ReqWeight * (1 - ratio) + Specificity * ratio
+		// Note: We normalize both to 0-1 range first
+		reqWeight := skill.Weight // Already 0-1 range (1.0, 0.5, 0.3)
+		blendedWeight := reqWeight*(1-specificityWeight) + specificity*specificityWeight
+
+		skill.Weight = blendedWeight
+	}
+
+	// Re-sort by new blended weight
+	sort.Slice(targets.Skills, func(i, j int) bool {
+		return targets.Skills[i].Weight > targets.Skills[j].Weight
+	})
+
+	return targets, nil
 }
 
 // skillInfo holds temporary information about a skill during building

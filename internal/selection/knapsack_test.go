@@ -136,7 +136,7 @@ func TestBacktrack(t *testing.T) {
 	state1 := &dpState{
 		score:  1.0,
 		parent: nil,
-		selection: &storySelection{
+		selection: &StorySelection{
 			storyID:   "story_001",
 			bulletIDs: []string{"bullet_001"},
 		},
@@ -145,7 +145,7 @@ func TestBacktrack(t *testing.T) {
 	state2 := &dpState{
 		score:  2.0,
 		parent: state1,
-		selection: &storySelection{
+		selection: &StorySelection{
 			storyID:   "story_002",
 			bulletIDs: []string{"bullet_002"},
 		},
@@ -161,7 +161,7 @@ func TestBacktrack_SingleSelection(t *testing.T) {
 	state := &dpState{
 		score:  1.0,
 		parent: nil,
-		selection: &storySelection{
+		selection: &StorySelection{
 			storyID:   "story_001",
 			bulletIDs: []string{"bullet_001"},
 		},
