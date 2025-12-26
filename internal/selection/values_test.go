@@ -13,7 +13,7 @@ func TestComputeStoryValue(t *testing.T) {
 		Bullets: []types.Bullet{
 			{
 				ID:          "bullet_001",
-				LengthChars: 90,
+				LengthChars: 100,
 				Skills:      []string{"Go"},
 			},
 			{
@@ -39,14 +39,14 @@ func TestComputeStoryValue(t *testing.T) {
 	// Test with single bullet
 	value1 := computeStoryValue(rankedStory, story.Bullets[0:1], skillTargets)
 	assert.Equal(t, 1, value1.CostBullets)
-	assert.Equal(t, 1, value1.CostLines) // 90 chars = 1 line
+	assert.Equal(t, 1, value1.CostLines) // 100 chars = 1 line
 	assert.Equal(t, []string{"bullet_001"}, value1.BulletIDs)
 	assert.Greater(t, value1.Value, 0.0)
 
 	// Test with both bullets
 	value2 := computeStoryValue(rankedStory, story.Bullets, skillTargets)
 	assert.Equal(t, 2, value2.CostBullets)
-	assert.Equal(t, 3, value2.CostLines) // 90 + 100 = 190 chars = 3 lines
+	assert.Equal(t, 2, value2.CostLines) // 100 + 100 = 200 chars = 2 lines
 	assert.Equal(t, []string{"bullet_001", "bullet_002"}, value2.BulletIDs)
 	assert.Greater(t, value2.Value, value1.Value) // More bullets should have higher value
 }

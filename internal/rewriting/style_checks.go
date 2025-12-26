@@ -11,7 +11,7 @@ import (
 
 const (
 	// charsPerLine is the estimated number of characters per line in the resume (same as selection package)
-	charsPerLine = 90
+	charsPerLine = 100
 	// lengthTolerancePercent is the percentage tolerance for target length (within 20% is acceptable)
 	lengthTolerancePercent = 0.2
 )

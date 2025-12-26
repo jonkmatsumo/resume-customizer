@@ -93,8 +93,8 @@ func TestSolveKnapsack_OptimalSelection(t *testing.T) {
 		{
 			ID: "story_001",
 			Bullets: []types.Bullet{
-				{ID: "bullet_001", LengthChars: 200, Skills: []string{"Go"}},
-				{ID: "bullet_002", LengthChars: 200, Skills: []string{"Kubernetes"}},
+				{ID: "bullet_001", LengthChars: 250, Skills: []string{"Go"}},
+				{ID: "bullet_002", LengthChars: 250, Skills: []string{"Kubernetes"}},
 			},
 		},
 		{

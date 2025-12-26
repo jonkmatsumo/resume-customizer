@@ -9,7 +9,7 @@ import (
 
 const (
 	// charsPerLine is the estimated number of characters per line in the resume
-	charsPerLine = 90
+	charsPerLine = 100
 	// defaultRelevanceWeight is the weight for relevance score in value computation
 	defaultRelevanceWeight = 0.6
 	// defaultSkillWeight is the weight for skill coverage in value computation

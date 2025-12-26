@@ -15,18 +15,18 @@ func TestEstimateLines(t *testing.T) {
 	}{
 		{
 			name:        "exact fit",
-			lengthChars: 90,
+			lengthChars: 100,
 			expected:    1,
 		},
 		{
 			name:        "just over one line",
-			lengthChars: 91,
+			lengthChars: 101,
 			expected:    2,
 		},
 		{
 			name:        "multiple lines",
-			lengthChars: 200,
-			expected:    3, // ceil(200/90) = 3
+			lengthChars: 250,
+			expected:    3, // ceil(250/100) = 3
 		},
 		{
 			name:        "zero chars",

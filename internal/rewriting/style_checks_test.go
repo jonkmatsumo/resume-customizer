@@ -178,12 +178,12 @@ func TestEstimateLines(t *testing.T) {
 		expectedLines int
 	}{
 		{"Short text", 45, 1},
-		{"One line", 90, 1},
-		{"Two lines", 91, 2},
-		{"Two lines exact", 180, 2},
-		{"Three lines", 181, 3},
+		{"One line", 100, 1},
+		{"Two lines", 101, 2},
+		{"Two lines exact", 200, 2},
+		{"Three lines", 201, 3},
 		{"Zero length", 0, 1}, // Minimum 1 line
-		{"Very long", 500, 6},
+		{"Very long", 500, 5},
 	}
 
 	for _, tt := range tests {
