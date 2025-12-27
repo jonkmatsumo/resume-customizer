@@ -16,8 +16,6 @@ linters:
       check-type-assertions: true
     staticcheck:
       checks: ["all"]
-    unused:
-      check-exported: false
 
   exclusions:
     rules:
