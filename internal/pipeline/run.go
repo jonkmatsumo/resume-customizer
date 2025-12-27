@@ -14,6 +14,7 @@ import (
 	"github.com/jonathan/resume-customizer/internal/experience"
 	"github.com/jonathan/resume-customizer/internal/fetch"
 	"github.com/jonathan/resume-customizer/internal/ingestion"
+	"github.com/jonathan/resume-customizer/internal/observability"
 	"github.com/jonathan/resume-customizer/internal/parsing"
 	"github.com/jonathan/resume-customizer/internal/ranking"
 	"github.com/jonathan/resume-customizer/internal/rendering"
@@ -74,6 +75,9 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
+	// Initialize observability printer for verbose output
+	printer := observability.NewPrinter(os.Stdout)
+
 	// Step 1: Ingest job posting (from URL or File)
 	var cleanedText string
 	var jobMetadata *ingestion.Metadata
@@ -120,6 +124,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	}
 	if opts.Verbose {
 		fmt.Printf("[VERBOSE] Saved job profile to %s\n", jobProfilePath)
+		printer.PrintJobProfile(jobProfile)
 	}
 
 	fmt.Printf("Step 2a/12: Extracting education requirements...\n")
@@ -150,7 +155,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 
 	// Experience Branch (Steps 3-6)
 	g.Go(func() error {
-		result, err := runExperienceBranch(gCtx, opts, jobProfile, cleanedText)
+		result, err := runExperienceBranch(gCtx, opts, jobProfile, cleanedText, printer)
 		if err != nil {
 			return fmt.Errorf("experience branch failed: %w", err)
 		}
@@ -162,7 +167,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 
 	// Research Branch (Steps 7-8)
 	g.Go(func() error {
-		result, err := runResearchBranch(gCtx, opts, jobProfile, jobMetadata)
+		result, err := runResearchBranch(gCtx, opts, jobProfile, jobMetadata, printer)
 		if err != nil {
 			return fmt.Errorf("research branch failed: %w", err)
 		}
@@ -192,6 +197,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	}
 	if opts.Verbose {
 		fmt.Printf("[VERBOSE] Saved rewritten bullets to %s\n", rewrittenBulletsPath)
+		printer.PrintRewrittenBullets(rewrittenBullets)
 	}
 
 	fmt.Printf("Step 10/12: Rendering LaTeX resume...\n")
@@ -218,6 +224,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	}
 	if opts.Verbose {
 		fmt.Printf("[VERBOSE] Saved violations to %s\n", violationsPath)
+		printer.PrintViolations(violations)
 	}
 
 	if violations != nil && len(violations.Violations) > 0 {
@@ -297,7 +304,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 }
 
 // runExperienceBranch executes Steps 3-6: Loading, ranking, selecting, and materializing experience
-func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types.JobProfile, cleanedText string) (*ExperienceBranchResult, error) {
+func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types.JobProfile, cleanedText string, printer *observability.Printer) (*ExperienceBranchResult, error) {
 	prefix := prefixExperience
 
 	fmt.Printf("%sStep 3/12: Loading and normalizing experience bank from %s...\n", prefix, opts.ExperiencePath)
@@ -327,6 +334,7 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	}
 	if opts.Verbose {
 		fmt.Printf("%s[VERBOSE] Saved ranked stories to %s\n", prefix, rankedStoriesPath)
+		printer.PrintRankedStories(rankedStories)
 	}
 
 	fmt.Printf("%sStep 4a/12: Scoring education relevance...\n", prefix)
@@ -383,6 +391,7 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	}
 	if opts.Verbose {
 		fmt.Printf("%s[VERBOSE] Saved selected bullets to %s\n", prefix, bulletsPath)
+		printer.PrintSelectedBullets(selectedBullets)
 	}
 
 	fmt.Printf("%s✅ Experience branch complete.\n", prefix)
@@ -397,7 +406,7 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 }
 
 // runResearchBranch executes Steps 7-8: Company research and voice summarization
-func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.JobProfile, jobMetadata *ingestion.Metadata) (*ResearchBranchResult, error) {
+func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.JobProfile, jobMetadata *ingestion.Metadata, printer *observability.Printer) (*ResearchBranchResult, error) {
 	prefix := prefixResearch
 
 	fmt.Printf("%sStep 7/12: Researching company voice...\n", prefix)
@@ -553,6 +562,7 @@ func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.J
 	}
 	if opts.Verbose {
 		fmt.Printf("%s[VERBOSE] Saved company profile to %s\n", prefix, voiceProfilePath)
+		printer.PrintCompanyProfile(companyProfile)
 	}
 
 	fmt.Printf("%s✅ Research branch complete.\n", prefix)
