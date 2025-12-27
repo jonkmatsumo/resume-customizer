@@ -62,47 +62,84 @@ func NewGeminiClient(ctx context.Context, config *Config, apiKey string) (*Gemin
 	}, nil
 }
 
-// GenerateContent generates text content using the specified model tier
+// GenerateContent generates text content using the specified model tier with fallback support
 func (c *GeminiClient) GenerateContent(ctx context.Context, prompt string, tier ModelTier) (string, error) {
-	modelName := c.config.GetModel(tier)
-	if modelName == "" {
-		return "", fmt.Errorf("no model configured for tier %s", tier)
+	tiers := c.getFallbackTiers(tier)
+
+	var lastErr error
+	for _, t := range tiers {
+		modelName := c.config.GetModel(t)
+		if modelName == "" {
+			// If this is a synthesized tier for fallback (like "safety"), GetModel might return empty
+			if t == "safety" {
+				modelName = "gemini-2.0-flash"
+			} else {
+				continue
+			}
+		}
+
+		res, err := c.tryGenerate(ctx, prompt, modelName, false)
+		if err == nil {
+			return res, nil
+		}
+		lastErr = err
+		// Log fallback if verbose? We don't have easy access to logger here, but we can assume it's okay for now.
 	}
 
-	model := c.client.GenerativeModel(modelName)
-	model.SetTemperature(0.1) // Low temperature for consistent output
-
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
-	if err != nil {
-		return "", fmt.Errorf("failed to generate content: %w", err)
-	}
-
-	return extractTextFromResponse(resp)
+	return "", fmt.Errorf("all model tiers failed, last error: %w", lastErr)
 }
 
-// GenerateJSON generates JSON content using the specified model tier
+// GenerateJSON generates JSON content using the specified model tier with fallback support
 func (c *GeminiClient) GenerateJSON(ctx context.Context, prompt string, tier ModelTier) (string, error) {
-	modelName := c.config.GetModel(tier)
-	if modelName == "" {
-		return "", fmt.Errorf("no model configured for tier %s", tier)
+	tiers := c.getFallbackTiers(tier)
+
+	var lastErr error
+	for _, t := range tiers {
+		modelName := c.config.GetModel(t)
+		if modelName == "" {
+			if t == "safety" {
+				modelName = "gemini-2.0-flash"
+			} else {
+				continue
+			}
+		}
+
+		res, err := c.tryGenerate(ctx, prompt, modelName, true)
+		if err == nil {
+			return cleanJSONBlock(res), nil
+		}
+		lastErr = err
 	}
 
+	return "", fmt.Errorf("all model tiers failed (JSON), last error: %w", lastErr)
+}
+
+func (c *GeminiClient) getFallbackTiers(tier ModelTier) []ModelTier {
+	switch tier {
+	case TierAdvanced:
+		return []ModelTier{TierAdvanced, TierStandard, TierLite, "safety"}
+	case TierStandard:
+		return []ModelTier{TierStandard, TierLite, "safety"}
+	case TierLite:
+		return []ModelTier{TierLite, "safety"}
+	default:
+		return []ModelTier{tier, TierLite, "safety"}
+	}
+}
+
+func (c *GeminiClient) tryGenerate(ctx context.Context, prompt string, modelName string, isJSON bool) (string, error) {
 	model := c.client.GenerativeModel(modelName)
-	model.SetTemperature(0.1) // Low temperature for consistent output
-	model.ResponseMIMEType = "application/json"
+	model.SetTemperature(0.1)
+	if isJSON {
+		model.ResponseMIMEType = "application/json"
+	}
 
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
-	if err != nil {
-		return "", fmt.Errorf("failed to generate content: %w", err)
-	}
-
-	text, err := extractTextFromResponse(resp)
 	if err != nil {
 		return "", err
 	}
 
-	// Clean any markdown code block wrappers
-	return cleanJSONBlock(text), nil
+	return extractTextFromResponse(resp)
 }
 
 // GetModel returns the model name for a tier
