@@ -1,14 +1,7 @@
-version: 2
-
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-  staticcheck:
-    checks: ["all"]
-  unused:
-    check-exported: false
+version: "2"
 
 linters:
+  default: none
   enable:
     - errcheck      # Check for unchecked errors
     - govet         # Go vet
@@ -18,12 +11,20 @@ linters:
     - misspell      # Spelling mistakes
     - revive        # Fast, configurable linter
 
+  settings:
+    errcheck:
+      check-type-assertions: true
+    staticcheck:
+      checks: ["all"]
+    unused:
+      check-exported: false
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck  # Allow unchecked errors in tests
+
 issues:
-  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck  # Allow unchecked errors in tests
-
