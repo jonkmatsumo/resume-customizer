@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/jonathan/resume-customizer/internal/experience"
 	"github.com/jonathan/resume-customizer/internal/fetch"
@@ -40,6 +43,29 @@ type RunOptions struct {
 	UseBrowser     bool
 	Verbose        bool
 }
+
+// ExperienceBranchResult holds the outputs from the experience processing branch
+type ExperienceBranchResult struct {
+	SelectedBullets   *types.SelectedBullets
+	RankedStories     *types.RankedStories
+	ExperienceBank    *types.ExperienceBank
+	SelectedEducation []types.Education
+	ResumePlan        *types.ResumePlan
+}
+
+// ResearchBranchResult holds the outputs from the research/voice branch
+type ResearchBranchResult struct {
+	CompanyProfile *types.CompanyProfile
+	CompanyCorpus  *types.CompanyCorpus
+}
+
+// logPrefix is used to distinguish concurrent log output
+type logPrefix string
+
+const (
+	prefixExperience logPrefix = "[Experience] "
+	prefixResearch   logPrefix = "[Research]   "
+)
 
 // RunPipeline orchestrates the full resume generation pipeline
 func RunPipeline(ctx context.Context, opts RunOptions) error {
@@ -111,248 +137,52 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		}
 	}
 
-	fmt.Printf("Step 3/12: Loading and normalizing experience bank from %s...\n", opts.ExperiencePath)
-	experienceBank, err := experience.LoadExperienceBank(opts.ExperiencePath)
-	if err != nil {
-		return fmt.Errorf("loading experience bank failed: %w", err)
-	}
-	if err := experience.NormalizeExperienceBank(experienceBank); err != nil {
-		return fmt.Errorf("normalizing experience bank failed: %w", err)
-	}
-	expBankPath := filepath.Join(opts.OutputDir, "experience_bank_normalized.json")
-	if err := saveJSON(expBankPath, experienceBank); err != nil {
-		return err
-	}
-	if opts.Verbose {
-		fmt.Printf("[VERBOSE] Saved normalized experience bank to %s\n", expBankPath)
-	}
+	// =========================================================================
+	// PARALLEL EXECUTION: Experience Branch + Research Branch
+	// =========================================================================
+	fmt.Printf("\n🚀 Starting parallel execution of Experience and Research branches...\n\n")
 
-	fmt.Printf("Step 4/12: Ranking stories...\n")
-	rankedStories, err := ranking.RankStories(jobProfile, experienceBank)
-	if err != nil {
-		return fmt.Errorf("ranking stories failed: %w", err)
-	}
-	rankedStoriesPath := filepath.Join(opts.OutputDir, "ranked_stories.json")
-	if err := saveJSON(rankedStoriesPath, rankedStories); err != nil {
-		return err
-	}
-	if opts.Verbose {
-		fmt.Printf("[VERBOSE] Saved ranked stories to %s\n", rankedStoriesPath)
-	}
+	g, gCtx := errgroup.WithContext(ctx)
 
-	fmt.Printf("Step 4a/12: Scoring education relevance...\n")
-	var selectedEducation []types.Education
-	eduScores, err := ranking.ScoreEducation(ctx, experienceBank.Education, jobProfile.EducationRequirements, cleanedText, opts.APIKey)
-	if err != nil {
-		fmt.Printf("Warning: Education scoring failed: %v. Including all education.\n", err)
-		selectedEducation = experienceBank.Education
-	} else {
-		eduScoresPath := filepath.Join(opts.OutputDir, "education_scores.json")
-		if err := saveJSON(eduScoresPath, eduScores); err != nil {
-			return err
+	var experienceResult *ExperienceBranchResult
+	var researchResult *ResearchBranchResult
+	var expMu, resMu sync.Mutex // Protect result assignments
+
+	// Experience Branch (Steps 3-6)
+	g.Go(func() error {
+		result, err := runExperienceBranch(gCtx, opts, jobProfile, cleanedText)
+		if err != nil {
+			return fmt.Errorf("experience branch failed: %w", err)
 		}
-		if opts.Verbose {
-			fmt.Printf("[VERBOSE] Saved education scores to %s\n", eduScoresPath)
-		}
-		// Filter based on Included flag
-		for _, score := range eduScores {
-			if score.Included {
-				for _, edu := range experienceBank.Education {
-					if edu.ID == score.EducationID {
-						selectedEducation = append(selectedEducation, edu)
-					}
-				}
-			}
-		}
-	}
-
-	fmt.Printf("Step 5/12: Selecting optimum resume plan...\n")
-	spaceBudget := &types.SpaceBudget{
-		MaxBullets: opts.MaxBullets,
-		MaxLines:   opts.MaxLines,
-	}
-	resumePlan, err := selection.SelectPlan(rankedStories, jobProfile, experienceBank, spaceBudget)
-	if err != nil {
-		return fmt.Errorf("selecting plan failed: %w", err)
-	}
-	planPath := filepath.Join(opts.OutputDir, "resume_plan.json")
-	if err := saveJSON(planPath, resumePlan); err != nil {
-		return err
-	}
-	if opts.Verbose {
-		fmt.Printf("[VERBOSE] Saved resume plan to %s\n", planPath)
-	}
-
-	fmt.Printf("Step 6/12: Materializing selected bullets...\n")
-	selectedBullets, err := selection.MaterializeBullets(resumePlan, experienceBank)
-	if err != nil {
-		return fmt.Errorf("materializing bullets failed: %w", err)
-	}
-	bulletsPath := filepath.Join(opts.OutputDir, "selected_bullets.json")
-	if err := saveJSON(bulletsPath, selectedBullets); err != nil {
-		return err
-	}
-	if opts.Verbose {
-		fmt.Printf("[VERBOSE] Saved selected bullets to %s\n", bulletsPath)
-	}
-
-	fmt.Printf("Step 7/12: Researching company voice...\\n")
-
-	// Determine seeds and company info for research
-	var seeds []string
-	if jobMetadata != nil && len(jobMetadata.ExtractedLinks) > 0 {
-		seeds = append(seeds, jobMetadata.ExtractedLinks...)
-	}
-
-	// Build initial corpus from "About Company" section if available
-	initialCorpus := ""
-	if jobMetadata != nil && jobMetadata.AboutCompany != "" {
-		initialCorpus = "## About the Company\n" + jobMetadata.AboutCompany + "\n\n"
-	}
-
-	companyName := jobProfile.Company
-	if companyName == "" && jobMetadata != nil && jobMetadata.Company != "" {
-		companyName = jobMetadata.Company
-	}
-	if companyName == "" && jobMetadata != nil && jobMetadata.URL != "" {
-		companyName = fetch.ExtractCompanyFromURL(jobMetadata.URL)
-	}
-	companyDomain := ""
-
-	// If Google Search API keys are present, try discovery
-	googleKey := os.Getenv("GOOGLE_SEARCH_API_KEY")
-	googleCX := os.Getenv("GOOGLE_SEARCH_CX")
-
-	if googleKey == "" || googleCX == "" {
-		fmt.Printf("Debug: Google Search API keys not found in environment (GOOGLE_SEARCH_API_KEY: %t, GOOGLE_SEARCH_CX: %t)\n", googleKey != "", googleCX != "")
-	}
-
-	if googleKey != "" && googleCX != "" {
-		if opts.Verbose {
-			fmt.Printf("[VERBOSE] Using Google Search for discovery...\n")
-		}
-		researcher, err := research.NewResearcher(ctx, googleKey, googleCX)
-		if err == nil {
-			// 1. Discover website if not provided
-			companyWebsite := opts.CompanySeedURL
-			if companyWebsite == "" && companyName != "" {
-				website, err := researcher.DiscoverCompanyWebsite(ctx, jobProfile)
-				if err != nil {
-					fmt.Printf("Warning: Failed to discover company website: %v\n", err)
-				} else if website != "" {
-					fmt.Printf("Discovered company website: %s\n", website)
-					companyWebsite = website
-				}
-			}
-
-			// Extract domain for research
-			if companyWebsite != "" {
-				companyDomain = research.ExtractDomain(companyWebsite)
-				seeds = append(seeds, companyWebsite)
-			}
-
-			// 2. Find voice seeds (About, Culture, Values pages)
-			if companyWebsite != "" || companyName != "" {
-				discoveredSeeds, err := researcher.FindVoiceSeeds(ctx, companyName, companyWebsite)
-				if err != nil {
-					fmt.Printf("Warning: Failed to find voice seeds: %v\n", err)
-				} else if len(discoveredSeeds) > 0 {
-					fmt.Printf("Discovered %d additional voice seeds\n", len(discoveredSeeds))
-					seeds = append(seeds, discoveredSeeds...)
-				}
-			}
-		} else {
-			fmt.Printf("Warning: Failed to initialize researcher: %v\n", err)
-		}
-	}
-
-	// Fallback/Augment with provided seed if not already in list
-	if opts.CompanySeedURL != "" {
-		found := false
-		for _, s := range seeds {
-			if s == opts.CompanySeedURL {
-				found = true
-				break
-			}
-		}
-		if !found {
-			seeds = append(seeds, opts.CompanySeedURL)
-		}
-		// Ensure domain is set
-		if companyDomain == "" {
-			companyDomain = research.ExtractDomain(opts.CompanySeedURL)
-		}
-	}
-
-	if len(seeds) == 0 {
-		return fmt.Errorf("no company seed URL provided and discovery failed. Set GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CX env vars for auto-discovery, or provide --company-seed")
-	}
-
-	fmt.Printf("Researching company voice with LLM-guided crawling (seeds: %v)...\n", seeds)
-
-	// Use research module for smarter LLM-filtered crawling
-	researchSession, err := research.RunResearch(ctx, research.RunResearchOptions{
-		SeedURLs:      seeds,
-		Company:       companyName,
-		Domain:        companyDomain,
-		InitialCorpus: initialCorpus,
-		MaxPages:      5,
-		APIKey:        opts.APIKey,
-		Verbose:       opts.Verbose,
-		UseBrowser:    opts.UseBrowser,
+		expMu.Lock()
+		experienceResult = result
+		expMu.Unlock()
+		return nil
 	})
-	if err != nil {
-		return fmt.Errorf("research failed: %w", err)
-	}
 
-	// Build corpus from research session
-	companyCorpus := &types.CompanyCorpus{
-		Corpus:  researchSession.Corpus,
-		Sources: researchSession.ToSources(),
-	}
+	// Research Branch (Steps 7-8)
+	g.Go(func() error {
+		result, err := runResearchBranch(gCtx, opts, jobProfile, jobMetadata)
+		if err != nil {
+			return fmt.Errorf("research branch failed: %w", err)
+		}
+		resMu.Lock()
+		researchResult = result
+		resMu.Unlock()
+		return nil
+	})
 
-	// Save sources
-	sourcesPath := filepath.Join(opts.OutputDir, "sources.json")
-	if err := saveJSON(sourcesPath, companyCorpus.Sources); err != nil {
+	// Wait for both branches to complete
+	if err := g.Wait(); err != nil {
 		return err
 	}
-	if opts.Verbose {
-		fmt.Printf("[VERBOSE] Saved research sources to %s\n", sourcesPath)
-	}
 
-	// Save corpus text for debug
-	corpusPath := filepath.Join(opts.OutputDir, "company_corpus.txt")
-	if err := os.WriteFile(corpusPath, []byte(companyCorpus.Corpus), 0644); err != nil {
-		return fmt.Errorf("failed to save company corpus text: %w", err)
-	}
-	if opts.Verbose {
-		fmt.Printf("[VERBOSE] Saved company corpus text to %s\n", corpusPath)
-	}
+	fmt.Printf("\n✅ Both branches completed. Continuing with rewriting...\n\n")
+	// =========================================================================
 
-	// Save research session for debug
-	sessionPath := filepath.Join(opts.OutputDir, "research_session.json")
-	if err := saveJSON(sessionPath, researchSession); err != nil {
-		return err
-	}
-	if opts.Verbose {
-		fmt.Printf("[VERBOSE] Saved research session to %s\n", sessionPath)
-	}
-
-	fmt.Printf("Step 8/12: Summarizing company voice...\n")
-	companyProfile, err := voice.SummarizeVoice(ctx, companyCorpus.Corpus, companyCorpus.Sources, opts.APIKey)
-	if err != nil {
-		return fmt.Errorf("summarizing voice failed: %w", err)
-	}
-	voiceProfilePath := filepath.Join(opts.OutputDir, "company_profile.json")
-	if err := saveJSON(voiceProfilePath, companyProfile); err != nil {
-		return err
-	}
-	if opts.Verbose {
-		fmt.Printf("[VERBOSE] Saved company profile to %s\n", voiceProfilePath)
-	}
-
+	// Step 9: Rewrite bullets (requires both branches)
 	fmt.Printf("Step 9/12: Rewriting bullets to match voice...\n")
-	rewrittenBullets, err := rewriting.RewriteBullets(ctx, selectedBullets, jobProfile, companyProfile, opts.APIKey)
+	rewrittenBullets, err := rewriting.RewriteBullets(ctx, experienceResult.SelectedBullets, jobProfile, researchResult.CompanyProfile, opts.APIKey)
 	if err != nil {
 		return fmt.Errorf("rewriting bullets failed: %w", err)
 	}
@@ -365,7 +195,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	}
 
 	fmt.Printf("Step 10/12: Rendering LaTeX resume...\n")
-	latex, err := rendering.RenderLaTeX(resumePlan, rewrittenBullets, opts.TemplatePath, opts.CandidateName, opts.CandidateEmail, opts.CandidatePhone, experienceBank, selectedEducation)
+	latex, err := rendering.RenderLaTeX(experienceResult.ResumePlan, rewrittenBullets, opts.TemplatePath, opts.CandidateName, opts.CandidateEmail, opts.CandidatePhone, experienceResult.ExperienceBank, experienceResult.SelectedEducation)
 	if err != nil {
 		return fmt.Errorf("rendering latex failed: %w", err)
 	}
@@ -378,7 +208,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	}
 
 	fmt.Printf("Step 11/12: Validating LaTeX constraints...\n")
-	violations, err := validation.ValidateConstraints(latexPath, companyProfile, 1, 100) // Default max 1 page, 100 chars per line (approx)
+	violations, err := validation.ValidateConstraints(latexPath, researchResult.CompanyProfile, 1, 100) // Default max 1 page, 100 chars per line (approx)
 	if err != nil {
 		return fmt.Errorf("validating latex failed: %w", err)
 	}
@@ -401,16 +231,16 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 
 		finalPlan, finalBullets, finalLaTeX, finalViolations, iterations, err := repair.RunRepairLoop(
 			ctx,
-			resumePlan,
+			experienceResult.ResumePlan,
 			rewrittenBullets,
 			violations,
-			rankedStories,
+			experienceResult.RankedStories,
 			jobProfile,
-			companyProfile,
-			experienceBank,
+			researchResult.CompanyProfile,
+			experienceResult.ExperienceBank,
 			opts.TemplatePath,
 			candidateInfo,
-			selectedEducation,
+			experienceResult.SelectedEducation,
 			1,   // max pages
 			100, // max chars per line
 			5,   // max iterations
@@ -464,6 +294,273 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 
 	fmt.Printf("Done! Generated resume at %s\n", latexPath)
 	return nil
+}
+
+// runExperienceBranch executes Steps 3-6: Loading, ranking, selecting, and materializing experience
+func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types.JobProfile, cleanedText string) (*ExperienceBranchResult, error) {
+	prefix := prefixExperience
+
+	fmt.Printf("%sStep 3/12: Loading and normalizing experience bank from %s...\n", prefix, opts.ExperiencePath)
+	experienceBank, err := experience.LoadExperienceBank(opts.ExperiencePath)
+	if err != nil {
+		return nil, fmt.Errorf("loading experience bank failed: %w", err)
+	}
+	if err := experience.NormalizeExperienceBank(experienceBank); err != nil {
+		return nil, fmt.Errorf("normalizing experience bank failed: %w", err)
+	}
+	expBankPath := filepath.Join(opts.OutputDir, "experience_bank_normalized.json")
+	if err := saveJSON(expBankPath, experienceBank); err != nil {
+		return nil, err
+	}
+	if opts.Verbose {
+		fmt.Printf("%s[VERBOSE] Saved normalized experience bank to %s\n", prefix, expBankPath)
+	}
+
+	fmt.Printf("%sStep 4/12: Ranking stories...\n", prefix)
+	rankedStories, err := ranking.RankStories(jobProfile, experienceBank)
+	if err != nil {
+		return nil, fmt.Errorf("ranking stories failed: %w", err)
+	}
+	rankedStoriesPath := filepath.Join(opts.OutputDir, "ranked_stories.json")
+	if err := saveJSON(rankedStoriesPath, rankedStories); err != nil {
+		return nil, err
+	}
+	if opts.Verbose {
+		fmt.Printf("%s[VERBOSE] Saved ranked stories to %s\n", prefix, rankedStoriesPath)
+	}
+
+	fmt.Printf("%sStep 4a/12: Scoring education relevance...\n", prefix)
+	var selectedEducation []types.Education
+	eduScores, err := ranking.ScoreEducation(ctx, experienceBank.Education, jobProfile.EducationRequirements, cleanedText, opts.APIKey)
+	if err != nil {
+		fmt.Printf("%sWarning: Education scoring failed: %v. Including all education.\n", prefix, err)
+		selectedEducation = experienceBank.Education
+	} else {
+		eduScoresPath := filepath.Join(opts.OutputDir, "education_scores.json")
+		if err := saveJSON(eduScoresPath, eduScores); err != nil {
+			return nil, err
+		}
+		if opts.Verbose {
+			fmt.Printf("%s[VERBOSE] Saved education scores to %s\n", prefix, eduScoresPath)
+		}
+		// Filter based on Included flag
+		for _, score := range eduScores {
+			if score.Included {
+				for _, edu := range experienceBank.Education {
+					if edu.ID == score.EducationID {
+						selectedEducation = append(selectedEducation, edu)
+					}
+				}
+			}
+		}
+	}
+
+	fmt.Printf("%sStep 5/12: Selecting optimum resume plan...\n", prefix)
+	spaceBudget := &types.SpaceBudget{
+		MaxBullets: opts.MaxBullets,
+		MaxLines:   opts.MaxLines,
+	}
+	resumePlan, err := selection.SelectPlan(rankedStories, jobProfile, experienceBank, spaceBudget)
+	if err != nil {
+		return nil, fmt.Errorf("selecting plan failed: %w", err)
+	}
+	planPath := filepath.Join(opts.OutputDir, "resume_plan.json")
+	if err := saveJSON(planPath, resumePlan); err != nil {
+		return nil, err
+	}
+	if opts.Verbose {
+		fmt.Printf("%s[VERBOSE] Saved resume plan to %s\n", prefix, planPath)
+	}
+
+	fmt.Printf("%sStep 6/12: Materializing selected bullets...\n", prefix)
+	selectedBullets, err := selection.MaterializeBullets(resumePlan, experienceBank)
+	if err != nil {
+		return nil, fmt.Errorf("materializing bullets failed: %w", err)
+	}
+	bulletsPath := filepath.Join(opts.OutputDir, "selected_bullets.json")
+	if err := saveJSON(bulletsPath, selectedBullets); err != nil {
+		return nil, err
+	}
+	if opts.Verbose {
+		fmt.Printf("%s[VERBOSE] Saved selected bullets to %s\n", prefix, bulletsPath)
+	}
+
+	fmt.Printf("%s✅ Experience branch complete.\n", prefix)
+
+	return &ExperienceBranchResult{
+		SelectedBullets:   selectedBullets,
+		RankedStories:     rankedStories,
+		ExperienceBank:    experienceBank,
+		SelectedEducation: selectedEducation,
+		ResumePlan:        resumePlan,
+	}, nil
+}
+
+// runResearchBranch executes Steps 7-8: Company research and voice summarization
+func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.JobProfile, jobMetadata *ingestion.Metadata) (*ResearchBranchResult, error) {
+	prefix := prefixResearch
+
+	fmt.Printf("%sStep 7/12: Researching company voice...\n", prefix)
+
+	// Determine seeds and company info for research
+	var seeds []string
+	if jobMetadata != nil && len(jobMetadata.ExtractedLinks) > 0 {
+		seeds = append(seeds, jobMetadata.ExtractedLinks...)
+	}
+
+	// Build initial corpus from "About Company" section if available
+	initialCorpus := ""
+	if jobMetadata != nil && jobMetadata.AboutCompany != "" {
+		initialCorpus = "## About the Company\n" + jobMetadata.AboutCompany + "\n\n"
+	}
+
+	companyName := jobProfile.Company
+	if companyName == "" && jobMetadata != nil && jobMetadata.Company != "" {
+		companyName = jobMetadata.Company
+	}
+	if companyName == "" && jobMetadata != nil && jobMetadata.URL != "" {
+		companyName = fetch.ExtractCompanyFromURL(jobMetadata.URL)
+	}
+	companyDomain := ""
+
+	// If Google Search API keys are present, try discovery
+	googleKey := os.Getenv("GOOGLE_SEARCH_API_KEY")
+	googleCX := os.Getenv("GOOGLE_SEARCH_CX")
+
+	if googleKey == "" || googleCX == "" {
+		fmt.Printf("%sDebug: Google Search API keys not found in environment (GOOGLE_SEARCH_API_KEY: %t, GOOGLE_SEARCH_CX: %t)\n", prefix, googleKey != "", googleCX != "")
+	}
+
+	if googleKey != "" && googleCX != "" {
+		if opts.Verbose {
+			fmt.Printf("%s[VERBOSE] Using Google Search for discovery...\n", prefix)
+		}
+		researcher, err := research.NewResearcher(ctx, googleKey, googleCX)
+		if err == nil {
+			// 1. Discover website if not provided
+			companyWebsite := opts.CompanySeedURL
+			if companyWebsite == "" && companyName != "" {
+				website, err := researcher.DiscoverCompanyWebsite(ctx, jobProfile)
+				if err != nil {
+					fmt.Printf("%sWarning: Failed to discover company website: %v\n", prefix, err)
+				} else if website != "" {
+					fmt.Printf("%sDiscovered company website: %s\n", prefix, website)
+					companyWebsite = website
+				}
+			}
+
+			// Extract domain for research
+			if companyWebsite != "" {
+				companyDomain = research.ExtractDomain(companyWebsite)
+				seeds = append(seeds, companyWebsite)
+			}
+
+			// 2. Find voice seeds (About, Culture, Values pages)
+			if companyWebsite != "" || companyName != "" {
+				discoveredSeeds, err := researcher.FindVoiceSeeds(ctx, companyName, companyWebsite)
+				if err != nil {
+					fmt.Printf("%sWarning: Failed to find voice seeds: %v\n", prefix, err)
+				} else if len(discoveredSeeds) > 0 {
+					fmt.Printf("%sDiscovered %d additional voice seeds\n", prefix, len(discoveredSeeds))
+					seeds = append(seeds, discoveredSeeds...)
+				}
+			}
+		} else {
+			fmt.Printf("%sWarning: Failed to initialize researcher: %v\n", prefix, err)
+		}
+	}
+
+	// Fallback/Augment with provided seed if not already in list
+	if opts.CompanySeedURL != "" {
+		found := false
+		for _, s := range seeds {
+			if s == opts.CompanySeedURL {
+				found = true
+				break
+			}
+		}
+		if !found {
+			seeds = append(seeds, opts.CompanySeedURL)
+		}
+		// Ensure domain is set
+		if companyDomain == "" {
+			companyDomain = research.ExtractDomain(opts.CompanySeedURL)
+		}
+	}
+
+	if len(seeds) == 0 {
+		return nil, fmt.Errorf("no company seed URL provided and discovery failed. Set GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CX env vars for auto-discovery, or provide --company-seed")
+	}
+
+	fmt.Printf("%sResearching company voice with LLM-guided crawling (seeds: %v)...\n", prefix, seeds)
+
+	// Use research module for smarter LLM-filtered crawling
+	researchSession, err := research.RunResearch(ctx, research.RunResearchOptions{
+		SeedURLs:      seeds,
+		Company:       companyName,
+		Domain:        companyDomain,
+		InitialCorpus: initialCorpus,
+		MaxPages:      5,
+		APIKey:        opts.APIKey,
+		Verbose:       opts.Verbose,
+		UseBrowser:    opts.UseBrowser,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("research failed: %w", err)
+	}
+
+	// Build corpus from research session
+	companyCorpus := &types.CompanyCorpus{
+		Corpus:  researchSession.Corpus,
+		Sources: researchSession.ToSources(),
+	}
+
+	// Save sources
+	sourcesPath := filepath.Join(opts.OutputDir, "sources.json")
+	if err := saveJSON(sourcesPath, companyCorpus.Sources); err != nil {
+		return nil, err
+	}
+	if opts.Verbose {
+		fmt.Printf("%s[VERBOSE] Saved research sources to %s\n", prefix, sourcesPath)
+	}
+
+	// Save corpus text for debug
+	corpusPath := filepath.Join(opts.OutputDir, "company_corpus.txt")
+	if err := os.WriteFile(corpusPath, []byte(companyCorpus.Corpus), 0644); err != nil {
+		return nil, fmt.Errorf("failed to save company corpus text: %w", err)
+	}
+	if opts.Verbose {
+		fmt.Printf("%s[VERBOSE] Saved company corpus text to %s\n", prefix, corpusPath)
+	}
+
+	// Save research session for debug
+	sessionPath := filepath.Join(opts.OutputDir, "research_session.json")
+	if err := saveJSON(sessionPath, researchSession); err != nil {
+		return nil, err
+	}
+	if opts.Verbose {
+		fmt.Printf("%s[VERBOSE] Saved research session to %s\n", prefix, sessionPath)
+	}
+
+	fmt.Printf("%sStep 8/12: Summarizing company voice...\n", prefix)
+	companyProfile, err := voice.SummarizeVoice(ctx, companyCorpus.Corpus, companyCorpus.Sources, opts.APIKey)
+	if err != nil {
+		return nil, fmt.Errorf("summarizing voice failed: %w", err)
+	}
+	voiceProfilePath := filepath.Join(opts.OutputDir, "company_profile.json")
+	if err := saveJSON(voiceProfilePath, companyProfile); err != nil {
+		return nil, err
+	}
+	if opts.Verbose {
+		fmt.Printf("%s[VERBOSE] Saved company profile to %s\n", prefix, voiceProfilePath)
+	}
+
+	fmt.Printf("%s✅ Research branch complete.\n", prefix)
+
+	return &ResearchBranchResult{
+		CompanyProfile: companyProfile,
+		CompanyCorpus:  companyCorpus,
+	}, nil
 }
 
 func saveJSON(path string, v interface{}) error {
