@@ -23,7 +23,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest-v2
+          version: v2.7.2
 
   fmt-check:
     runs-on: ubuntu-latest
