@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+bin/
+*.exe
+resume_agent
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+artifacts/
+testdata/
+
+# Local env
+.env
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Development
+.pre-commit-config.yaml
+.golangci.yml
+.cursorrules
+implementation_plans/
