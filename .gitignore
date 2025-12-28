@@ -56,3 +56,9 @@ data/
 
 # Generated/internal documentation
 docs/
+
+# Accidentally compiled tool binaries
+test_company_profiles
+test_companies
+migrate_companies
+migrate_company_profiles

@@ -33,6 +33,10 @@ test-integration:
 test-companies:
 	go test -v ./internal/db/... -run 'Company|CrawledPage|Normalize|Hash|Extract'
 
+# Run profile-related tests (Phase 2)
+test-profiles:
+	go test -v ./internal/db/... -run 'Profile|Signal|Source|Taboo'
+
 # Linting
 lint:
 	@golangci-lint run

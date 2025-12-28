@@ -6,11 +6,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
+	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/llm"
 	"github.com/jonathan/resume-customizer/internal/prompts"
 	"github.com/jonathan/resume-customizer/internal/types"
 )
+
+// SummarizeOptions adds database support for caching
+type SummarizeOptions struct {
+	Database  *db.DB
+	CompanyID *uuid.UUID
+	MaxAge    time.Duration // How old cached profiles can be
+}
 
 // SummarizeVoice extracts brand voice and style rules from company corpus text
 func SummarizeVoice(ctx context.Context, corpusText string, sources []types.Source, apiKey string) (*types.CompanyProfile, error) {
@@ -62,6 +72,74 @@ func SummarizeVoice(ctx context.Context, corpusText string, sources []types.Sour
 	}
 
 	return profile, nil
+}
+
+// SummarizeVoiceWithCache attempts to use cached profile first, falling back to LLM generation
+func SummarizeVoiceWithCache(ctx context.Context, opts SummarizeOptions, corpusText string, sources []types.Source, apiKey string) (*types.CompanyProfile, error) {
+	// Try to get fresh cached profile
+	if opts.Database != nil && opts.CompanyID != nil {
+		maxAge := opts.MaxAge
+		if maxAge == 0 {
+			maxAge = db.DefaultProfileCacheTTL
+		}
+
+		cached, err := opts.Database.GetFreshCompanyProfile(ctx, *opts.CompanyID, maxAge)
+		if err == nil && cached != nil {
+			// Convert db.CompanyProfile to types.CompanyProfile
+			return &types.CompanyProfile{
+				Tone:          cached.Tone,
+				DomainContext: derefStr(cached.DomainContext),
+				StyleRules:    cached.StyleRules,
+				TabooPhrases:  cached.TabooPhrases,
+				Values:        cached.Values,
+				EvidenceURLs:  cached.EvidenceURLs,
+			}, nil
+		}
+	}
+
+	// Generate fresh profile
+	profile, err := SummarizeVoice(ctx, corpusText, sources, apiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Store in database if connected
+	if opts.Database != nil && opts.CompanyID != nil {
+		input := &db.ProfileCreateInput{
+			CompanyID:     *opts.CompanyID,
+			Tone:          profile.Tone,
+			DomainContext: profile.DomainContext,
+			SourceCorpus:  corpusText,
+			StyleRules:    profile.StyleRules,
+			Values:        profile.Values,
+		}
+
+		// Convert taboo phrases
+		for _, phrase := range profile.TabooPhrases {
+			input.TabooPhrases = append(input.TabooPhrases, db.TabooPhraseInput{
+				Phrase: phrase,
+			})
+		}
+
+		// Convert evidence URLs
+		for _, url := range profile.EvidenceURLs {
+			input.EvidenceURLs = append(input.EvidenceURLs, db.ProfileSourceInput{
+				URL: url,
+			})
+		}
+
+		_, _ = opts.Database.CreateCompanyProfile(ctx, input)
+	}
+
+	return profile, nil
+}
+
+// derefStr returns the value of a string pointer, or empty string if nil
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // buildExtractionPrompt constructs the prompt for structured voice extraction
