@@ -9,8 +9,10 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/experience"
 	"github.com/jonathan/resume-customizer/internal/fetch"
 	"github.com/jonathan/resume-customizer/internal/ingestion"
@@ -43,6 +45,7 @@ type RunOptions struct {
 	APIKey         string
 	UseBrowser     bool
 	Verbose        bool
+	DatabaseURL    string
 }
 
 // ExperienceBranchResult holds the outputs from the experience processing branch
@@ -77,6 +80,23 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 
 	// Initialize observability printer for verbose output
 	printer := observability.NewPrinter(os.Stdout)
+
+	// Initialize database connection if configured
+	var database *db.DB
+	var runID uuid.UUID
+	if opts.DatabaseURL != "" {
+		var err error
+		database, err = db.Connect(ctx, opts.DatabaseURL)
+		if err != nil {
+			fmt.Printf("Warning: Failed to connect to database: %v\n", err)
+			fmt.Printf("Continuing without database persistence...\n")
+		} else {
+			defer database.Close()
+			if opts.Verbose {
+				fmt.Printf("[VERBOSE] Connected to database\n")
+			}
+		}
+	}
 
 	// Step 1: Ingest job posting (from URL or File)
 	var cleanedText string
@@ -125,6 +145,22 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	if opts.Verbose {
 		fmt.Printf("[VERBOSE] Saved job profile to %s\n", jobProfilePath)
 		printer.PrintJobProfile(jobProfile)
+	}
+
+	// Save to database if connected
+	if database != nil {
+		runID, err = database.CreateRun(ctx, jobProfile.Company, jobProfile.RoleTitle, opts.JobURL)
+		if err != nil {
+			fmt.Printf("Warning: Failed to create database run: %v\n", err)
+		} else {
+			if opts.Verbose {
+				fmt.Printf("[VERBOSE] Created database run: %s\n", runID)
+			}
+			// Save initial artifacts
+			_ = database.SaveTextArtifact(ctx, runID, db.StepJobPosting, cleanedText)
+			_ = database.SaveArtifact(ctx, runID, db.StepJobMetadata, jobMetadata)
+			_ = database.SaveArtifact(ctx, runID, db.StepJobProfile, jobProfile)
+		}
 	}
 
 	fmt.Printf("Step 2a/12: Extracting education requirements...\n")

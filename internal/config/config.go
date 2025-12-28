@@ -34,6 +34,7 @@ type Config struct {
 	Verbose           bool    `json:"verbose,omitempty"`            // Print detailed debug information
 	SkillMatchRatio   float64 `json:"skill_match_ratio,omitempty"`  // Ratio of space reserved for skill matching (0.0-1.0)
 	SpecificityWeight float64 `json:"specificity_weight,omitempty"` // Weight for specificity vs requirement level (0.0-1.0)
+	DatabaseURL       string  `json:"database_url,omitempty"`       // PostgreSQL connection URL
 }
 
 // LoadConfig loads configuration from a JSON file.
@@ -139,6 +140,9 @@ func (c *Config) MergeWithDefaults(defaults Config) Config {
 	}
 	if result.APIKey == "" {
 		result.APIKey = defaults.APIKey
+	}
+	if result.DatabaseURL == "" {
+		result.DatabaseURL = defaults.DatabaseURL
 	}
 
 	// Int fields: use default if zero

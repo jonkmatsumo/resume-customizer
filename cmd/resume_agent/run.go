@@ -35,6 +35,7 @@ var (
 	runAPIKey      string
 	runUseBrowser  bool
 	runVerbose     bool
+	runDatabaseURL string
 )
 
 func init() {
@@ -57,6 +58,9 @@ func init() {
 
 	// API key can be passed as a flag, or read from env var GEMINI_API_KEY
 	runCommand.Flags().StringVar(&runAPIKey, "api-key", "", "Gemini API Key (optional, defaults to GEMINI_API_KEY env var)")
+
+	// Database URL for artifact persistence
+	runCommand.Flags().StringVar(&runDatabaseURL, "db-url", "", "PostgreSQL connection URL (optional, defaults to DATABASE_URL env var)")
 
 	// Note: --job is no longer required; we validate after merging config
 	// Note: --experience and --out may come from config file
@@ -128,6 +132,9 @@ func runPipelineCmd(cmd *cobra.Command, _ []string) error {
 	if cmd.Flags().Changed("verbose") {
 		cfg.Verbose = runVerbose
 	}
+	if cmd.Flags().Changed("db-url") {
+		cfg.DatabaseURL = runDatabaseURL
+	}
 
 	// Step 3: Apply defaults for unset values
 	defaults := config.Config{
@@ -162,6 +169,11 @@ func runPipelineCmd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("GEMINI_API_KEY environment variable or --api-key flag is required")
 	}
 
+	// Step 6: Database URL handling (optional)
+	if cfg.DatabaseURL == "" {
+		cfg.DatabaseURL = os.Getenv("DATABASE_URL")
+	}
+
 	opts := pipeline.RunOptions{
 		JobPath:        cfg.Job,
 		JobURL:         cfg.JobURL,
@@ -177,6 +189,7 @@ func runPipelineCmd(cmd *cobra.Command, _ []string) error {
 		APIKey:         cfg.APIKey,
 		UseBrowser:     cfg.UseBrowser,
 		Verbose:        cfg.Verbose,
+		DatabaseURL:    cfg.DatabaseURL,
 	}
 
 	// Create a context (could be cancellable if we wanted to add signal handling)
