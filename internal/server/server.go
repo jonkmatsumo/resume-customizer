@@ -45,6 +45,7 @@ func New(cfg Config) (*Server, error) {
 	// Setup router
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /run", s.handleRun)
+	mux.HandleFunc("POST /run/stream", s.handleRunStream)
 	mux.HandleFunc("GET /status/{id}", s.handleStatus)
 	mux.HandleFunc("GET /artifact/{id}", s.handleArtifact)
 	mux.HandleFunc("GET /health", s.handleHealth)

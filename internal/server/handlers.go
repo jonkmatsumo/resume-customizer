@@ -185,3 +185,84 @@ func (s *Server) handleArtifact(w http.ResponseWriter, r *http.Request) {
 
 	s.jsonResponse(w, http.StatusOK, artifact)
 }
+
+// handleRunStream starts a pipeline and streams progress via SSE
+func (s *Server) handleRunStream(w http.ResponseWriter, r *http.Request) {
+	var req RunRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.errorResponse(w, http.StatusBadRequest, "Invalid request body: "+err.Error())
+		return
+	}
+
+	// Validate required fields
+	if req.JobURL == "" && req.JobPath == "" {
+		s.errorResponse(w, http.StatusBadRequest, "Either job_url or job is required")
+		return
+	}
+	if req.Experience == "" {
+		s.errorResponse(w, http.StatusBadRequest, "experience is required")
+		return
+	}
+
+	// Set defaults
+	if req.OutputDir == "" {
+		req.OutputDir = "artifacts/"
+	}
+	if req.Template == "" {
+		req.Template = "templates/resume.tex"
+	}
+	if req.MaxBullets == 0 {
+		req.MaxBullets = 25
+	}
+	if req.MaxLines == 0 {
+		req.MaxLines = 35
+	}
+
+	// Ensure output directory exists
+	if err := os.MkdirAll(req.OutputDir, 0755); err != nil {
+		s.errorResponse(w, http.StatusInternalServerError, "Failed to create output directory")
+		return
+	}
+
+	// Setup SSE writer
+	sse, err := NewSSEWriter(w)
+	if err != nil {
+		s.errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	log.Printf("Starting streaming pipeline run...")
+
+	// Build pipeline options with progress callback
+	opts := pipeline.RunOptions{
+		JobURL:         req.JobURL,
+		JobPath:        req.JobPath,
+		ExperiencePath: req.Experience,
+		OutputDir:      req.OutputDir,
+		TemplatePath:   req.Template,
+		CandidateName:  req.Name,
+		CandidateEmail: req.Email,
+		CandidatePhone: req.Phone,
+		MaxBullets:     req.MaxBullets,
+		MaxLines:       req.MaxLines,
+		APIKey:         s.apiKey,
+		DatabaseURL:    "", // Not needed, we stream instead
+		Verbose:        true,
+		OnProgress: func(event pipeline.ProgressEvent) {
+			if err := sse.WriteEvent("step", event); err != nil {
+				log.Printf("Error writing SSE event: %v", err)
+			}
+		},
+	}
+
+	// Run pipeline synchronously (blocking until complete)
+	ctx := r.Context()
+	if err := pipeline.RunPipeline(ctx, opts); err != nil {
+		log.Printf("Pipeline run failed: %v", err)
+		sse.WriteError(err.Error())
+		return
+	}
+
+	sse.WriteComplete("", "completed")
+	log.Printf("Streaming pipeline run completed")
+}

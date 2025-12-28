@@ -29,6 +29,18 @@ import (
 	"github.com/jonathan/resume-customizer/internal/voice"
 )
 
+// ProgressEvent represents a progress update during pipeline execution
+type ProgressEvent struct {
+	Step     string `json:"step"`
+	Category string `json:"category"`
+	Message  string `json:"message"`
+	RunID    string `json:"run_id,omitempty"`
+	Content  any    `json:"content,omitempty"`
+}
+
+// ProgressCallback is called when pipeline progress occurs
+type ProgressCallback func(event ProgressEvent)
+
 // RunOptions holds configuration for running the pipeline
 type RunOptions struct {
 	JobPath        string
@@ -46,6 +58,7 @@ type RunOptions struct {
 	UseBrowser     bool
 	Verbose        bool
 	DatabaseURL    string
+	OnProgress     ProgressCallback
 }
 
 // ExperienceBranchResult holds the outputs from the experience processing branch
@@ -70,6 +83,18 @@ const (
 	prefixExperience logPrefix = "[Experience] "
 	prefixResearch   logPrefix = "[Research]   "
 )
+
+// emitProgress calls the progress callback if configured
+func emitProgress(opts *RunOptions, step, category, message string, content any) {
+	if opts.OnProgress != nil {
+		opts.OnProgress(ProgressEvent{
+			Step:     step,
+			Category: category,
+			Message:  message,
+			Content:  content,
+		})
+	}
+}
 
 // RunPipeline orchestrates the full resume generation pipeline
 func RunPipeline(ctx context.Context, opts RunOptions) error {
@@ -146,6 +171,8 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		fmt.Printf("[VERBOSE] Saved job profile to %s\n", jobProfilePath)
 		printer.PrintJobProfile(jobProfile)
 	}
+	emitProgress(&opts, db.StepJobProfile, db.CategoryIngestion,
+		fmt.Sprintf("Parsed job profile: %s at %s", jobProfile.RoleTitle, jobProfile.Company), jobProfile)
 
 	// Save to database if connected
 	if database != nil {
@@ -239,6 +266,8 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		fmt.Printf("[VERBOSE] Saved rewritten bullets to %s\n", rewrittenBulletsPath)
 		printer.PrintRewrittenBullets(rewrittenBullets)
 	}
+	emitProgress(&opts, db.StepRewrittenBullets, db.CategoryRewriting,
+		fmt.Sprintf("Rewritten %d bullets", len(rewrittenBullets.Bullets)), nil)
 
 	fmt.Printf("Step 10/12: Rendering LaTeX resume...\n")
 	latex, err := rendering.RenderLaTeX(experienceResult.ResumePlan, rewrittenBullets, opts.TemplatePath, opts.CandidateName, opts.CandidateEmail, opts.CandidatePhone, experienceResult.ExperienceBank, experienceResult.SelectedEducation)
@@ -252,6 +281,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	if opts.Verbose {
 		fmt.Printf("[VERBOSE] Saved LaTeX resume to %s\n", latexPath)
 	}
+	emitProgress(&opts, db.StepResumeTex, db.CategoryValidation, "Rendered LaTeX resume", nil)
 
 	fmt.Printf("Step 11/12: Validating LaTeX constraints...\n")
 	violations, err := validation.ValidateConstraints(latexPath, researchResult.CompanyProfile, 1, 100) // Default max 1 page, 100 chars per line (approx)
