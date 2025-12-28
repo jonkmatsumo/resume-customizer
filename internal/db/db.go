@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jonathan/resume-customizer/internal/types"
 )
 
 // DB wraps a PostgreSQL connection pool
@@ -598,4 +599,85 @@ func (db *DB) ListArtifacts(ctx context.Context, filters ArtifactFilters) ([]Art
 		artifacts = append(artifacts, a)
 	}
 	return artifacts, nil
+}
+
+// GetExperienceBank assembles a full ExperienceBank for a user from the database
+func (db *DB) GetExperienceBank(ctx context.Context, userID uuid.UUID) (*types.ExperienceBank, error) {
+	// 1. Fetch Jobs
+	jobs, err := db.ListJobs(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list jobs: %w", err)
+	}
+
+	// 2. Build Stories from Jobs
+	var stories []types.Story
+	for _, job := range jobs {
+		// Fetch experiences for this job
+		exps, err := db.ListExperiences(ctx, job.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list experiences for job %s: %w", job.ID, err)
+		}
+
+		// Map Bullets
+		var bullets []types.Bullet
+		for _, exp := range exps {
+			bullets = append(bullets, types.Bullet{
+				ID:               exp.ID.String(),
+				Text:             exp.BulletText,
+				Skills:           exp.Skills,
+				EvidenceStrength: exp.EvidenceStrength,
+				RiskFlags:        exp.RiskFlags,
+				LengthChars:      len(exp.BulletText),
+			})
+		}
+
+		// Helper to format dates
+		formatDate := func(d *Date) string {
+			if d == nil {
+				return ""
+			}
+			return d.Format("2006-01")
+		}
+
+		stories = append(stories, types.Story{
+			ID:        job.ID.String(),
+			Company:   job.Company,
+			Role:      job.RoleTitle,
+			StartDate: formatDate(job.StartDate),
+			EndDate:   formatDate(job.EndDate),
+			Bullets:   bullets,
+		})
+	}
+
+	// 3. Fetch Education
+	dbEdu, err := db.ListEducation(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list education: %w", err)
+	}
+
+	// 4. Map Education
+	var education []types.Education
+	for _, edu := range dbEdu {
+		formatDate := func(d *Date) string {
+			if d == nil {
+				return ""
+			}
+			return d.Format("2006-01")
+		}
+
+		education = append(education, types.Education{
+			ID:        edu.ID.String(),
+			School:    edu.School,
+			Degree:    edu.DegreeType,
+			Field:     edu.Field,
+			GPA:       edu.GPA,
+			StartDate: formatDate(edu.StartDate),
+			EndDate:   formatDate(edu.EndDate),
+		})
+	}
+
+	return &types.ExperienceBank{
+		Stories:   stories,
+		Education: education,
+	}, nil
 }

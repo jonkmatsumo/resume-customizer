@@ -10,15 +10,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/pipeline"
-	"github.com/jonathan/resume-customizer/internal/types"
 )
 
 // RunRequest represents the request body for /run
 type RunRequest struct {
 	JobURL     string `json:"job_url,omitempty"`
 	JobPath    string `json:"job,omitempty"`
-	Experience string `json:"experience,omitempty"` // Path to JSON file (optional if user_id set)
-	UserID     string `json:"user_id,omitempty"`    // UUID of user in DB (optional if experience set)
+	UserID     string `json:"user_id"` // UUID of user in DB (required)
 	Name       string `json:"name,omitempty"`
 	Email      string `json:"email,omitempty"`
 	Phone      string `json:"phone,omitempty"`
@@ -64,8 +62,8 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 		s.errorResponse(w, http.StatusBadRequest, "Either job_url or job is required")
 		return
 	}
-	if req.Experience == "" && req.UserID == "" {
-		s.errorResponse(w, http.StatusBadRequest, "Either experience (file path) or user_id is required")
+	if req.UserID == "" {
+		s.errorResponse(w, http.StatusBadRequest, "user_id is required")
 		return
 	}
 
@@ -84,7 +82,6 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 	opts := pipeline.RunOptions{
 		JobURL:         req.JobURL,
 		JobPath:        req.JobPath,
-		ExperiencePath: req.Experience,
 		TemplatePath:   req.Template,
 		CandidateName:  req.Name,
 		CandidateEmail: req.Email,
@@ -96,43 +93,41 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 		Verbose:        true,
 	}
 
-	// If UserID is provided, fetch experience data from DB
-	if req.UserID != "" {
-		uid, err := uuid.Parse(req.UserID)
-		if err != nil {
-			s.errorResponse(w, http.StatusBadRequest, "Invalid user_id")
-			return
-		}
-
-		// Fetch user profile if name/email not provided in request
-		if req.Name == "" || req.Email == "" {
-			u, err := s.db.GetUser(r.Context(), uid)
-			if err != nil {
-				s.errorResponse(w, http.StatusInternalServerError, "Failed to fetch user profile: "+err.Error())
-				return
-			}
-			if u == nil {
-				s.errorResponse(w, http.StatusBadRequest, "User not found")
-				return
-			}
-			if req.Name == "" {
-				opts.CandidateName = u.Name
-			}
-			if req.Email == "" {
-				opts.CandidateEmail = u.Email
-			}
-			if req.Phone == "" {
-				opts.CandidatePhone = u.Phone
-			}
-		}
-
-		expData, err := s.fetchExperienceBankFromDB(r.Context(), uid)
-		if err != nil {
-			s.errorResponse(w, http.StatusInternalServerError, "Failed to fetch experience data: "+err.Error())
-			return
-		}
-		opts.ExperienceData = expData
+	// Fetch experience data from DB using UserID
+	uid, err := uuid.Parse(req.UserID)
+	if err != nil {
+		s.errorResponse(w, http.StatusBadRequest, "Invalid user_id")
+		return
 	}
+
+	// Fetch user profile if name/email not provided in request
+	if req.Name == "" || req.Email == "" {
+		u, err := s.db.GetUser(r.Context(), uid)
+		if err != nil {
+			s.errorResponse(w, http.StatusInternalServerError, "Failed to fetch user profile: "+err.Error())
+			return
+		}
+		if u == nil {
+			s.errorResponse(w, http.StatusBadRequest, "User not found")
+			return
+		}
+		if req.Name == "" {
+			opts.CandidateName = u.Name
+		}
+		if req.Email == "" {
+			opts.CandidateEmail = u.Email
+		}
+		if req.Phone == "" {
+			opts.CandidatePhone = u.Phone
+		}
+	}
+
+	expData, err := s.fetchExperienceBankFromDB(r.Context(), uid)
+	if err != nil {
+		s.errorResponse(w, http.StatusInternalServerError, "Failed to fetch experience data: "+err.Error())
+		return
+	}
+	opts.ExperienceData = expData
 
 	// Generate a preliminary run ID for the response
 	// The actual run will be created in the pipeline
@@ -229,8 +224,8 @@ func (s *Server) handleRunStream(w http.ResponseWriter, r *http.Request) {
 		s.errorResponse(w, http.StatusBadRequest, "Either job_url or job is required")
 		return
 	}
-	if req.Experience == "" && req.UserID == "" {
-		s.errorResponse(w, http.StatusBadRequest, "Either experience (file path) or user_id is required")
+	if req.UserID == "" {
+		s.errorResponse(w, http.StatusBadRequest, "user_id is required")
 		return
 	}
 
@@ -245,42 +240,39 @@ func (s *Server) handleRunStream(w http.ResponseWriter, r *http.Request) {
 		req.MaxLines = 35
 	}
 
-	// If UserID is provided, fetch experience data from DB
-	var expData *types.ExperienceBank
-	if req.UserID != "" {
-		uid, err := uuid.Parse(req.UserID)
+	// Fetch experience data from DB using UserID
+	uid, err := uuid.Parse(req.UserID)
+	if err != nil {
+		s.errorResponse(w, http.StatusBadRequest, "Invalid user_id")
+		return
+	}
+
+	// Fetch user profile if name/email not provided in request
+	if req.Name == "" || req.Email == "" {
+		u, err := s.db.GetUser(r.Context(), uid)
 		if err != nil {
-			s.errorResponse(w, http.StatusBadRequest, "Invalid user_id")
+			s.errorResponse(w, http.StatusInternalServerError, "Failed to fetch user profile: "+err.Error())
 			return
 		}
-
-		// Fetch user profile if name/email not provided in request
-		if req.Name == "" || req.Email == "" {
-			u, err := s.db.GetUser(r.Context(), uid)
-			if err != nil {
-				s.errorResponse(w, http.StatusInternalServerError, "Failed to fetch user profile: "+err.Error())
-				return
-			}
-			if u == nil {
-				s.errorResponse(w, http.StatusBadRequest, "User not found")
-				return
-			}
-			if req.Name == "" {
-				req.Name = u.Name
-			}
-			if req.Email == "" {
-				req.Email = u.Email
-			}
-			if req.Phone == "" {
-				req.Phone = u.Phone
-			}
-		}
-
-		expData, err = s.fetchExperienceBankFromDB(r.Context(), uid)
-		if err != nil {
-			s.errorResponse(w, http.StatusInternalServerError, "Failed to fetch experience data: "+err.Error())
+		if u == nil {
+			s.errorResponse(w, http.StatusBadRequest, "User not found")
 			return
 		}
+		if req.Name == "" {
+			req.Name = u.Name
+		}
+		if req.Email == "" {
+			req.Email = u.Email
+		}
+		if req.Phone == "" {
+			req.Phone = u.Phone
+		}
+	}
+
+	expData, err := s.fetchExperienceBankFromDB(r.Context(), uid)
+	if err != nil {
+		s.errorResponse(w, http.StatusInternalServerError, "Failed to fetch experience data: "+err.Error())
+		return
 	}
 
 	// Setup SSE writer
@@ -296,7 +288,6 @@ func (s *Server) handleRunStream(w http.ResponseWriter, r *http.Request) {
 	opts := pipeline.RunOptions{
 		JobURL:         req.JobURL,
 		JobPath:        req.JobPath,
-		ExperiencePath: req.Experience,
 		ExperienceData: expData,
 		TemplatePath:   req.Template,
 		CandidateName:  req.Name,

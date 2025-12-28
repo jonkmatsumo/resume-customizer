@@ -264,8 +264,8 @@ func TestSSEWriter(t *testing.T) {
 // TestRunRequest_Defaults tests that defaults are applied
 func TestRunRequest_Defaults(t *testing.T) {
 	req := RunRequest{
-		JobURL:     "https://example.com/job",
-		Experience: "test.json",
+		JobURL: "https://example.com/job",
+		UserID: uuid.New().String(),
 	}
 
 	// These are the defaults we set in handlers

@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"testing"
+
+	"github.com/jonathan/resume-customizer/internal/types"
 )
 
 func TestRunPipeline_Integration(t *testing.T) {
@@ -19,9 +21,14 @@ func TestRunPipeline_Integration(t *testing.T) {
 		t.Skip("Skipping integration test: DATABASE_URL not set (required for storage)")
 	}
 
+	// Create dummy experience data
+	expData := &types.ExperienceBank{
+		Stories: []types.Story{},
+	}
+
 	opts := RunOptions{
 		JobPath:        "../../testdata/parsing/sample_job_plain.txt",
-		ExperiencePath: "../../testdata/valid/experience_bank.json",
+		ExperienceData: expData, // Inject ExperienceData instead of ExperiencePath
 		CompanySeedURL: "https://example.com",
 		CandidateName:  "Test Candidate",
 		CandidateEmail: "test@example.com",
@@ -37,8 +44,9 @@ func TestRunPipeline_Integration(t *testing.T) {
 	if _, err := os.Stat(opts.JobPath); os.IsNotExist(err) {
 		t.Skipf("Skipping integration test: test data not found at %s", opts.JobPath)
 	}
-	if _, err := os.Stat(opts.ExperiencePath); os.IsNotExist(err) {
-		t.Skipf("Skipping integration test: test data not found at %s", opts.ExperiencePath)
+	// Mock file checks are no longer needed for ExperiencePath as it's removed
+	if opts.ExperienceData == nil {
+		t.Error("expected experience data to be set")
 	}
 	if _, err := os.Stat(opts.TemplatePath); os.IsNotExist(err) {
 		t.Skipf("Skipping integration test: template not found at %s", opts.TemplatePath)

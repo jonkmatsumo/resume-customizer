@@ -43,8 +43,7 @@ type ProgressCallback func(event ProgressEvent)
 type RunOptions struct {
 	JobPath        string
 	JobURL         string
-	ExperiencePath string
-	ExperienceData *types.ExperienceBank // Optional: Direct data injection
+	ExperienceData *types.ExperienceBank // Required: Direct data injection
 	CompanySeedURL string
 	CandidateName  string
 	CandidateEmail string
@@ -327,19 +326,14 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 
 	fmt.Printf("%sStep 3/12: Loading and normalizing experience bank...\n", prefix)
 
-	var experienceBank *types.ExperienceBank
-	var err error
-
-	if opts.ExperienceData != nil {
-		fmt.Printf("%sUsing provided experience data (from DB/Request)...\n", prefix)
-		experienceBank = opts.ExperienceData
-	} else {
-		fmt.Printf("%sLoading experience bank from %s...\n", prefix, opts.ExperiencePath)
-		experienceBank, err = experience.LoadExperienceBank(opts.ExperiencePath)
-		if err != nil {
-			return nil, fmt.Errorf("loading experience bank failed: %w", err)
-		}
+	// Determine experience data source
+	if opts.ExperienceData == nil {
+		return nil, fmt.Errorf("experience data is missing (legacy file path support removed)")
 	}
+
+	fmt.Printf("%sUsing provided experience data (from DB)...\n", prefix)
+	experienceBank := opts.ExperienceData
+
 	if err := experience.NormalizeExperienceBank(experienceBank); err != nil {
 		return nil, fmt.Errorf("normalizing experience bank failed: %w", err)
 	}

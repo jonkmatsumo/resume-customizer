@@ -8,7 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jonathan/resume-customizer/internal/experience"
+	"github.com/google/uuid"
+	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/repair"
 	"github.com/jonathan/resume-customizer/internal/schemas"
 	"github.com/jonathan/resume-customizer/internal/types"
@@ -29,7 +30,8 @@ var (
 	repairRankedFile         string
 	repairJobProfileFile     string
 	repairCompanyProfileFile string
-	repairExperienceFile     string
+	repairUserID             string
+	repairDatabaseURL        string
 	repairTemplateFile       string
 	repairName               string
 	repairEmail              string
@@ -48,7 +50,8 @@ func init() {
 	repairCmd.Flags().StringVarP(&repairRankedFile, "ranked", "r", "", "Path to RankedStories JSON file (required)")
 	repairCmd.Flags().StringVarP(&repairJobProfileFile, "job-profile", "j", "", "Path to JobProfile JSON file (required)")
 	repairCmd.Flags().StringVarP(&repairCompanyProfileFile, "company-profile", "c", "", "Path to CompanyProfile JSON file (required)")
-	repairCmd.Flags().StringVarP(&repairExperienceFile, "experience", "e", "", "Path to ExperienceBank JSON file (required)")
+	repairCmd.Flags().StringVarP(&repairUserID, "user-id", "u", "", "User ID (required)")
+	repairCmd.Flags().StringVar(&repairDatabaseURL, "db-url", "", "Database URL (optional)")
 	repairCmd.Flags().StringVarP(&repairTemplateFile, "template", "t", "templates/one_page_resume.tex", "Path to LaTeX template file")
 	repairCmd.Flags().StringVarP(&repairName, "name", "n", "", "Candidate name (required)")
 	repairCmd.Flags().StringVar(&repairEmail, "email", "", "Candidate email (required)")
@@ -77,8 +80,8 @@ func init() {
 	if err := repairCmd.MarkFlagRequired("company-profile"); err != nil {
 		panic(fmt.Sprintf("failed to mark company-profile flag as required: %v", err))
 	}
-	if err := repairCmd.MarkFlagRequired("experience"); err != nil {
-		panic(fmt.Sprintf("failed to mark experience flag as required: %v", err))
+	if err := repairCmd.MarkFlagRequired("user-id"); err != nil {
+		panic(fmt.Sprintf("failed to mark user-id flag as required: %v", err))
 	}
 	if err := repairCmd.MarkFlagRequired("name"); err != nil {
 		panic(fmt.Sprintf("failed to mark name flag as required: %v", err))
@@ -94,6 +97,7 @@ func init() {
 }
 
 func runRepair(_ *cobra.Command, _ []string) error {
+	// ... (Load other inputs)
 	// Load ResumePlan
 	planContent, err := os.ReadFile(repairPlanFile)
 	if err != nil {
@@ -154,10 +158,30 @@ func runRepair(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to unmarshal company profile JSON: %w", err)
 	}
 
-	// Load ExperienceBank
-	experienceBank, err := experience.LoadExperienceBank(repairExperienceFile)
+	// Load ExperienceBank from DB
+	ctx := context.Background()
+
+	if repairDatabaseURL == "" {
+		repairDatabaseURL = os.Getenv("DATABASE_URL")
+	}
+	if repairDatabaseURL == "" {
+		return fmt.Errorf("DATABASE_URL not set and --db-url not provided (required for DB access)")
+	}
+
+	database, err := db.Connect(ctx, repairDatabaseURL)
 	if err != nil {
-		return fmt.Errorf("failed to load experience bank: %w", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+	defer database.Close()
+
+	uid, err := uuid.Parse(repairUserID)
+	if err != nil {
+		return fmt.Errorf("invalid user-id: %w", err)
+	}
+
+	experienceBank, err := database.GetExperienceBank(ctx, uid)
+	if err != nil {
+		return fmt.Errorf("failed to load experience bank from DB: %w", err)
 	}
 
 	// Get API key
@@ -182,7 +206,7 @@ func runRepair(_ *cobra.Command, _ []string) error {
 	}
 
 	// Run repair loop
-	ctx := context.Background()
+	// ctx declared earlier
 	var selectedEducation []types.Education
 	if experienceBank != nil {
 		selectedEducation = experienceBank.Education

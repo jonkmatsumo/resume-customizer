@@ -181,16 +181,25 @@ The service exposes a REST API for triggering pipelines and retrieving results.
 | `DELETE /education/{id}` | Delete Education | Deletes education entry |
 | `GET /users/{id}/experience-bank` | Export Experience JSON | Returns pipeline-compatible format |
 
+### API Request Fields
+
+| Field | Type | Required? | Description |
+| :--- | :--- | :--- | :--- |
+| `job_url` | string | **Yes** (or `job`) | URL of the job posting |
+| `job` | string | **Yes** (or `job_url`) | Path to local job posting file |
+| `user_id` | string | **Yes** | UUID of the user profile in DB |
+| `template` | string | No | Path to LaTeX template (default: `templates/one_page_resume.tex`) |
+| `max_bullets` | int | No | Target number of bullets (default: 25) |
+| `max_lines` | int | No | Target number of lines (default: 35) |
+
 ### Example: Start Pipeline
 
 ```bash
-curl -X POST http://localhost:8080/run/stream \
+curl -X POST http://localhost:8080/run \
   -H "Content-Type: application/json" \
   -d '{
-    "job_url": "https://boards.greenhouse.io/company/jobs/12345",
-    "experience": "history.json",
-    "name": "Jane Smith",
-    "email": "jane@example.com"
+    "user_id": "550e8400-e29b-41d4-a716-446655440000",
+    "job_url": "https://www.linkedin.com/jobs/view/123456789"
   }'
 ```
 
@@ -249,8 +258,7 @@ curl http://localhost:8080/health
 |-------|-------------|
 | `job_url` | URL to fetch job posting from |
 | `job` | Path to job text file (alternative) |
-| `experience` | Path to JSON file (optional if `user_id` set) |
-| `user_id` | UUID of user in DB (optional if `experience` set) |
+| `user_id` | UUID of user in DB (required) |
 | `name`, `email`, `phone` | Candidate contact info |
 | `template` | LaTeX template path |
 | `max_bullets`, `max_lines` | Layout constraints |

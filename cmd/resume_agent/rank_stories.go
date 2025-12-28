@@ -8,7 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jonathan/resume-customizer/internal/experience"
+	"github.com/google/uuid"
+	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/ranking"
 	"github.com/jonathan/resume-customizer/internal/schemas"
 	"github.com/jonathan/resume-customizer/internal/types"
@@ -28,23 +29,25 @@ Falls back to heuristic-only scoring if LLM is unavailable.`,
 }
 
 var (
-	rankStoriesJobProfile string
-	rankStoriesExperience string
-	rankStoriesOutput     string
-	rankStoriesAPIKey     string
+	rankStoriesJobProfile  string
+	rankStoriesUserID      string
+	rankStoriesDatabaseURL string
+	rankStoriesOutput      string
+	rankStoriesAPIKey      string
 )
 
 func init() {
 	rankStoriesCmd.Flags().StringVarP(&rankStoriesJobProfile, "job-profile", "j", "", "Path to input JobProfile JSON file (required)")
-	rankStoriesCmd.Flags().StringVarP(&rankStoriesExperience, "experience", "e", "", "Path to input ExperienceBank JSON file (required)")
+	rankStoriesCmd.Flags().StringVarP(&rankStoriesUserID, "user-id", "u", "", "User ID (required)")
+	rankStoriesCmd.Flags().StringVar(&rankStoriesDatabaseURL, "db-url", "", "Database URL (optional)")
 	rankStoriesCmd.Flags().StringVarP(&rankStoriesOutput, "out", "o", "", "Path to output RankedStories JSON file (required)")
 	rankStoriesCmd.Flags().StringVar(&rankStoriesAPIKey, "api-key", "", "Optional Gemini API key for LLM-enhanced ranking (env: GEMINI_API_KEY)")
 
 	if err := rankStoriesCmd.MarkFlagRequired("job-profile"); err != nil {
 		panic(fmt.Sprintf("failed to mark job-profile flag as required: %v", err))
 	}
-	if err := rankStoriesCmd.MarkFlagRequired("experience"); err != nil {
-		panic(fmt.Sprintf("failed to mark experience flag as required: %v", err))
+	if err := rankStoriesCmd.MarkFlagRequired("user-id"); err != nil {
+		panic(fmt.Sprintf("failed to mark user-id flag as required: %v", err))
 	}
 	if err := rankStoriesCmd.MarkFlagRequired("out"); err != nil {
 		panic(fmt.Sprintf("failed to mark out flag as required: %v", err))
@@ -65,10 +68,30 @@ func runRankStories(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to unmarshal job profile JSON: %w", err)
 	}
 
-	// 2. Load ExperienceBank
-	experienceBank, err := experience.LoadExperienceBank(rankStoriesExperience)
+	// 2. Load ExperienceBank from DB
+	ctx := context.Background()
+
+	if rankStoriesDatabaseURL == "" {
+		rankStoriesDatabaseURL = os.Getenv("DATABASE_URL")
+	}
+	if rankStoriesDatabaseURL == "" {
+		return fmt.Errorf("DATABASE_URL not set and --db-url not provided")
+	}
+
+	database, err := db.Connect(ctx, rankStoriesDatabaseURL)
 	if err != nil {
-		return fmt.Errorf("failed to load experience bank: %w", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+	defer database.Close()
+
+	uid, err := uuid.Parse(rankStoriesUserID)
+	if err != nil {
+		return fmt.Errorf("invalid user-id: %w", err)
+	}
+
+	experienceBank, err := database.GetExperienceBank(ctx, uid)
+	if err != nil {
+		return fmt.Errorf("failed to load experience bank from DB: %w", err)
 	}
 
 	// 3. Determine API key (flag takes precedence, then env var)
@@ -81,7 +104,6 @@ func runRankStories(_ *cobra.Command, _ []string) error {
 	var rankedStories *types.RankedStories
 	if apiKey != "" {
 		_, _ = fmt.Fprintf(os.Stderr, "Using LLM-enhanced ranking mode\n")
-		ctx := context.Background()
 		rankedStories, err = ranking.RankStoriesWithLLM(ctx, &jobProfile, experienceBank, apiKey)
 	} else {
 		_, _ = fmt.Fprintf(os.Stderr, "Using heuristic-only ranking mode (no API key provided)\n")

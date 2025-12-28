@@ -20,9 +20,10 @@ type Config struct {
 	Template    string `json:"template,omitempty"`     // Path to LaTeX template
 
 	// Candidate Info
-	Name  string `json:"name,omitempty"`  // Candidate name
-	Email string `json:"email,omitempty"` // Candidate email
-	Phone string `json:"phone,omitempty"` // Candidate phone
+	UserID string `json:"user_id,omitempty"` // User UUID (required for DB-based runs)
+	Name   string `json:"name,omitempty"`    // Candidate name
+	Email  string `json:"email,omitempty"`   // Candidate email
+	Phone  string `json:"phone,omitempty"`   // Candidate phone
 
 	// Limits
 	MaxBullets int `json:"max_bullets,omitempty"` // Maximum bullets allowed

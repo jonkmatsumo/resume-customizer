@@ -2,13 +2,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/jonathan/resume-customizer/internal/experience"
+	"github.com/google/uuid"
+	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/schemas"
 	"github.com/jonathan/resume-customizer/internal/selection"
 	"github.com/jonathan/resume-customizer/internal/types"
@@ -23,21 +25,23 @@ var materializeCmd = &cobra.Command{
 }
 
 var (
-	materializePlan       string
-	materializeExperience string
-	materializeOutput     string
+	materializePlan        string
+	materializeUserID      string
+	materializeDatabaseURL string
+	materializeOutput      string
 )
 
 func init() {
 	materializeCmd.Flags().StringVarP(&materializePlan, "plan", "p", "", "Path to ResumePlan JSON file (required)")
-	materializeCmd.Flags().StringVarP(&materializeExperience, "experience", "e", "", "Path to ExperienceBank JSON file (required)")
+	materializeCmd.Flags().StringVarP(&materializeUserID, "user-id", "u", "", "User ID (required)")
+	materializeCmd.Flags().StringVar(&materializeDatabaseURL, "db-url", "", "Database URL (optional)")
 	materializeCmd.Flags().StringVarP(&materializeOutput, "out", "o", "", "Path to output SelectedBullets JSON file (required)")
 
 	if err := materializeCmd.MarkFlagRequired("plan"); err != nil {
 		panic(fmt.Sprintf("failed to mark plan flag as required: %v", err))
 	}
-	if err := materializeCmd.MarkFlagRequired("experience"); err != nil {
-		panic(fmt.Sprintf("failed to mark experience flag as required: %v", err))
+	if err := materializeCmd.MarkFlagRequired("user-id"); err != nil {
+		panic(fmt.Sprintf("failed to mark user-id flag as required: %v", err))
 	}
 	if err := materializeCmd.MarkFlagRequired("out"); err != nil {
 		panic(fmt.Sprintf("failed to mark out flag as required: %v", err))
@@ -58,10 +62,30 @@ func runMaterialize(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to unmarshal plan JSON: %w", err)
 	}
 
-	// 2. Load ExperienceBank
-	experienceBank, err := experience.LoadExperienceBank(materializeExperience)
+	// 2. Load ExperienceBank from DB
+	ctx := context.Background()
+
+	if materializeDatabaseURL == "" {
+		materializeDatabaseURL = os.Getenv("DATABASE_URL")
+	}
+	if materializeDatabaseURL == "" {
+		return fmt.Errorf("DATABASE_URL not set and --db-url not provided (required for DB access)")
+	}
+
+	database, err := db.Connect(ctx, materializeDatabaseURL)
 	if err != nil {
-		return fmt.Errorf("failed to load experience bank: %w", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+	defer database.Close()
+
+	uid, err := uuid.Parse(materializeUserID)
+	if err != nil {
+		return fmt.Errorf("invalid user-id: %w", err)
+	}
+
+	experienceBank, err := database.GetExperienceBank(ctx, uid)
+	if err != nil {
+		return fmt.Errorf("failed to load experience bank from DB: %w", err)
 	}
 
 	// 3. Materialize bullets

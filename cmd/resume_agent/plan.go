@@ -2,13 +2,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/jonathan/resume-customizer/internal/experience"
+	"github.com/google/uuid"
+	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/schemas"
 	"github.com/jonathan/resume-customizer/internal/selection"
 	"github.com/jonathan/resume-customizer/internal/types"
@@ -23,18 +25,20 @@ var planCmd = &cobra.Command{
 }
 
 var (
-	planRanked     string
-	planJobProfile string
-	planExperience string
-	planMaxBullets int
-	planMaxLines   int
-	planOutput     string
+	planRanked      string
+	planJobProfile  string
+	planUserID      string
+	planDatabaseURL string
+	planMaxBullets  int
+	planMaxLines    int
+	planOutput      string
 )
 
 func init() {
 	planCmd.Flags().StringVarP(&planRanked, "ranked", "r", "", "Path to RankedStories JSON file (required)")
 	planCmd.Flags().StringVarP(&planJobProfile, "job-profile", "j", "", "Path to JobProfile JSON file (required)")
-	planCmd.Flags().StringVarP(&planExperience, "experience", "e", "", "Path to ExperienceBank JSON file (required)")
+	planCmd.Flags().StringVarP(&planUserID, "user-id", "u", "", "User ID (required)")
+	planCmd.Flags().StringVar(&planDatabaseURL, "db-url", "", "Database URL (optional)")
 	planCmd.Flags().IntVar(&planMaxBullets, "max-bullets", 0, "Maximum bullets allowed (required)")
 	planCmd.Flags().IntVar(&planMaxLines, "max-lines", 0, "Maximum lines allowed (required)")
 	planCmd.Flags().StringVarP(&planOutput, "out", "o", "", "Path to output ResumePlan JSON file (required)")
@@ -45,8 +49,8 @@ func init() {
 	if err := planCmd.MarkFlagRequired("job-profile"); err != nil {
 		panic(fmt.Sprintf("failed to mark job-profile flag as required: %v", err))
 	}
-	if err := planCmd.MarkFlagRequired("experience"); err != nil {
-		panic(fmt.Sprintf("failed to mark experience flag as required: %v", err))
+	if err := planCmd.MarkFlagRequired("user-id"); err != nil {
+		panic(fmt.Sprintf("failed to mark user-id flag as required: %v", err))
 	}
 	if err := planCmd.MarkFlagRequired("max-bullets"); err != nil {
 		panic(fmt.Sprintf("failed to mark max-bullets flag as required: %v", err))
@@ -62,6 +66,8 @@ func init() {
 }
 
 func runPlan(_ *cobra.Command, _ []string) error {
+	ctx := context.Background()
+
 	// Validate flags
 	if planMaxBullets <= 0 {
 		return fmt.Errorf("max-bullets must be greater than 0, got %d", planMaxBullets)
@@ -92,10 +98,28 @@ func runPlan(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to unmarshal job profile JSON: %w", err)
 	}
 
-	// 3. Load ExperienceBank
-	experienceBank, err := experience.LoadExperienceBank(planExperience)
+	// 3. Load ExperienceBank from DB
+	if planDatabaseURL == "" {
+		planDatabaseURL = os.Getenv("DATABASE_URL")
+	}
+	if planDatabaseURL == "" {
+		return fmt.Errorf("DATABASE_URL not set and --db-url not provided")
+	}
+
+	database, err := db.Connect(ctx, planDatabaseURL)
 	if err != nil {
-		return fmt.Errorf("failed to load experience bank: %w", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+	defer database.Close()
+
+	uid, err := uuid.Parse(planUserID)
+	if err != nil {
+		return fmt.Errorf("invalid user-id: %w", err)
+	}
+
+	experienceBank, err := database.GetExperienceBank(ctx, uid)
+	if err != nil {
+		return fmt.Errorf("failed to load experience bank from DB: %w", err)
 	}
 
 	// 4. Create SpaceBudget

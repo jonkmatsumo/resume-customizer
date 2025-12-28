@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/config"
+	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/pipeline"
 	"github.com/spf13/cobra"
 )
@@ -69,6 +71,8 @@ func init() {
 }
 
 func runPipelineCmd(cmd *cobra.Command, _ []string) error {
+	ctx := context.Background()
+
 	// Step 1: Load config file if provided
 	var cfg config.Config
 	if runConfigPath != "" {
@@ -154,8 +158,8 @@ func runPipelineCmd(cmd *cobra.Command, _ []string) error {
 	if cfg.Job != "" && cfg.JobURL != "" {
 		return fmt.Errorf("--job and --job-url are mutually exclusive; provide only one")
 	}
-	if cfg.Experience == "" {
-		return fmt.Errorf("--experience is required (via flag or config)")
+	if cfg.UserID == "" {
+		return fmt.Errorf("--user_id is required (via flag or config)")
 	}
 	if cfg.Output == "" {
 		return fmt.Errorf("--out is required (via flag or config)")
@@ -169,15 +173,35 @@ func runPipelineCmd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("GEMINI_API_KEY environment variable or --api-key flag is required")
 	}
 
-	// Step 6: Database URL handling (optional)
+	// Step 6: Database URL handling (required for fetching user data)
 	if cfg.DatabaseURL == "" {
 		cfg.DatabaseURL = os.Getenv("DATABASE_URL")
+	}
+	if cfg.DatabaseURL == "" {
+		return fmt.Errorf("DATABASE_URL environment variable or --db-url flag is required")
+	}
+
+	// Connect to DB to fetch experience data
+	database, err := db.Connect(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+	defer database.Close()
+
+	uid, err := uuid.Parse(cfg.UserID)
+	if err != nil {
+		return fmt.Errorf("invalid user_id format: %w", err)
+	}
+
+	expBank, err := database.GetExperienceBank(ctx, uid)
+	if err != nil {
+		return fmt.Errorf("failed to fetch experience bank for user %s: %w", uid, err)
 	}
 
 	opts := pipeline.RunOptions{
 		JobPath:        cfg.Job,
 		JobURL:         cfg.JobURL,
-		ExperiencePath: cfg.Experience,
+		ExperienceData: expBank,
 		CompanySeedURL: cfg.CompanySeed,
 		CandidateName:  cfg.Name,
 		CandidateEmail: cfg.Email,
@@ -190,9 +214,6 @@ func runPipelineCmd(cmd *cobra.Command, _ []string) error {
 		Verbose:        cfg.Verbose,
 		DatabaseURL:    cfg.DatabaseURL,
 	}
-
-	// Create a context (could be cancellable if we wanted to add signal handling)
-	ctx := context.Background()
 
 	return pipeline.RunPipeline(ctx, opts)
 }

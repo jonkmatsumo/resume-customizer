@@ -2,12 +2,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/jonathan/resume-customizer/internal/experience"
+	"github.com/google/uuid"
+	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/rendering"
 	"github.com/jonathan/resume-customizer/internal/types"
 	"github.com/spf13/cobra"
@@ -21,14 +23,15 @@ var renderLaTeXCmd = &cobra.Command{
 }
 
 var (
-	renderLaTeXPlanFile       string
-	renderLaTeXBulletsFile    string
-	renderLaTeXTemplateFile   string
-	renderLaTeXName           string
-	renderLaTeXEmail          string
-	renderLaTeXPhone          string
-	renderLaTeXOutputFile     string
-	renderLaTeXExperienceFile string
+	renderLaTeXPlanFile     string
+	renderLaTeXBulletsFile  string
+	renderLaTeXTemplateFile string
+	renderLaTeXName         string
+	renderLaTeXEmail        string
+	renderLaTeXPhone        string
+	renderLaTeXOutputFile   string
+	renderLaTeXUserID       string
+	renderLaTeXDatabaseURL  string
 )
 
 func init() {
@@ -39,7 +42,8 @@ func init() {
 	renderLaTeXCmd.Flags().StringVarP(&renderLaTeXEmail, "email", "e", "", "Candidate email (required)")
 	renderLaTeXCmd.Flags().StringVar(&renderLaTeXPhone, "phone", "", "Candidate phone number (optional)")
 	renderLaTeXCmd.Flags().StringVarP(&renderLaTeXOutputFile, "out", "o", "", "Path to output LaTeX file (required)")
-	renderLaTeXCmd.Flags().StringVar(&renderLaTeXExperienceFile, "experience", "", "Path to ExperienceBank JSON file (optional, needed for company/role/dates)")
+	renderLaTeXCmd.Flags().StringVarP(&renderLaTeXUserID, "user-id", "u", "", "User ID (optional, but recommended for full data)")
+	renderLaTeXCmd.Flags().StringVar(&renderLaTeXDatabaseURL, "db-url", "", "Database URL (optional)")
 
 	if err := renderLaTeXCmd.MarkFlagRequired("plan"); err != nil {
 		panic(fmt.Sprintf("failed to mark plan flag as required: %v", err))
@@ -89,14 +93,33 @@ func runRenderLaTeX(_ *cobra.Command, _ []string) error {
 		templatePath = "templates/one_page_resume.tex"
 	}
 
-	// Load ExperienceBank if provided (for company/role/dates)
+	// Load ExperienceBank from DB if UserID is provided
 	var experienceBank *types.ExperienceBank
-	if renderLaTeXExperienceFile != "" {
-		loadedBank, err := experience.LoadExperienceBank(renderLaTeXExperienceFile)
-		if err != nil {
-			return fmt.Errorf("failed to load experience bank: %w", err)
+	if renderLaTeXUserID != "" {
+		ctx := context.Background()
+
+		if renderLaTeXDatabaseURL == "" {
+			renderLaTeXDatabaseURL = os.Getenv("DATABASE_URL")
 		}
-		experienceBank = loadedBank
+		if renderLaTeXDatabaseURL == "" {
+			return fmt.Errorf("DATABASE_URL not set and --db-url not provided (required for DB access)")
+		}
+
+		database, err := db.Connect(ctx, renderLaTeXDatabaseURL)
+		if err != nil {
+			return fmt.Errorf("failed to connect to database: %w", err)
+		}
+		defer database.Close()
+
+		uid, err := uuid.Parse(renderLaTeXUserID)
+		if err != nil {
+			return fmt.Errorf("invalid user-id: %w", err)
+		}
+
+		experienceBank, err = database.GetExperienceBank(ctx, uid)
+		if err != nil {
+			return fmt.Errorf("failed to load experience bank from DB: %w", err)
+		}
 	}
 
 	// Ensure output directory exists
