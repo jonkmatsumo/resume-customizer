@@ -249,7 +249,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	emitProgress(&opts, db.StepResumeTex, db.CategoryValidation, "Rendered LaTeX resume", nil)
 
 	fmt.Printf("Step 11/12: Validating LaTeX constraints...\n")
-	violations, err := validation.ValidateFromContent(latex, researchResult.CompanyProfile, 1, 100) // Default max 1 page, 100 chars per line
+	violations, err := validation.ValidateFromContent(latex, researchResult.CompanyProfile, 1, 200) // Default max 1 page, 200 chars per line (2 lines)
 	if err != nil {
 		return fmt.Errorf("validating latex failed: %w", err)
 	}
@@ -285,7 +285,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 			candidateInfo,
 			experienceResult.SelectedEducation,
 			1,   // max pages
-			100, // max chars per line
+			200, // max chars per line (2 lines)
 			5,   // max iterations
 			opts.APIKey,
 		)

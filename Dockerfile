@@ -17,7 +17,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o resume_agent ./cmd/resume_agent
 # Runtime stage
 FROM alpine:3.19
 
-RUN apk add --no-cache ca-certificates
+# Install runtime dependencies: ca-certificates for HTTPS, texlive for LaTeX compilation
+RUN apk add --no-cache ca-certificates texlive texlive-xetex
 
 WORKDIR /app
 
