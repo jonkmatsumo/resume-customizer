@@ -179,7 +179,6 @@ func runPipelineCmd(cmd *cobra.Command, _ []string) error {
 		JobURL:         cfg.JobURL,
 		ExperiencePath: cfg.Experience,
 		CompanySeedURL: cfg.CompanySeed,
-		OutputDir:      cfg.Output,
 		CandidateName:  cfg.Name,
 		CandidateEmail: cfg.Email,
 		CandidatePhone: cfg.Phone,

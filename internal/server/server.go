@@ -17,9 +17,10 @@ import (
 
 // Server represents the HTTP server
 type Server struct {
-	httpServer *http.Server
-	db         *db.DB
-	apiKey     string
+	httpServer  *http.Server
+	db          *db.DB
+	apiKey      string
+	databaseURL string
 }
 
 // Config holds server configuration
@@ -38,8 +39,9 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	s := &Server{
-		db:     database,
-		apiKey: cfg.APIKey,
+		db:          database,
+		apiKey:      cfg.APIKey,
+		databaseURL: cfg.DatabaseURL,
 	}
 
 	// Setup router

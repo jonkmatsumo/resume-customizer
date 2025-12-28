@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/pipeline"
@@ -16,7 +15,6 @@ type RunRequest struct {
 	JobURL     string `json:"job_url,omitempty"`
 	JobPath    string `json:"job,omitempty"`
 	Experience string `json:"experience"`
-	OutputDir  string `json:"out"`
 	Name       string `json:"name,omitempty"`
 	Email      string `json:"email,omitempty"`
 	Phone      string `json:"phone,omitempty"`
@@ -68,9 +66,6 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set defaults
-	if req.OutputDir == "" {
-		req.OutputDir = "artifacts/"
-	}
 	if req.Template == "" {
 		req.Template = "templates/one_page_resume.tex"
 	}
@@ -81,18 +76,11 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 		req.MaxLines = 35
 	}
 
-	// Ensure output directory exists
-	if err := os.MkdirAll(req.OutputDir, 0755); err != nil {
-		s.errorResponse(w, http.StatusInternalServerError, "Failed to create output directory")
-		return
-	}
-
 	// Build pipeline options
 	opts := pipeline.RunOptions{
 		JobURL:         req.JobURL,
 		JobPath:        req.JobPath,
 		ExperiencePath: req.Experience,
-		OutputDir:      req.OutputDir,
 		TemplatePath:   req.Template,
 		CandidateName:  req.Name,
 		CandidateEmail: req.Email,
@@ -100,7 +88,7 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 		MaxBullets:     req.MaxBullets,
 		MaxLines:       req.MaxLines,
 		APIKey:         s.apiKey,
-		DatabaseURL:    "", // We'll pass the db directly
+		DatabaseURL:    s.databaseURL,
 		Verbose:        true,
 	}
 
@@ -205,9 +193,6 @@ func (s *Server) handleRunStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set defaults
-	if req.OutputDir == "" {
-		req.OutputDir = "artifacts/"
-	}
 	if req.Template == "" {
 		req.Template = "templates/one_page_resume.tex"
 	}
@@ -216,12 +201,6 @@ func (s *Server) handleRunStream(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.MaxLines == 0 {
 		req.MaxLines = 35
-	}
-
-	// Ensure output directory exists
-	if err := os.MkdirAll(req.OutputDir, 0755); err != nil {
-		s.errorResponse(w, http.StatusInternalServerError, "Failed to create output directory")
-		return
 	}
 
 	// Setup SSE writer
@@ -238,7 +217,6 @@ func (s *Server) handleRunStream(w http.ResponseWriter, r *http.Request) {
 		JobURL:         req.JobURL,
 		JobPath:        req.JobPath,
 		ExperiencePath: req.Experience,
-		OutputDir:      req.OutputDir,
 		TemplatePath:   req.Template,
 		CandidateName:  req.Name,
 		CandidateEmail: req.Email,
@@ -246,7 +224,7 @@ func (s *Server) handleRunStream(w http.ResponseWriter, r *http.Request) {
 		MaxBullets:     req.MaxBullets,
 		MaxLines:       req.MaxLines,
 		APIKey:         s.apiKey,
-		DatabaseURL:    "", // Not needed, we stream instead
+		DatabaseURL:    s.databaseURL,
 		Verbose:        true,
 		OnProgress: func(event pipeline.ProgressEvent) {
 			if err := sse.WriteEvent("step", event); err != nil {

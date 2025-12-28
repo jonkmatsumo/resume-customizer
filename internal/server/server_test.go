@@ -269,9 +269,6 @@ func TestRunRequest_Defaults(t *testing.T) {
 	}
 
 	// These are the defaults we set in handlers
-	if req.OutputDir != "" {
-		t.Error("OutputDir should initially be empty")
-	}
 	if req.Template != "" {
 		t.Error("Template should initially be empty")
 	}

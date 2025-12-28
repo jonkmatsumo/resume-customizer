@@ -4,10 +4,30 @@ package validation
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/jonathan/resume-customizer/internal/types"
 )
+
+// ValidateFromContent validates LaTeX content against the specified constraints.
+// It writes the content to a temp file for LaTeX compilation.
+func ValidateFromContent(latexContent string, companyProfile *types.CompanyProfile, maxPages int, maxCharsPerLine int) (*types.Violations, error) {
+	// Create temp directory for validation
+	tmpDir, err := os.MkdirTemp("", "resume-validation-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	// Write LaTeX content to temp file
+	texPath := filepath.Join(tmpDir, "resume.tex")
+	if err := os.WriteFile(texPath, []byte(latexContent), 0644); err != nil {
+		return nil, fmt.Errorf("failed to write temp LaTeX file: %w", err)
+	}
+
+	return ValidateConstraints(texPath, companyProfile, maxPages, maxCharsPerLine)
+}
 
 // ValidateConstraints validates a LaTeX resume file against the specified constraints
 func ValidateConstraints(texPath string, companyProfile *types.CompanyProfile, maxPages int, maxCharsPerLine int) (*types.Violations, error) {

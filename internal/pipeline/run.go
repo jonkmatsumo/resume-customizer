@@ -3,10 +3,8 @@ package pipeline
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/google/uuid"
@@ -47,7 +45,6 @@ type RunOptions struct {
 	JobURL         string
 	ExperiencePath string
 	CompanySeedURL string
-	OutputDir      string
 	CandidateName  string
 	CandidateEmail string
 	CandidatePhone string
@@ -107,10 +104,6 @@ func countBullets(bank *types.ExperienceBank) int {
 
 // RunPipeline orchestrates the full resume generation pipeline
 func RunPipeline(ctx context.Context, opts RunOptions) error {
-	// 1. Ensure output directory exists
-	if err := os.MkdirAll(opts.OutputDir, 0755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
-	}
 
 	// Initialize observability printer for verbose output
 	printer := observability.NewPrinter(os.Stdout)
@@ -143,13 +136,6 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		if err != nil {
 			return fmt.Errorf("job ingestion from URL failed: %w", err)
 		}
-		// Write the ingested job to the output directory so subsequent runs/debug can use it
-		if err := ingestion.WriteOutput(opts.OutputDir, cleanedText, jobMetadata); err != nil {
-			return fmt.Errorf("failed to write ingested job: %w", err)
-		}
-		if opts.Verbose {
-			fmt.Printf("[VERBOSE] Ingested job saved to %s\n", filepath.Join(opts.OutputDir, "job_posting.cleaned.txt"))
-		}
 	} else {
 		fmt.Printf("Step 1/12: Ingesting job posting from file: %s...\n", opts.JobPath)
 		cleanedText, jobMetadata, err = ingestion.IngestFromFile(ctx, opts.JobPath, opts.APIKey)
@@ -158,14 +144,6 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		}
 	}
 
-	// Save job metadata
-	jobMetaPath := filepath.Join(opts.OutputDir, "job_metadata.json")
-	if err := saveJSON(jobMetaPath, jobMetadata); err != nil {
-		return err
-	}
-	if opts.Verbose {
-		fmt.Printf("[VERBOSE] Saved job metadata to %s\n", jobMetaPath)
-	}
 	emitProgress(&opts, db.StepJobPosting, db.CategoryIngestion,
 		fmt.Sprintf("Ingested and cleaned job posting from %s", opts.JobURL), nil)
 
@@ -174,12 +152,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	if err != nil {
 		return fmt.Errorf("job parsing failed: %w", err)
 	}
-	jobProfilePath := filepath.Join(opts.OutputDir, "job_profile.json")
-	if err := saveJSON(jobProfilePath, jobProfile); err != nil {
-		return err
-	}
 	if opts.Verbose {
-		fmt.Printf("[VERBOSE] Saved job profile to %s\n", jobProfilePath)
 		printer.PrintJobProfile(jobProfile)
 	}
 	emitProgress(&opts, db.StepJobProfile, db.CategoryIngestion,
@@ -207,13 +180,6 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		fmt.Printf("Warning: Failed to extract education requirements: %v\n", err)
 	} else {
 		jobProfile.EducationRequirements = eduReq
-		eduReqPath := filepath.Join(opts.OutputDir, "education_requirements.json")
-		if err := saveJSON(eduReqPath, eduReq); err != nil {
-			return err
-		}
-		if opts.Verbose {
-			fmt.Printf("[VERBOSE] Saved education requirements to %s\n", eduReqPath)
-		}
 		// Save to database
 		if database != nil && runID != uuid.Nil {
 			_ = database.SaveArtifact(ctx, runID, db.StepEducationReq, db.CategoryIngestion, eduReq)
@@ -269,12 +235,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	if err != nil {
 		return fmt.Errorf("rewriting bullets failed: %w", err)
 	}
-	rewrittenBulletsPath := filepath.Join(opts.OutputDir, "rewritten_bullets.json")
-	if err := saveJSON(rewrittenBulletsPath, rewrittenBullets); err != nil {
-		return err
-	}
 	if opts.Verbose {
-		fmt.Printf("[VERBOSE] Saved rewritten bullets to %s\n", rewrittenBulletsPath)
 		printer.PrintRewrittenBullets(rewrittenBullets)
 	}
 	emitProgress(&opts, db.StepRewrittenBullets, db.CategoryRewriting,
@@ -285,26 +246,14 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	if err != nil {
 		return fmt.Errorf("rendering latex failed: %w", err)
 	}
-	latexPath := filepath.Join(opts.OutputDir, "resume.tex")
-	if err := os.WriteFile(latexPath, []byte(latex), 0644); err != nil {
-		return fmt.Errorf("failed to write resume.tex: %w", err)
-	}
-	if opts.Verbose {
-		fmt.Printf("[VERBOSE] Saved LaTeX resume to %s\n", latexPath)
-	}
 	emitProgress(&opts, db.StepResumeTex, db.CategoryValidation, "Rendered LaTeX resume", nil)
 
 	fmt.Printf("Step 11/12: Validating LaTeX constraints...\n")
-	violations, err := validation.ValidateConstraints(latexPath, researchResult.CompanyProfile, 1, 100) // Default max 1 page, 100 chars per line (approx)
+	violations, err := validation.ValidateFromContent(latex, researchResult.CompanyProfile, 1, 100) // Default max 1 page, 100 chars per line
 	if err != nil {
 		return fmt.Errorf("validating latex failed: %w", err)
 	}
-	violationsPath := filepath.Join(opts.OutputDir, "violations.json")
-	if err := saveJSON(violationsPath, violations); err != nil {
-		return err
-	}
 	if opts.Verbose {
-		fmt.Printf("[VERBOSE] Saved violations to %s\n", violationsPath)
 		printer.PrintViolations(violations)
 	}
 	// Save rewriting artifacts to database
@@ -344,40 +293,9 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 			return fmt.Errorf("repair loop failed: %w", err)
 		}
 
-		// Save final artifacts
-		finalPlanPath := filepath.Join(opts.OutputDir, "resume_plan_final.json")
-		if err := saveJSON(finalPlanPath, finalPlan); err != nil {
-			return err
-		}
-		if opts.Verbose {
-			fmt.Printf("[VERBOSE] Saved final resume plan to %s\n", finalPlanPath)
-		}
-
-		finalBulletsPath := filepath.Join(opts.OutputDir, "rewritten_bullets_final.json")
-		if err := saveJSON(finalBulletsPath, finalBullets); err != nil {
-			return err
-		}
-		if opts.Verbose {
-			fmt.Printf("[VERBOSE] Saved final rewritten bullets to %s\n", finalBulletsPath)
-		}
-
-		finalViolationsPath := filepath.Join(opts.OutputDir, "violations_final.json")
-		if err := saveJSON(finalViolationsPath, finalViolations); err != nil {
-			return err
-		}
-		if opts.Verbose {
-			fmt.Printf("[VERBOSE] Saved final violations to %s\n", finalViolationsPath)
-		}
-
-		if err := os.WriteFile(filepath.Join(opts.OutputDir, "resume.tex"), []byte(finalLaTeX), 0644); err != nil {
-			return fmt.Errorf("failed to overwrite resume.tex with final version: %w", err)
-		}
-		if opts.Verbose {
-			fmt.Printf("[VERBOSE] Overwrote resume.tex with final version\n")
-		}
-
-		// Update database with final artifacts
+		// Update database with final artifacts (overwrite previous)
 		if database != nil && runID != uuid.Nil {
+			_ = database.SaveArtifact(ctx, runID, db.StepResumePlan, db.CategoryExperience, finalPlan)
 			_ = database.SaveArtifact(ctx, runID, db.StepRewrittenBullets, db.CategoryRewriting, finalBullets)
 			_ = database.SaveTextArtifact(ctx, runID, db.StepResumeTex, db.CategoryValidation, finalLaTeX)
 			_ = database.SaveArtifact(ctx, runID, db.StepViolations, db.CategoryValidation, finalViolations)
@@ -398,7 +316,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		_ = database.CompleteRun(ctx, runID, "completed")
 	}
 
-	fmt.Printf("Done! Generated resume at %s\n", latexPath)
+	fmt.Printf("Done! Resume stored in database.\n")
 	return nil
 }
 
@@ -414,13 +332,6 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	if err := experience.NormalizeExperienceBank(experienceBank); err != nil {
 		return nil, fmt.Errorf("normalizing experience bank failed: %w", err)
 	}
-	expBankPath := filepath.Join(opts.OutputDir, "experience_bank_normalized.json")
-	if err := saveJSON(expBankPath, experienceBank); err != nil {
-		return nil, err
-	}
-	if opts.Verbose {
-		fmt.Printf("%s[VERBOSE] Saved normalized experience bank to %s\n", prefix, expBankPath)
-	}
 	emitProgress(&opts, db.StepExperienceBank, db.CategoryExperience,
 		fmt.Sprintf("Loaded %d stories with %d total bullets", len(experienceBank.Stories), countBullets(experienceBank)), nil)
 	// Save to database
@@ -433,12 +344,7 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	if err != nil {
 		return nil, fmt.Errorf("ranking stories failed: %w", err)
 	}
-	rankedStoriesPath := filepath.Join(opts.OutputDir, "ranked_stories.json")
-	if err := saveJSON(rankedStoriesPath, rankedStories); err != nil {
-		return nil, err
-	}
 	if opts.Verbose {
-		fmt.Printf("%s[VERBOSE] Saved ranked stories to %s\n", prefix, rankedStoriesPath)
 		printer.PrintRankedStories(rankedStories)
 	}
 	// Save to database
@@ -454,13 +360,6 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 		fmt.Printf("%sWarning: Education scoring failed: %v. Including all education.\n", prefix, err)
 		selectedEducation = experienceBank.Education
 	} else {
-		eduScoresPath := filepath.Join(opts.OutputDir, "education_scores.json")
-		if err := saveJSON(eduScoresPath, eduScores); err != nil {
-			return nil, err
-		}
-		if opts.Verbose {
-			fmt.Printf("%s[VERBOSE] Saved education scores to %s\n", prefix, eduScoresPath)
-		}
 		// Save to database
 		if database != nil && runID != uuid.Nil {
 			_ = database.SaveArtifact(ctx, runID, db.StepEducationScores, db.CategoryExperience, eduScores)
@@ -486,13 +385,6 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	if err != nil {
 		return nil, fmt.Errorf("selecting plan failed: %w", err)
 	}
-	planPath := filepath.Join(opts.OutputDir, "resume_plan.json")
-	if err := saveJSON(planPath, resumePlan); err != nil {
-		return nil, err
-	}
-	if opts.Verbose {
-		fmt.Printf("%s[VERBOSE] Saved resume plan to %s\n", prefix, planPath)
-	}
 	// Save to database
 	if database != nil && runID != uuid.Nil {
 		_ = database.SaveArtifact(ctx, runID, db.StepResumePlan, db.CategoryExperience, resumePlan)
@@ -503,12 +395,7 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	if err != nil {
 		return nil, fmt.Errorf("materializing bullets failed: %w", err)
 	}
-	bulletsPath := filepath.Join(opts.OutputDir, "selected_bullets.json")
-	if err := saveJSON(bulletsPath, selectedBullets); err != nil {
-		return nil, err
-	}
 	if opts.Verbose {
-		fmt.Printf("%s[VERBOSE] Saved selected bullets to %s\n", prefix, bulletsPath)
 		printer.PrintSelectedBullets(selectedBullets)
 	}
 	// Save to database
@@ -648,42 +535,10 @@ func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.J
 		Sources: researchSession.ToSources(),
 	}
 
-	// Save sources
-	sourcesPath := filepath.Join(opts.OutputDir, "sources.json")
-	if err := saveJSON(sourcesPath, companyCorpus.Sources); err != nil {
-		return nil, err
-	}
-	if opts.Verbose {
-		fmt.Printf("%s[VERBOSE] Saved research sources to %s\n", prefix, sourcesPath)
-	}
 	// Save to database
 	if database != nil && runID != uuid.Nil {
 		_ = database.SaveArtifact(ctx, runID, db.StepSources, db.CategoryResearch, companyCorpus.Sources)
-	}
-
-	// Save corpus text for debug
-	corpusPath := filepath.Join(opts.OutputDir, "company_corpus.txt")
-	if err := os.WriteFile(corpusPath, []byte(companyCorpus.Corpus), 0644); err != nil {
-		return nil, fmt.Errorf("failed to save company corpus text: %w", err)
-	}
-	if opts.Verbose {
-		fmt.Printf("%s[VERBOSE] Saved company corpus text to %s\n", prefix, corpusPath)
-	}
-	// Save to database
-	if database != nil && runID != uuid.Nil {
 		_ = database.SaveTextArtifact(ctx, runID, db.StepCompanyCorpus, db.CategoryResearch, companyCorpus.Corpus)
-	}
-
-	// Save research session for debug
-	sessionPath := filepath.Join(opts.OutputDir, "research_session.json")
-	if err := saveJSON(sessionPath, researchSession); err != nil {
-		return nil, err
-	}
-	if opts.Verbose {
-		fmt.Printf("%s[VERBOSE] Saved research session to %s\n", prefix, sessionPath)
-	}
-	// Save to database
-	if database != nil && runID != uuid.Nil {
 		_ = database.SaveArtifact(ctx, runID, db.StepResearchSession, db.CategoryResearch, researchSession)
 	}
 
@@ -692,12 +547,7 @@ func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.J
 	if err != nil {
 		return nil, fmt.Errorf("summarizing voice failed: %w", err)
 	}
-	voiceProfilePath := filepath.Join(opts.OutputDir, "company_profile.json")
-	if err := saveJSON(voiceProfilePath, companyProfile); err != nil {
-		return nil, err
-	}
 	if opts.Verbose {
-		fmt.Printf("%s[VERBOSE] Saved company profile to %s\n", prefix, voiceProfilePath)
 		printer.PrintCompanyProfile(companyProfile)
 	}
 	// Save to database
@@ -713,15 +563,4 @@ func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.J
 		CompanyProfile: companyProfile,
 		CompanyCorpus:  companyCorpus,
 	}, nil
-}
-
-func saveJSON(path string, v interface{}) error {
-	data, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal json for %s: %w", path, err)
-	}
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		return fmt.Errorf("failed to write json file %s: %w", path, err)
-	}
-	return nil
 }
