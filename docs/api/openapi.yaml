@@ -1,0 +1,1119 @@
+openapi: 3.0.3
+info:
+  title: Resume Customizer API
+  description: |
+    Resume Customizer exposes a REST API for triggering the resume-tailoring pipeline, tracking runs,
+    and retrieving artifacts (including the generated LaTeX resume).
+
+    The endpoints and their descriptions are based on the repository README's REST API section.
+  version: "0.1.0"
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: health
+    description: Health checks
+  - name: pipeline
+    description: Start pipeline runs (background or streaming)
+  - name: runs
+    description: Run listing, status, and lifecycle
+  - name: artifacts
+    description: Artifact listing and retrieval
+  - name: users
+    description: User profile CRUD
+  - name: jobs
+    description: Employment history CRUD
+  - name: experiences
+    description: Experience bullet CRUD
+  - name: education
+    description: Education history CRUD
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      description: Returns service liveness.
+      operationId: getHealth
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /run:
+    post:
+      tags: [pipeline]
+      summary: Start pipeline (background)
+      description: Starts the pipeline asynchronously and returns a run ID immediately.
+      operationId: startRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunCreateRequest"
+            examples:
+              basic:
+                summary: Start a run from a job URL
+                value:
+                  user_id: "550e8400-e29b-41d4-a716-446655440000"
+                  job_url: "https://www.linkedin.com/jobs/view/123456789"
+      responses:
+        "202":
+          description: Accepted (run started)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunCreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /run/stream:
+    post:
+      tags: [pipeline]
+      summary: Start pipeline (SSE)
+      description: Starts the pipeline and streams progress events using Server-Sent Events (SSE).
+      operationId: startRunStream
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunCreateRequest"
+      responses:
+        "200":
+          description: SSE stream of progress events
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/SseEvent"
+              examples:
+                progress:
+                  summary: Example SSE message (illustrative)
+                  value: |
+                    event: progress
+                    data: {"run_id":"550e8400-e29b-41d4-a716-446655440000","step":"ingestion","status":"running"}
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /runs:
+    get:
+      tags: [runs]
+      summary: List all runs
+      description: Lists pipeline runs with optional filters.
+      operationId: listRuns
+      parameters:
+        - in: query
+          name: company
+          schema: { type: string }
+          description: Filter by company name
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [queued, running, completed, failed, canceled]
+          description: Filter by run status
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+          description: Max number of runs to return
+      responses:
+        "200":
+          description: A list of runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Run"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /status/{id}:
+    get:
+      tags: [runs]
+      summary: Get run status
+      description: Returns status, company, role (and other metadata) for a run.
+      operationId: getRunStatus
+      parameters:
+        - $ref: "#/components/parameters/RunIdPath"
+      responses:
+        "200":
+          description: Run status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunStatus"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /runs/{id}:
+    delete:
+      tags: [runs]
+      summary: Delete run
+      description: Deletes a run and cascades deletion to associated artifacts.
+      operationId: deleteRun
+      parameters:
+        - $ref: "#/components/parameters/RunIdPath"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /artifacts:
+    get:
+      tags: [artifacts]
+      summary: List artifacts
+      description: Lists artifacts with optional filters.
+      operationId: listArtifacts
+      parameters:
+        - in: query
+          name: run_id
+          schema: { type: string, format: uuid }
+          description: Filter by run ID
+        - in: query
+          name: step
+          schema: { type: string }
+          description: Filter by pipeline step
+        - in: query
+          name: category
+          schema: { type: string }
+          description: Filter by artifact category
+      responses:
+        "200":
+          description: A list of artifacts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ArtifactSummary"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /artifact/{id}:
+    get:
+      tags: [artifacts]
+      summary: Get artifact by ID
+      description: Returns full artifact JSON content.
+      operationId: getArtifact
+      parameters:
+        - $ref: "#/components/parameters/ArtifactIdPath"
+      responses:
+        "200":
+          description: Full artifact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /runs/{id}/artifacts:
+    get:
+      tags: [artifacts]
+      summary: List artifacts for a run
+      description: Lists artifacts for a single run (summary view).
+      operationId: listRunArtifacts
+      parameters:
+        - $ref: "#/components/parameters/RunIdPath"
+      responses:
+        "200":
+          description: A list of artifacts for the run
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ArtifactSummary"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /runs/{id}/resume.tex:
+    get:
+      tags: [artifacts]
+      summary: Download LaTeX resume
+      description: Downloads the generated LaTeX resume for a run as plain text.
+      operationId: downloadResumeTex
+      parameters:
+        - $ref: "#/components/parameters/RunIdPath"
+      responses:
+        "200":
+          description: LaTeX document
+          content:
+            text/plain:
+              schema:
+                type: string
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /users:
+    post:
+      tags: [users]
+      summary: Create user
+      description: Creates a user profile.
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreateRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /users/{id}:
+    get:
+      tags: [users]
+      summary: Get user
+      description: Returns a user profile.
+      operationId: getUser
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    put:
+      tags: [users]
+      summary: Update user
+      description: Updates a user profile.
+      operationId: updateUser
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdateRequest"
+      responses:
+        "200":
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /users/{id}/jobs:
+    get:
+      tags: [jobs]
+      summary: List jobs
+      description: Lists employment history for a user.
+      operationId: listJobs
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      responses:
+        "200":
+          description: Jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Job" }
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      tags: [jobs]
+      summary: Create job
+      description: Creates a job (employment entry) for a user.
+      operationId: createJob
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobCreateRequest"
+      responses:
+        "201":
+          description: Created job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /jobs/{id}:
+    put:
+      tags: [jobs]
+      summary: Update job
+      description: Updates a job.
+      operationId: updateJob
+      parameters:
+        - $ref: "#/components/parameters/JobIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobUpdateRequest"
+      responses:
+        "200":
+          description: Updated job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      tags: [jobs]
+      summary: Delete job
+      description: Deletes a job and its experiences.
+      operationId: deleteJob
+      parameters:
+        - $ref: "#/components/parameters/JobIdPath"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /jobs/{id}/experiences:
+    get:
+      tags: [experiences]
+      summary: List experiences
+      description: Lists bullet-point experiences for a job.
+      operationId: listExperiences
+      parameters:
+        - $ref: "#/components/parameters/JobIdPath"
+      responses:
+        "200":
+          description: Experiences
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Experience" }
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      tags: [experiences]
+      summary: Add experience
+      description: Adds an experience bullet to a job.
+      operationId: createExperience
+      parameters:
+        - $ref: "#/components/parameters/JobIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperienceCreateRequest"
+      responses:
+        "201":
+          description: Created experience
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experience"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /experiences/{id}:
+    put:
+      tags: [experiences]
+      summary: Update experience
+      description: Updates an experience bullet.
+      operationId: updateExperience
+      parameters:
+        - $ref: "#/components/parameters/ExperienceIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperienceUpdateRequest"
+      responses:
+        "200":
+          description: Updated experience
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experience"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      tags: [experiences]
+      summary: Delete experience
+      description: Deletes an experience bullet.
+      operationId: deleteExperience
+      parameters:
+        - $ref: "#/components/parameters/ExperienceIdPath"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /users/{id}/education:
+    get:
+      tags: [education]
+      summary: List education
+      description: Lists education history for a user.
+      operationId: listEducation
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      responses:
+        "200":
+          description: Education entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Education" }
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      tags: [education]
+      summary: Add education
+      description: Adds an education entry for a user.
+      operationId: createEducation
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EducationCreateRequest"
+      responses:
+        "201":
+          description: Created education entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Education"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /education/{id}:
+    put:
+      tags: [education]
+      summary: Update education
+      description: Updates an education entry.
+      operationId: updateEducation
+      parameters:
+        - $ref: "#/components/parameters/EducationIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EducationUpdateRequest"
+      responses:
+        "200":
+          description: Updated education entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Education"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      tags: [education]
+      summary: Delete education
+      description: Deletes an education entry.
+      operationId: deleteEducation
+      parameters:
+        - $ref: "#/components/parameters/EducationIdPath"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /users/{id}/experience-bank:
+    get:
+      tags: [users]
+      summary: Export experience bank
+      description: Exports the user’s experience bank JSON in a pipeline-compatible format.
+      operationId: exportExperienceBank
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      responses:
+        "200":
+          description: Experience bank export
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperienceBankExport"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  parameters:
+    RunIdPath:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Run ID
+
+    ArtifactIdPath:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Artifact ID
+
+    UserIdPath:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: User ID
+
+    JobIdPath:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Job ID
+
+    ExperienceIdPath:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Experience ID
+
+    EducationIdPath:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Education ID
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          examples:
+            bad_request:
+              value:
+                error: bad_request
+                message: Invalid request payload
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          examples:
+            not_found:
+              value:
+                error: not_found
+                message: Resource not found
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          examples:
+            internal_error:
+              value:
+                error: internal_error
+                message: Unexpected error
+
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          example: ok
+      required: [status]
+
+    RunCreateRequest:
+      type: object
+      description: Request body to start a pipeline run.
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: UUID of the user profile in DB
+        job_url:
+          type: string
+          format: uri
+          description: URL of the job posting
+        job:
+          type: string
+          description: Path to local job posting file (alternative to job_url)
+        template:
+          type: string
+          description: Path to LaTeX template
+          default: templates/one_page_resume.tex
+        max_bullets:
+          type: integer
+          minimum: 1
+          description: Target number of bullets
+          default: 25
+        max_lines:
+          type: integer
+          minimum: 1
+          description: Target number of lines
+          default: 35
+      required: [user_id]
+      oneOf:
+        - required: [job_url]
+        - required: [job]
+
+    RunCreateResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        run_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, running]
+          description: Initial status
+      required: [run_id, status]
+
+    Run:
+      type: object
+      description: A pipeline run.
+      properties:
+        id:
+          type: string
+          format: uuid
+        company:
+          type: string
+          nullable: true
+        role:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [queued, running, completed, failed, canceled]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, status, created_at, updated_at]
+
+    RunStatus:
+      allOf:
+        - $ref: "#/components/schemas/Run"
+        - type: object
+          properties:
+            message:
+              type: string
+              nullable: true
+              description: Optional status message / error reason
+
+    ArtifactSummary:
+      type: object
+      description: Artifact summary row returned by list endpoints.
+      properties:
+        id:
+          type: string
+          format: uuid
+        run_id:
+          type: string
+          format: uuid
+        step:
+          type: string
+        category:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required: [id, run_id, step, category, created_at]
+
+    Artifact:
+      type: object
+      description: Full artifact JSON record.
+      properties:
+        id:
+          type: string
+          format: uuid
+        run_id:
+          type: string
+          format: uuid
+        step:
+          type: string
+        category:
+          type: string
+        content:
+          description: Arbitrary JSON content stored for this artifact.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+            - type: string
+            - type: number
+            - type: boolean
+            - type: "null"
+        created_at:
+          type: string
+          format: date-time
+      required: [id, run_id, step, category, content, created_at]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, name, created_at, updated_at]
+
+    UserCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+      required: [name]
+
+    UserUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+      additionalProperties: false
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        company:
+          type: string
+        role_title:
+          type: string
+        location:
+          type: string
+          nullable: true
+        start_date:
+          type: string
+          nullable: true
+          description: Free-form or ISO date, depending on your implementation
+        end_date:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, user_id, company, role_title, created_at, updated_at]
+
+    JobCreateRequest:
+      type: object
+      properties:
+        company:
+          type: string
+        role_title:
+          type: string
+        location:
+          type: string
+        start_date:
+          type: string
+        end_date:
+          type: string
+      required: [company, role_title]
+
+    JobUpdateRequest:
+      type: object
+      properties:
+        company:
+          type: string
+        role_title:
+          type: string
+        location:
+          type: string
+        start_date:
+          type: string
+        end_date:
+          type: string
+      additionalProperties: false
+
+    Experience:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        bullet_text:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+          description: Skill tags associated with the bullet
+        risk_flags:
+          type: array
+          items:
+            type: string
+          description: Optional flags (e.g., overclaim risk)
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, job_id, bullet_text, created_at, updated_at]
+
+    ExperienceCreateRequest:
+      type: object
+      properties:
+        bullet_text:
+          type: string
+        skills:
+          type: array
+          items: { type: string }
+        risk_flags:
+          type: array
+          items: { type: string }
+      required: [bullet_text]
+
+    ExperienceUpdateRequest:
+      type: object
+      properties:
+        bullet_text:
+          type: string
+        skills:
+          type: array
+          items: { type: string }
+        risk_flags:
+          type: array
+          items: { type: string }
+      additionalProperties: false
+
+    Education:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        school:
+          type: string
+        degree:
+          type: string
+          nullable: true
+        field:
+          type: string
+          nullable: true
+        start_date:
+          type: string
+          nullable: true
+        end_date:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, user_id, school, created_at, updated_at]
+
+    EducationCreateRequest:
+      type: object
+      properties:
+        school:
+          type: string
+        degree:
+          type: string
+        field:
+          type: string
+        start_date:
+          type: string
+        end_date:
+          type: string
+      required: [school]
+
+    EducationUpdateRequest:
+      type: object
+      properties:
+        school:
+          type: string
+        degree:
+          type: string
+        field:
+          type: string
+        start_date:
+          type: string
+        end_date:
+          type: string
+      additionalProperties: false
+
+    ExperienceBankExport:
+      type: object
+      description: Pipeline-compatible export format (structure may evolve).
+      additionalProperties: true
+
+    SseEvent:
+      type: string
+      description: Raw SSE event text payload (implementation-defined).
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: bad_request
+        message:
+          type: string
+          example: Invalid request payload
+        details:
+          nullable: true
+          description: Optional extra details
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+            - type: string
+      required: [error, message]

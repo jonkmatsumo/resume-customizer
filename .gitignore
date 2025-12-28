@@ -31,9 +31,6 @@ go.work.sum
 # .vscode/
 .cursorrules
 
-# Design documents
-docs/
-
 # Build artifacts
 bin/
 artifacts/*

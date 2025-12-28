@@ -2,7 +2,9 @@
 
 ## 1. Introduction
 
-Resume Customizer is a multi-agentic system that automates the tailoring of resumes to specific job postings. It processes a job description, researches the target company, and selects relevant experiences from a user's professional history to generate a focused, one-page LaTeX resume.
+Resume Customizer is a local tool (with a planned hosted version) that tailors your LaTeX resume to a specific job posting. It uses an LLM (Gemini 1.5 Pro) to analyze the job description and your experience bank, rewriting bullet points to match the required skills and "vibe."
+
+[**API Docs**](docs/api/index.html) | [**OpenAPI Spec**](docs/api/openapi.yaml)
 
 | Agent | Function |
 |-------|----------|
@@ -133,69 +135,28 @@ flowchart TD
 
 ## 3. REST API
 
-The service exposes a REST API for triggering pipelines and retrieving results.
+The service exposes a comprehensive REST API. For full documentation including all endpoints, parameters, and schemas, please view the interactive API docs.
 
-### Pipeline Endpoints
+### Viewing the API Documentation
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST /run` | Start pipeline (background) | Returns run ID immediately |
-| `POST /run/stream` | Start pipeline (SSE) | Streams progress events |
-| `GET /health` | Health check | Returns `{"status":"ok"}` |
-
-### Run Management
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET /runs` | List all runs | Filter: `?company=&status=&limit=` |
-| `GET /status/{id}` | Get run status | Status, company, role |
-| `DELETE /runs/{id}` | Delete run | Cascades to artifacts |
-
-### Artifact Retrieval
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET /artifacts` | List artifacts | Filter: `?run_id=&step=&category=` |
-| `GET /artifact/{id}` | Get artifact by ID | Full JSON content |
-| `GET /runs/{id}/artifacts` | List run's artifacts | Summary view |
-| `GET /runs/{id}/resume.tex` | Download LaTeX | Plain text download |
-
-### User Profile Management
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST /users` | Create User | Body: `{"name","email","phone"}` |
-| `GET /users/{id}` | Get User | Returns user profile |
-| `PUT /users/{id}` | Update User | Update fields |
-| `GET /users/{id}/jobs` | List Jobs | Returns employment history |
-| `POST /users/{id}/jobs` | Create Job | Body: `{"company","role_title",...}` |
-| `PUT /jobs/{id}` | Update Job | Body: `{"company","role_title",...}` |
-| `DELETE /jobs/{id}` | Delete Job | Deletes job and experiences |
-| `GET /jobs/{id}/experiences` | List Experiences | Returns bullet points |
-| `POST /jobs/{id}/experiences` | Add Experience | Body: `{"bullet_text","skills",...}` |
-| `PUT /experiences/{id}` | Update Experience | Body: `{"bullet_text","skills",...}` |
-| `DELETE /experiences/{id}` | Delete Experience | Deletes bullet point |
-| `GET /users/{id}/education` | List Education | Returns education history |
-| `POST /users/{id}/education` | Add Education | Body: `{"school","degree",...}` |
-| `PUT /education/{id}` | Update Education | Body: `{"school","degree",...}` |
-| `DELETE /education/{id}` | Delete Education | Deletes education entry |
-| `GET /users/{id}/experience-bank` | Export Experience JSON | Returns pipeline-compatible format |
-
-### API Request Fields
-
-| Field | Type | Required? | Description |
-| :--- | :--- | :--- | :--- |
-| `job_url` | string | **Yes** (or `job`) | URL of the job posting |
-| `job` | string | **Yes** (or `job_url`) | Path to local job posting file |
-| `user_id` | string | **Yes** | UUID of the user profile in DB |
-| `template` | string | No | Path to LaTeX template (default: `templates/one_page_resume.tex`) |
-| `max_bullets` | int | No | Target number of bullets (default: 25) |
-| `max_lines` | int | No | Target number of lines (default: 35) |
-
-### Example: Start Pipeline
+The documentation is available as a static HTML file that renders the OpenAPI specification.
 
 ```bash
-curl -X POST http://localhost:8080/run \
+# Serve the documentation locally
+python3 -m http.server --directory docs/api 8000
+```
+
+Then visit [http://localhost:8000](http://localhost:8000) in your browser.
+
+### Key Examples
+
+Here are the most common operations to get you started:
+
+#### 1. Start a Pipeline Run (Streaming)
+
+```bash
+# Note: Use -N to see the stream immediately
+curl -N -X POST http://localhost:8080/run/stream \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -203,17 +164,17 @@ curl -X POST http://localhost:8080/run \
   }'
 ```
 
-### Example: Retrieve Results
+#### 2. Check Run Status
 
 ```bash
-# List runs
-curl http://localhost:8080/runs?status=completed
+curl http://localhost:8080/status/{run_id}
+```
 
-# Get artifacts for a run
-curl http://localhost:8080/runs/{run_id}/artifacts
+#### 3. Download Generated Resume
 
-# Download resume
-curl http://localhost:8080/runs/{run_id}/resume.tex -o resume.tex
+```bash
+# Use -O to save the file with the remote filename
+curl -O http://localhost:8080/runs/{run_id}/resume.tex
 ```
 
 ---
