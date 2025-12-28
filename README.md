@@ -4,7 +4,7 @@
 
 Resume Customizer is a local tool (with a planned hosted version) that tailors your LaTeX resume to a specific job posting. It uses an LLM (Gemini 1.5 Pro) to analyze the job description and your experience bank, rewriting bullet points to match the required skills and "vibe."
 
-[**API Docs**](docs/api/index.html) | [**OpenAPI Spec**](docs/api/openapi.yaml)
+[**API Docs**](https://jonkmatsumo.github.io/resume-customizer/) | [**OpenAPI Spec**](openapi/openapi.yaml)
 
 | Agent | Function |
 |-------|----------|
@@ -139,17 +139,16 @@ The service exposes a comprehensive REST API. For full documentation including a
 
 ### Viewing the API Documentation
 
-The documentation is **automatically published to GitHub Pages** on every push to main.
+The documentation is available online at **[https://jonkmatsumo.github.io/resume-customizer/](https://jonkmatsumo.github.io/resume-customizer/)**.
 
-To preview changes locally:
+To preview or validate locally:
 
 ```bash
 # Lint the spec
 npx -y @stoplight/spectral-cli lint openapi/openapi.yaml
 
-# Render current spec
-npx -y redoc-cli bundle openapi/openapi.yaml -o docs/index.html
-# Then open docs/index.html in your browser
+# Preview locally (opens browser)
+npx -y @redocly/cli preview-docs openapi/openapi.yaml
 ```
 
 ### Key Examples
