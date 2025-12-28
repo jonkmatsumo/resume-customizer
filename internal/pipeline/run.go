@@ -96,6 +96,15 @@ func emitProgress(opts *RunOptions, step, category, message string, content any)
 	}
 }
 
+// countBullets returns the total number of bullets in an experience bank
+func countBullets(bank *types.ExperienceBank) int {
+	count := 0
+	for _, story := range bank.Stories {
+		count += len(story.Bullets)
+	}
+	return count
+}
+
 // RunPipeline orchestrates the full resume generation pipeline
 func RunPipeline(ctx context.Context, opts RunOptions) error {
 	// 1. Ensure output directory exists
@@ -157,6 +166,8 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	if opts.Verbose {
 		fmt.Printf("[VERBOSE] Saved job metadata to %s\n", jobMetaPath)
 	}
+	emitProgress(&opts, db.StepJobPosting, db.CategoryIngestion,
+		fmt.Sprintf("Ingested and cleaned job posting from %s", opts.JobURL), nil)
 
 	fmt.Printf("Step 2/12: Parsing job profile...\n")
 	jobProfile, err := parsing.ParseJobProfile(ctx, cleanedText, opts.APIKey)
@@ -410,6 +421,8 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	if opts.Verbose {
 		fmt.Printf("%s[VERBOSE] Saved normalized experience bank to %s\n", prefix, expBankPath)
 	}
+	emitProgress(&opts, db.StepExperienceBank, db.CategoryExperience,
+		fmt.Sprintf("Loaded %d stories with %d total bullets", len(experienceBank.Stories), countBullets(experienceBank)), nil)
 	// Save to database
 	if database != nil && runID != uuid.Nil {
 		_ = database.SaveArtifact(ctx, runID, db.StepExperienceBank, db.CategoryExperience, experienceBank)
@@ -432,6 +445,7 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	if database != nil && runID != uuid.Nil {
 		_ = database.SaveArtifact(ctx, runID, db.StepRankedStories, db.CategoryExperience, rankedStories)
 	}
+	emitProgress(&opts, db.StepRankedStories, db.CategoryExperience, "Ranked stories by relevance", rankedStories)
 
 	fmt.Printf("%sStep 4a/12: Scoring education relevance...\n", prefix)
 	var selectedEducation []types.Education
@@ -501,6 +515,8 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	if database != nil && runID != uuid.Nil {
 		_ = database.SaveArtifact(ctx, runID, db.StepSelectedBullets, db.CategoryExperience, selectedBullets)
 	}
+	emitProgress(&opts, db.StepSelectedBullets, db.CategoryExperience,
+		fmt.Sprintf("Selected %d bullets for resume", len(selectedBullets.Bullets)), selectedBullets)
 
 	fmt.Printf("%s✅ Experience branch complete.\n", prefix)
 
@@ -688,6 +704,8 @@ func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.J
 	if database != nil && runID != uuid.Nil {
 		_ = database.SaveArtifact(ctx, runID, db.StepCompanyProfile, db.CategoryResearch, companyProfile)
 	}
+	emitProgress(&opts, db.StepCompanyProfile, db.CategoryResearch,
+		fmt.Sprintf("Analyzed company voice: %s", companyProfile.Company), companyProfile)
 
 	fmt.Printf("%s✅ Research branch complete.\n", prefix)
 

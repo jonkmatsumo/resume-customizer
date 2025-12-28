@@ -72,7 +72,7 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 		req.OutputDir = "artifacts/"
 	}
 	if req.Template == "" {
-		req.Template = "templates/resume.tex"
+		req.Template = "templates/one_page_resume.tex"
 	}
 	if req.MaxBullets == 0 {
 		req.MaxBullets = 25
@@ -209,7 +209,7 @@ func (s *Server) handleRunStream(w http.ResponseWriter, r *http.Request) {
 		req.OutputDir = "artifacts/"
 	}
 	if req.Template == "" {
-		req.Template = "templates/resume.tex"
+		req.Template = "templates/one_page_resume.tex"
 	}
 	if req.MaxBullets == 0 {
 		req.MaxBullets = 25
