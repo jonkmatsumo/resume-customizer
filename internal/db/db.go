@@ -215,3 +215,127 @@ func (db *DB) GetArtifactByID(ctx context.Context, artifactID uuid.UUID) (*Artif
 
 	return &artifact, nil
 }
+
+// RunFilters holds optional filters for listing runs
+type RunFilters struct {
+	Company string
+	Status  string
+	Limit   int
+}
+
+// ListRunsFiltered retrieves runs with optional filters
+func (db *DB) ListRunsFiltered(ctx context.Context, filters RunFilters) ([]Run, error) {
+	if filters.Limit == 0 {
+		filters.Limit = 50
+	}
+
+	query := `SELECT id, company, role_title, job_url, status, created_at, completed_at
+		FROM pipeline_runs WHERE 1=1`
+	args := []any{}
+	argNum := 1
+
+	if filters.Company != "" {
+		query += fmt.Sprintf(" AND company ILIKE $%d", argNum)
+		args = append(args, "%"+filters.Company+"%")
+		argNum++
+	}
+	if filters.Status != "" {
+		query += fmt.Sprintf(" AND status = $%d", argNum)
+		args = append(args, filters.Status)
+		argNum++
+	}
+
+	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d", argNum)
+	args = append(args, filters.Limit)
+
+	rows, err := db.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list runs: %w", err)
+	}
+	defer rows.Close()
+
+	var runs []Run
+	for rows.Next() {
+		var run Run
+		if err := rows.Scan(&run.ID, &run.Company, &run.RoleTitle, &run.JobURL, &run.Status, &run.CreatedAt, &run.CompletedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan run: %w", err)
+		}
+		runs = append(runs, run)
+	}
+	return runs, nil
+}
+
+// DeleteRun deletes a pipeline run and all its artifacts (via cascade)
+func (db *DB) DeleteRun(ctx context.Context, runID uuid.UUID) error {
+	result, err := db.pool.Exec(ctx, `DELETE FROM pipeline_runs WHERE id = $1`, runID)
+	if err != nil {
+		return fmt.Errorf("failed to delete run: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("run not found: %s", runID)
+	}
+	return nil
+}
+
+// ArtifactSummary is a lightweight view of an artifact for listing
+type ArtifactSummary struct {
+	ID        uuid.UUID `json:"id"`
+	Step      string    `json:"step"`
+	Category  string    `json:"category"`
+	CreatedAt string    `json:"created_at"`
+	HasJSON   bool      `json:"has_json"`
+	HasText   bool      `json:"has_text"`
+}
+
+// ArtifactFilters holds optional filters for listing artifacts
+type ArtifactFilters struct {
+	RunID    uuid.UUID
+	Step     string
+	Category string
+}
+
+// ListArtifacts retrieves artifacts with optional filters
+func (db *DB) ListArtifacts(ctx context.Context, filters ArtifactFilters) ([]ArtifactSummary, error) {
+	query := `SELECT id, step, COALESCE(category, ''), created_at, 
+		      content IS NOT NULL as has_json, text_content IS NOT NULL as has_text
+		FROM artifacts WHERE 1=1`
+	args := []any{}
+	argNum := 1
+
+	if filters.RunID != uuid.Nil {
+		query += fmt.Sprintf(" AND run_id = $%d", argNum)
+		args = append(args, filters.RunID)
+		argNum++
+	}
+	if filters.Step != "" {
+		query += fmt.Sprintf(" AND step = $%d", argNum)
+		args = append(args, filters.Step)
+		argNum++
+	}
+	if filters.Category != "" {
+		query += fmt.Sprintf(" AND category = $%d", argNum)
+		args = append(args, filters.Category)
+	}
+
+	query += " ORDER BY created_at ASC"
+
+	rows, err := db.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list artifacts: %w", err)
+	}
+	defer rows.Close()
+
+	var artifacts []ArtifactSummary
+	for rows.Next() {
+		var a ArtifactSummary
+		var createdAt any
+		if err := rows.Scan(&a.ID, &a.Step, &a.Category, &createdAt, &a.HasJSON, &a.HasText); err != nil {
+			return nil, fmt.Errorf("failed to scan artifact: %w", err)
+		}
+		if t, ok := createdAt.(interface{ String() string }); ok {
+			a.CreatedAt = t.String()
+		}
+		artifacts = append(artifacts, a)
+	}
+	return artifacts, nil
+}

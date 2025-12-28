@@ -364,3 +364,77 @@ func TestErrorResponse(t *testing.T) {
 		t.Errorf("expected error='test error', got '%s'", resp["error"])
 	}
 }
+
+// TestDeleteRunEndpoint_InvalidID tests DELETE /runs/{id} with invalid UUID
+func TestDeleteRunEndpoint_InvalidID(t *testing.T) {
+	s := newTestServer()
+
+	req := httptest.NewRequest(http.MethodDelete, "/runs/not-a-uuid", nil)
+	req.SetPathValue("id", "not-a-uuid")
+	w := httptest.NewRecorder()
+
+	s.handleDeleteRun(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+}
+
+// TestDeleteRunEndpoint_MissingID tests DELETE /runs/{id} with missing ID
+func TestDeleteRunEndpoint_MissingID(t *testing.T) {
+	s := newTestServer()
+
+	req := httptest.NewRequest(http.MethodDelete, "/runs/", nil)
+	req.SetPathValue("id", "")
+	w := httptest.NewRecorder()
+
+	s.handleDeleteRun(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+}
+
+// TestListArtifactsEndpoint_InvalidRunID tests /artifacts with invalid run_id
+func TestListArtifactsEndpoint_InvalidRunID(t *testing.T) {
+	s := newTestServer()
+
+	req := httptest.NewRequest(http.MethodGet, "/artifacts?run_id=not-a-uuid", nil)
+	w := httptest.NewRecorder()
+
+	s.handleListArtifacts(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+}
+
+// TestRunArtifactsEndpoint_InvalidID tests /runs/{id}/artifacts with invalid UUID
+func TestRunArtifactsEndpoint_InvalidID(t *testing.T) {
+	s := newTestServer()
+
+	req := httptest.NewRequest(http.MethodGet, "/runs/not-a-uuid/artifacts", nil)
+	req.SetPathValue("id", "not-a-uuid")
+	w := httptest.NewRecorder()
+
+	s.handleRunArtifacts(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+}
+
+// TestRunResumeTex_InvalidID tests /runs/{id}/resume.tex with invalid UUID
+func TestRunResumeTex_InvalidID(t *testing.T) {
+	s := newTestServer()
+
+	req := httptest.NewRequest(http.MethodGet, "/runs/not-a-uuid/resume.tex", nil)
+	req.SetPathValue("id", "not-a-uuid")
+	w := httptest.NewRecorder()
+
+	s.handleRunResumeTex(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+}

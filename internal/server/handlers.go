@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/google/uuid"
+	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/pipeline"
 )
 
@@ -243,4 +245,159 @@ func (s *Server) handleRunStream(w http.ResponseWriter, r *http.Request) {
 
 	sse.WriteComplete("", "completed")
 	log.Printf("Streaming pipeline run completed")
+}
+
+// handleListRuns returns a list of pipeline runs with optional filters
+func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
+	filters := db.RunFilters{
+		Company: r.URL.Query().Get("company"),
+		Status:  r.URL.Query().Get("status"),
+	}
+
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if limit, err := strconv.Atoi(limitStr); err == nil {
+			filters.Limit = limit
+		}
+	}
+
+	runs, err := s.db.ListRunsFiltered(r.Context(), filters)
+	if err != nil {
+		s.errorResponse(w, http.StatusInternalServerError, "Database error: "+err.Error())
+		return
+	}
+
+	// Convert to response format
+	type RunItem struct {
+		ID        string `json:"id"`
+		Company   string `json:"company"`
+		RoleTitle string `json:"role_title"`
+		Status    string `json:"status"`
+		CreatedAt string `json:"created_at"`
+	}
+	response := make([]RunItem, 0, len(runs))
+	for _, run := range runs {
+		response = append(response, RunItem{
+			ID:        run.ID.String(),
+			Company:   run.Company,
+			RoleTitle: run.RoleTitle,
+			Status:    run.Status,
+			CreatedAt: run.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		})
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]any{
+		"runs":  response,
+		"count": len(response),
+	})
+}
+
+// handleDeleteRun deletes a pipeline run and its artifacts
+func (s *Server) handleDeleteRun(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	if idStr == "" {
+		s.errorResponse(w, http.StatusBadRequest, "Run ID is required")
+		return
+	}
+
+	runID, err := uuid.Parse(idStr)
+	if err != nil {
+		s.errorResponse(w, http.StatusBadRequest, "Invalid run ID format")
+		return
+	}
+
+	if err := s.db.DeleteRun(r.Context(), runID); err != nil {
+		if err.Error() == "run not found: "+runID.String() {
+			s.errorResponse(w, http.StatusNotFound, "Run not found")
+			return
+		}
+		s.errorResponse(w, http.StatusInternalServerError, "Database error: "+err.Error())
+		return
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// handleListArtifacts returns a list of artifacts with optional filters
+func (s *Server) handleListArtifacts(w http.ResponseWriter, r *http.Request) {
+	filters := db.ArtifactFilters{
+		Step:     r.URL.Query().Get("step"),
+		Category: r.URL.Query().Get("category"),
+	}
+
+	if runIDStr := r.URL.Query().Get("run_id"); runIDStr != "" {
+		runID, err := uuid.Parse(runIDStr)
+		if err != nil {
+			s.errorResponse(w, http.StatusBadRequest, "Invalid run_id format")
+			return
+		}
+		filters.RunID = runID
+	}
+
+	artifacts, err := s.db.ListArtifacts(r.Context(), filters)
+	if err != nil {
+		s.errorResponse(w, http.StatusInternalServerError, "Database error: "+err.Error())
+		return
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]any{
+		"artifacts": artifacts,
+		"count":     len(artifacts),
+	})
+}
+
+// handleRunArtifacts returns artifacts for a specific run
+func (s *Server) handleRunArtifacts(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	if idStr == "" {
+		s.errorResponse(w, http.StatusBadRequest, "Run ID is required")
+		return
+	}
+
+	runID, err := uuid.Parse(idStr)
+	if err != nil {
+		s.errorResponse(w, http.StatusBadRequest, "Invalid run ID format")
+		return
+	}
+
+	artifacts, err := s.db.ListArtifacts(r.Context(), db.ArtifactFilters{RunID: runID})
+	if err != nil {
+		s.errorResponse(w, http.StatusInternalServerError, "Database error: "+err.Error())
+		return
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]any{
+		"run_id":    runID.String(),
+		"artifacts": artifacts,
+		"count":     len(artifacts),
+	})
+}
+
+// handleRunResumeTex returns the resume.tex for a specific run as plain text
+func (s *Server) handleRunResumeTex(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	if idStr == "" {
+		s.errorResponse(w, http.StatusBadRequest, "Run ID is required")
+		return
+	}
+
+	runID, err := uuid.Parse(idStr)
+	if err != nil {
+		s.errorResponse(w, http.StatusBadRequest, "Invalid run ID format")
+		return
+	}
+
+	tex, err := s.db.GetTextArtifact(r.Context(), runID, "resume_tex")
+	if err != nil {
+		s.errorResponse(w, http.StatusInternalServerError, "Database error: "+err.Error())
+		return
+	}
+	if tex == "" {
+		s.errorResponse(w, http.StatusNotFound, "resume.tex not found for this run")
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=resume.tex")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(tex))
 }

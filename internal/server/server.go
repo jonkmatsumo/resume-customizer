@@ -52,6 +52,15 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /artifact/{id}", s.handleArtifact)
 	mux.HandleFunc("GET /health", s.handleHealth)
 
+	// CRUD endpoints for runs
+	mux.HandleFunc("GET /runs", s.handleListRuns)
+	mux.HandleFunc("DELETE /runs/{id}", s.handleDeleteRun)
+	mux.HandleFunc("GET /runs/{id}/artifacts", s.handleRunArtifacts)
+	mux.HandleFunc("GET /runs/{id}/resume.tex", s.handleRunResumeTex)
+
+	// CRUD endpoints for artifacts
+	mux.HandleFunc("GET /artifacts", s.handleListArtifacts)
+
 	// Create HTTP server
 	s.httpServer = &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
