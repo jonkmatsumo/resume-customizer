@@ -277,6 +277,266 @@ func (db *DB) DeleteRun(ctx context.Context, runID uuid.UUID) error {
 	return nil
 }
 
+// ---------------------------------------------------------------------
+// User Profile Methods
+// ---------------------------------------------------------------------
+
+// CreateUser creates a new user
+func (db *DB) CreateUser(ctx context.Context, name, email, phone string) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := db.pool.QueryRow(ctx,
+		`INSERT INTO users (name, email, phone)
+		 VALUES ($1, $2, $3)
+		 RETURNING id`,
+		name, email, phone,
+	).Scan(&id)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to create user: %w", err)
+	}
+	return id, nil
+}
+
+// GetUser retrieves a user by ID
+func (db *DB) GetUser(ctx context.Context, id uuid.UUID) (*User, error) {
+	var u User
+	err := db.pool.QueryRow(ctx,
+		`SELECT id, name, email, phone, created_at FROM users WHERE id = $1`,
+		id,
+	).Scan(&u.ID, &u.Name, &u.Email, &u.Phone, &u.CreatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+	return &u, nil
+}
+
+// UpdateUser updates a user profile
+func (db *DB) UpdateUser(ctx context.Context, u *User) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE users SET name = $1, email = $2, phone = $3 WHERE id = $4`,
+		u.Name, u.Email, u.Phone, u.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update user: %w", err)
+	}
+	return nil
+}
+
+// DeleteUser deletes a user (cascades to jobs/education)
+func (db *DB) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	cmd, err := db.pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return fmt.Errorf("user not found: %s", id)
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------
+// Job Methods
+// ---------------------------------------------------------------------
+
+// CreateJob creates a new job entry
+func (db *DB) CreateJob(ctx context.Context, job *Job) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := db.pool.QueryRow(ctx,
+		`INSERT INTO jobs (user_id, company, role_title, location, employment_type, start_date, end_date)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 RETURNING id`,
+		job.UserID, job.Company, job.RoleTitle, job.Location, job.EmploymentType, job.StartDate, job.EndDate,
+	).Scan(&id)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to create job: %w", err)
+	}
+	return id, nil
+}
+
+// ListJobs retrieves all jobs for a user
+func (db *DB) ListJobs(ctx context.Context, userID uuid.UUID) ([]Job, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT id, user_id, company, role_title, location, employment_type, start_date, end_date, created_at
+		 FROM jobs WHERE user_id = $1 ORDER BY start_date DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list jobs: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []Job
+	for rows.Next() {
+		var j Job
+		if err := rows.Scan(&j.ID, &j.UserID, &j.Company, &j.RoleTitle, &j.Location, &j.EmploymentType, &j.StartDate, &j.EndDate, &j.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan job: %w", err)
+		}
+		jobs = append(jobs, j)
+	}
+	return jobs, nil
+}
+
+// UpdateJob updates a job entry
+func (db *DB) UpdateJob(ctx context.Context, job *Job) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE jobs SET company = $1, role_title = $2, location = $3, employment_type = $4, start_date = $5, end_date = $6
+		 WHERE id = $7`,
+		job.Company, job.RoleTitle, job.Location, job.EmploymentType, job.StartDate, job.EndDate, job.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update job: %w", err)
+	}
+	return nil
+}
+
+// DeleteJob deletes a job entry
+func (db *DB) DeleteJob(ctx context.Context, id uuid.UUID) error {
+	cmd, err := db.pool.Exec(ctx, `DELETE FROM jobs WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete job: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return fmt.Errorf("job not found: %s", id)
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------
+// Experience Methods
+// ---------------------------------------------------------------------
+
+// CreateExperience creates a new experience bullet
+func (db *DB) CreateExperience(ctx context.Context, exp *Experience) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := db.pool.QueryRow(ctx,
+		`INSERT INTO experiences (job_id, bullet_text, skills, evidence_strength, risk_flags)
+		 VALUES ($1, $2, $3, $4, $5)
+		 RETURNING id`,
+		exp.JobID, exp.BulletText, exp.Skills, exp.EvidenceStrength, exp.RiskFlags,
+	).Scan(&id)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to create experience: %w", err)
+	}
+	return id, nil
+}
+
+// ListExperiences retrieves all bullets for a job
+func (db *DB) ListExperiences(ctx context.Context, jobID uuid.UUID) ([]Experience, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT id, job_id, bullet_text, skills, evidence_strength, risk_flags, created_at
+		 FROM experiences WHERE job_id = $1 ORDER BY created_at ASC`,
+		jobID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list experiences: %w", err)
+	}
+	defer rows.Close()
+
+	var experiences []Experience
+	for rows.Next() {
+		var e Experience
+		if err := rows.Scan(&e.ID, &e.JobID, &e.BulletText, &e.Skills, &e.EvidenceStrength, &e.RiskFlags, &e.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan experience: %w", err)
+		}
+		experiences = append(experiences, e)
+	}
+	return experiences, nil
+}
+
+// UpdateExperience updates an experience bullet
+func (db *DB) UpdateExperience(ctx context.Context, exp *Experience) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE experiences SET bullet_text = $1, skills = $2, evidence_strength = $3, risk_flags = $4
+		 WHERE id = $5`,
+		exp.BulletText, exp.Skills, exp.EvidenceStrength, exp.RiskFlags, exp.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update experience: %w", err)
+	}
+	return nil
+}
+
+// DeleteExperience deletes an experience bullet
+func (db *DB) DeleteExperience(ctx context.Context, id uuid.UUID) error {
+	cmd, err := db.pool.Exec(ctx, `DELETE FROM experiences WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete experience: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return fmt.Errorf("experience not found: %s", id)
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------
+// Education Methods
+// ---------------------------------------------------------------------
+
+// CreateEducation creates a new education entry
+func (db *DB) CreateEducation(ctx context.Context, edu *Education) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := db.pool.QueryRow(ctx,
+		`INSERT INTO education (user_id, school, degree_type, field, gpa, location, start_date, end_date)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		 RETURNING id`,
+		edu.UserID, edu.School, edu.DegreeType, edu.Field, edu.GPA, edu.Location, edu.StartDate, edu.EndDate,
+	).Scan(&id)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to create education: %w", err)
+	}
+	return id, nil
+}
+
+// ListEducation retrieves all education entries for a user
+func (db *DB) ListEducation(ctx context.Context, userID uuid.UUID) ([]Education, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT id, user_id, school, degree_type, field, gpa, location, start_date, end_date, created_at
+		 FROM education WHERE user_id = $1 ORDER BY start_date DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list education: %w", err)
+	}
+	defer rows.Close()
+
+	var education []Education
+	for rows.Next() {
+		var e Education
+		if err := rows.Scan(&e.ID, &e.UserID, &e.School, &e.DegreeType, &e.Field, &e.GPA, &e.Location, &e.StartDate, &e.EndDate, &e.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan education: %w", err)
+		}
+		education = append(education, e)
+	}
+	return education, nil
+}
+
+// UpdateEducation updates an education entry
+func (db *DB) UpdateEducation(ctx context.Context, edu *Education) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE education SET school = $1, degree_type = $2, field = $3, gpa = $4, location = $5, start_date = $6, end_date = $7
+		 WHERE id = $8`,
+		edu.School, edu.DegreeType, edu.Field, edu.GPA, edu.Location, edu.StartDate, edu.EndDate, edu.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update education: %w", err)
+	}
+	return nil
+}
+
+// DeleteEducation deletes an education entry
+func (db *DB) DeleteEducation(ctx context.Context, id uuid.UUID) error {
+	cmd, err := db.pool.Exec(ctx, `DELETE FROM education WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete education: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return fmt.Errorf("education not found: %s", id)
+	}
+	return nil
+}
+
 // ArtifactSummary is a lightweight view of an artifact for listing
 type ArtifactSummary struct {
 	ID        uuid.UUID `json:"id"`

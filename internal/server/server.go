@@ -61,6 +61,33 @@ func New(cfg Config) (*Server, error) {
 	// CRUD endpoints for artifacts
 	mux.HandleFunc("GET /artifacts", s.handleListArtifacts)
 
+	// User Profile endpoints
+	mux.HandleFunc("POST /users", s.handleCreateUser)
+	mux.HandleFunc("GET /users/{id}", s.handleGetUser)
+	mux.HandleFunc("PUT /users/{id}", s.handleUpdateUser)
+	mux.HandleFunc("DELETE /users/{id}", s.handleDeleteUser)
+
+	// Job endpoints
+	mux.HandleFunc("GET /users/{id}/jobs", s.handleListJobs)
+	mux.HandleFunc("POST /users/{id}/jobs", s.handleCreateJob)
+	mux.HandleFunc("PUT /jobs/{id}", s.handleUpdateJob)
+	mux.HandleFunc("DELETE /jobs/{id}", s.handleDeleteJob)
+
+	// Experience endpoints
+	mux.HandleFunc("GET /jobs/{id}/experiences", s.handleListExperiences)
+	mux.HandleFunc("POST /jobs/{id}/experiences", s.handleCreateExperience)
+	mux.HandleFunc("PUT /experiences/{id}", s.handleUpdateExperience)
+	mux.HandleFunc("DELETE /experiences/{id}", s.handleDeleteExperience)
+
+	// Education endpoints
+	mux.HandleFunc("GET /users/{id}/education", s.handleListEducation)
+	mux.HandleFunc("POST /users/{id}/education", s.handleCreateEducation)
+	mux.HandleFunc("PUT /education/{id}", s.handleUpdateEducation)
+	mux.HandleFunc("DELETE /education/{id}", s.handleDeleteEducation)
+
+	// Export endpoint
+	mux.HandleFunc("GET /users/{id}/experience-bank", s.handleGetExperienceBank)
+
 	// Create HTTP server
 	s.httpServer = &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),

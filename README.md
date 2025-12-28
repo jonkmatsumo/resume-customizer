@@ -28,10 +28,12 @@ flowchart LR
         end
     end
     
-    USER[API Client] --> API
-    API --> AGENT
+    USER[API Client] <--> API
+    API <--> AGENT
+    API <--> DB
     AGENT <--> LLM[LLM API]
-    AGENT --> DB
+    AGENT <--> SEARCH[Search API]
+    AGENT <--> DB
 ```
 
 The system uses hybrid ranking (deterministic heuristics + LLM semantic evaluation), validation loops that compile LaTeX and check the PDF, and persists every artifact to PostgreSQL for debugging. Under the hood, the pipeline orchestrates specialized agents that pass validated data between stages—green nodes below indicate LLM-powered steps:
@@ -158,6 +160,21 @@ The service exposes a REST API for triggering pipelines and retrieving results.
 | `GET /runs/{id}/artifacts` | List run's artifacts | Summary view |
 | `GET /runs/{id}/resume.tex` | Download LaTeX | Plain text download |
 
+### User Profile Management
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST /users` | Create User | Body: `{"name","email","phone"}` |
+| `GET /users/{id}` | Get User | Returns user profile |
+| `PUT /users/{id}` | Update User | Update fields |
+| `GET /users/{id}/jobs` | List Jobs | Returns employment history |
+| `POST /users/{id}/jobs` | Create Job | Body: `{"company","role_title",...}` |
+| `GET /jobs/{id}/experiences` | List Experiences | Returns bullet points |
+| `POST /jobs/{id}/experiences` | Add Experience | Body: `{"bullet_text","skills",...}` |
+| `GET /users/{id}/education` | List Education | Returns education history |
+| `POST /users/{id}/education` | Add Education | Body: `{"school","degree",...}` |
+| `GET /users/{id}/experience-bank` | Export Experience JSON | Returns pipeline-compatible format |
+
 ### Example: Start Pipeline
 
 ```bash
@@ -226,7 +243,8 @@ curl http://localhost:8080/health
 |-------|-------------|
 | `job_url` | URL to fetch job posting from |
 | `job` | Path to job text file (alternative) |
-| `experience` | Path to experience bank JSON |
+| `experience` | Path to JSON file (optional if `user_id` set) |
+| `user_id` | UUID of user in DB (optional if `experience` set) |
 | `name`, `email`, `phone` | Candidate contact info |
 | `template` | LaTeX template path |
 | `max_bullets`, `max_lines` | Layout constraints |
@@ -246,6 +264,15 @@ All artifacts persist to PostgreSQL for history and debugging.
 | research | sources, company_corpus, company_profile |
 | rewriting | rewritten_bullets |
 | validation | resume_tex, violations |
+
+### User Profile Schema
+
+The system now supports storing user profiles in PostgreSQL:
+
+*   **users**: Core profile (name, email, phone)
+*   **jobs**: Employment history linked to user
+*   **experiences**: Bullet points linked to jobs, with embedded `skills` (JSONB) and `risk_flags`
+*   **education**: Academic history linked to user
 
 ### Database Queries
 

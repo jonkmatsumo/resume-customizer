@@ -44,6 +44,7 @@ type RunOptions struct {
 	JobPath        string
 	JobURL         string
 	ExperiencePath string
+	ExperienceData *types.ExperienceBank // Optional: Direct data injection
 	CompanySeedURL string
 	CandidateName  string
 	CandidateEmail string
@@ -324,10 +325,20 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types.JobProfile, cleanedText string, printer *observability.Printer, database *db.DB, runID uuid.UUID) (*ExperienceBranchResult, error) {
 	prefix := prefixExperience
 
-	fmt.Printf("%sStep 3/12: Loading and normalizing experience bank from %s...\n", prefix, opts.ExperiencePath)
-	experienceBank, err := experience.LoadExperienceBank(opts.ExperiencePath)
-	if err != nil {
-		return nil, fmt.Errorf("loading experience bank failed: %w", err)
+	fmt.Printf("%sStep 3/12: Loading and normalizing experience bank...\n", prefix)
+
+	var experienceBank *types.ExperienceBank
+	var err error
+
+	if opts.ExperienceData != nil {
+		fmt.Printf("%sUsing provided experience data (from DB/Request)...\n", prefix)
+		experienceBank = opts.ExperienceData
+	} else {
+		fmt.Printf("%sLoading experience bank from %s...\n", prefix, opts.ExperiencePath)
+		experienceBank, err = experience.LoadExperienceBank(opts.ExperiencePath)
+		if err != nil {
+			return nil, fmt.Errorf("loading experience bank failed: %w", err)
+		}
 	}
 	if err := experience.NormalizeExperienceBank(experienceBank); err != nil {
 		return nil, fmt.Errorf("normalizing experience bank failed: %w", err)
