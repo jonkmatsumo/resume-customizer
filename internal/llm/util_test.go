@@ -200,4 +200,3 @@ func TestExtractJSONArray(t *testing.T) {
 		})
 	}
 }
-

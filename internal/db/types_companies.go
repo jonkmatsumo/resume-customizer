@@ -32,16 +32,16 @@ type CompanyDomain struct {
 
 // CrawledPage represents a cached web page
 type CrawledPage struct {
-	ID             uuid.UUID  `json:"id"`
-	CompanyID      *uuid.UUID `json:"company_id,omitempty"`
-	URL            string     `json:"url"`
-	PageType       *string    `json:"page_type,omitempty"`
-	RawHTML        *string    `json:"-"` // Don't serialize (large)
-	ParsedText     *string    `json:"parsed_text,omitempty"`
-	ContentHash    *string    `json:"content_hash,omitempty"`
-	HTTPStatus     *int       `json:"http_status,omitempty"`
+	ID          uuid.UUID  `json:"id"`
+	CompanyID   *uuid.UUID `json:"company_id,omitempty"`
+	URL         string     `json:"url"`
+	PageType    *string    `json:"page_type,omitempty"`
+	RawHTML     *string    `json:"-"` // Don't serialize (large)
+	ParsedText  *string    `json:"parsed_text,omitempty"`
+	ContentHash *string    `json:"content_hash,omitempty"`
+	HTTPStatus  *int       `json:"http_status,omitempty"`
 	// Error tracking
-	FetchStatus        string     `json:"fetch_status"`          // 'success', 'error', 'not_found', 'timeout', 'blocked'
+	FetchStatus        string     `json:"fetch_status"` // 'success', 'error', 'not_found', 'timeout', 'blocked'
 	ErrorMessage       *string    `json:"error_message,omitempty"`
 	IsPermanentFailure bool       `json:"is_permanent_failure"`
 	RetryCount         int        `json:"retry_count"`
@@ -86,10 +86,10 @@ const DefaultPageCacheTTL = 7 * 24 * time.Hour
 // Retry backoff constants for transient failures
 // Schedule: 1 min → 5 min → 25 min → 2 hours (capped)
 const (
-	RetryInitialBackoff = 1 * time.Minute  // First retry after 1 minute
-	RetryBackoffFactor  = 5                // Multiply by 5 each retry
-	RetryMaxBackoff     = 2 * time.Hour    // Cap at 2 hours
-	RetryMaxAttempts    = 4                // Give up after ~2 hours total
+	RetryInitialBackoff = 1 * time.Minute // First retry after 1 minute
+	RetryBackoffFactor  = 5               // Multiply by 5 each retry
+	RetryMaxBackoff     = 2 * time.Hour   // Cap at 2 hours
+	RetryMaxAttempts    = 4               // Give up after ~2 hours total
 )
 
 // IsPermanentHTTPStatus returns true for status codes that indicate permanent failure
@@ -145,4 +145,3 @@ func (p *CrawledPage) IsExpired() bool {
 func (p *CrawledPage) IsFresh(maxAge time.Duration) bool {
 	return time.Since(p.FetchedAt) < maxAge
 }
-

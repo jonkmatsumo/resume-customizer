@@ -402,4 +402,3 @@ func ExtractDomain(rawURL string) (string, error) {
 	}
 	return normalizeDomain(parsed.Host), nil
 }
-

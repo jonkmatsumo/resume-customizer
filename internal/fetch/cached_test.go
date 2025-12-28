@@ -109,4 +109,3 @@ func strPtr(s string) *string {
 func intPtr(i int) *int {
 	return &i
 }
-

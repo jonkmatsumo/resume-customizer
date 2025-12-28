@@ -23,7 +23,7 @@ const (
 	StepRunStarted = "run_started"
 
 	// Ingestion phase
-	StepJobPosting = "job_posting"
+	StepJobPosting   = "job_posting"
 	StepJobMetadata  = "job_metadata"
 	StepJobProfile   = "job_profile"
 	StepEducationReq = "education_requirements"

@@ -206,4 +206,3 @@ func derefInt(i *int) int {
 	}
 	return *i
 }
-

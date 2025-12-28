@@ -21,7 +21,6 @@ import (
 	"github.com/jonathan/resume-customizer/internal/db"
 )
 
-
 func main() {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -192,4 +191,3 @@ func init() {
 	_ = db.NormalizeName("test")
 	_ = uuid.Nil
 }
-
