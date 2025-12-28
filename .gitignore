@@ -53,3 +53,6 @@ testdata/actual/
 
 # Mac metadata
 .DS_Store
+
+# PostgreSQL data (bind mount)
+data/
