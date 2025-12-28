@@ -13,7 +13,109 @@ The system utilizes specialized AI agents to handle different stages of the proc
 
 ---
 
-## 2. Quick Start with Docker
+## 2. The Multi-Agent Workflow
+
+The pipeline orchestrates specialized agents that pass validated data between stages. 
+
+```mermaid
+flowchart TD
+    %% ---------------- USER INPUTS ----------------
+    JOB[Job Posting]
+    EXP[Experience Bank]
+
+    %% ---------------- RESEARCH SUBSYSTEM ----------------
+    subgraph "Research"
+        direction TB
+        
+        subgraph "Ingestion"
+            JOB --> B[Ingest & Clean]
+            B --> C[LLM: Extract Structure]
+            
+            C --> REQ[Requirements & Responsibilities]
+            C --> EDU_REQ[LLM: Education Requirements]
+            C --> T[Team/Cultural Notes]
+            C --> S[Extracted Links]
+        end
+        
+        subgraph "Company Research"
+            S --> DI[LLM: Identify Company Domains]
+            DI --> DF[LLM: Filter to Company Domains]
+            
+            DF --> SRCH{Search API?}
+            SRCH -->|Yes| GS[Google Search]
+            SRCH -->|No| PAT[Pattern URLs]
+            GS --> FL[LLM: Filter & Prioritize]
+            PAT --> FL
+            
+            FL --> FR[URL Frontier]
+            FR --> FE[Fetch Pages]
+            FE --> LIMIT{Page Limit?}
+            LIMIT -->|No| EX[LLM: Extract Signals]
+            EX --> FR
+            LIMIT -->|Yes| AG[Aggregate Corpus]
+            
+            T -.->|Context| AG
+            AG --> SV[LLM: Summarize Voice]
+            SV --> CP[Company Profile]
+        end
+    end
+
+    %% ---------------- GENERATION SUBSYSTEM ----------------
+    subgraph "Resume Generation"
+        direction TB
+        
+        subgraph "Planning"
+            EXP --> RK[LLM: Rank Stories]
+            REQ --> RK
+            RK --> RS[Ranked Stories]
+            
+            EXP --> ES[LLM: Score Education]
+            EDU_REQ --> ES
+            ES --> SE[Selected Education]
+            
+            RS --> SP[Select Optimum Plan]
+            SP --> PLAN[Resume Plan]
+            PLAN --> MAT[Materialize Bullets]
+        end
+        
+        subgraph "Drafting & Refining"
+            MAT --> RW[LLM: Rewrite Bullets]
+            CP -.->|Voice| RW
+            REQ -.->|Keywords| RW
+            
+            RW --> TEX[Render LaTeX]
+            SE --> TEX
+            TEX --> PDF[Compile PDF]
+            PDF --> VAL[Validate Constraints]
+            
+            VAL --> VIO{Violations?}
+            VIO -->|No| FIN[✅ Final Resume]
+            VIO -->|Yes| RL[LLM: Repair Plan]
+            
+            RL -->|Updates| MAT
+        end
+    end
+    
+    %% Styling
+    classDef input fill:#6f8bb3,stroke:#333,stroke-width:2px,color:#000;
+    classDef llm fill:#88b090,stroke:#333,stroke-width:2px,color:#000;
+    classDef tool fill:#a0aab5,stroke:#333,stroke-width:1px,color:#000;
+    classDef data fill:#bba6c7,stroke:#666,stroke-width:1px,stroke-dasharray: 5 5,color:#000;
+    
+    class C,DI,DF,FL,EX,SV,RW,RL,RK,ES,EDU_REQ llm;
+    class B,FE,GS,PAT,AG,SP,MAT,TEX,PDF,VAL tool;
+    class REQ,T,S,FR,CP,RS,PLAN,FIN,SE data;
+    class JOB,EXP input;
+```
+
+**Data Flow:**
+- **JobProfile** combines: Requirements & Responsibilities, Level/Signals, Team Notes
+- **Team Notes** are shared with Company Research for context enrichment
+- **Company Profile** feeds into bullet rewriting for voice matching
+
+---
+
+## 3. Quick Start with Docker
 
 ### Prerequisites
 *   **Docker Desktop** (includes Docker Compose)
@@ -60,7 +162,7 @@ docker compose exec db psql -U resume -d resume_customizer \
 
 ---
 
-## 3. Configuration
+## 4. Configuration
 
 ### Config File Reference
 
@@ -100,7 +202,7 @@ Create a `config.json` file for your settings:
 
 ---
 
-## 4. Database & Artifact Storage
+## 5. Database & Artifact Storage
 
 All pipeline artifacts are persisted to PostgreSQL for history and debugging.
 
@@ -133,7 +235,7 @@ WHERE a.step = 'job_profile';
 
 ---
 
-## 5. Development
+## 6. Development
 
 ### Local Development (without Docker)
 
@@ -173,7 +275,7 @@ docker compose up -d    # Fresh schema
 
 ---
 
-## 6. Architecture
+## 7. Architecture
 
 ```mermaid
 flowchart LR
