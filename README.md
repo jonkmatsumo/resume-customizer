@@ -13,9 +13,24 @@ The system utilizes specialized AI agents to handle different stages of the proc
 
 ---
 
-## 2. The Multi-Agent Workflow
+## 2. Architecture
 
-The pipeline orchestrates specialized agents that pass validated data between stages. 
+At a high level, the system runs as a containerized Go application with PostgreSQL for artifact persistence:
+
+```mermaid
+flowchart LR
+    subgraph Docker
+        DB[(PostgreSQL)]
+        APP[resume_agent]
+    end
+    
+    JOB[Job URL] --> APP
+    EXP[Experience Bank] --> APP
+    APP --> DB
+    APP --> TEX[resume.tex]
+```
+
+The system uses hybrid ranking (deterministic heuristics + LLM semantic evaluation), validation loops that compile LaTeX and check the PDF, and persists every artifact to PostgreSQL for debugging. Under the hood, the pipeline orchestrates specialized agents that pass validated data between stages—green nodes below indicate LLM-powered steps:
 
 ```mermaid
 flowchart TD
@@ -108,14 +123,9 @@ flowchart TD
     class JOB,EXP input;
 ```
 
-**Data Flow:**
-- **JobProfile** combines: Requirements & Responsibilities, Level/Signals, Team Notes
-- **Team Notes** are shared with Company Research for context enrichment
-- **Company Profile** feeds into bullet rewriting for voice matching
-
 ---
 
-## 3. Quick Start with Docker
+## 4. Quick Start with Docker
 
 ### Prerequisites
 *   **Docker Desktop** (includes Docker Compose)
@@ -162,7 +172,7 @@ docker compose exec db psql -U resume -d resume_customizer \
 
 ---
 
-## 4. Configuration
+## 5. Configuration
 
 ### Config File Reference
 
@@ -202,7 +212,7 @@ Create a `config.json` file for your settings:
 
 ---
 
-## 5. Database & Artifact Storage
+## 6. Database & Artifact Storage
 
 All pipeline artifacts are persisted to PostgreSQL for history and debugging.
 
@@ -235,7 +245,7 @@ WHERE a.step = 'job_profile';
 
 ---
 
-## 6. Development
+## 7. Development
 
 ### Local Development (without Docker)
 
@@ -272,25 +282,3 @@ docker compose build --no-cache app
 docker compose down -v  # Removes volume
 docker compose up -d    # Fresh schema
 ```
-
----
-
-## 7. Architecture
-
-```mermaid
-flowchart LR
-    subgraph Docker
-        DB[(PostgreSQL)]
-        APP[resume_agent]
-    end
-    
-    JOB[Job URL] --> APP
-    EXP[Experience Bank] --> APP
-    APP --> DB
-    APP --> TEX[resume.tex]
-```
-
-The pipeline orchestrates specialized agents that pass validated data between stages:
-*   **Hybrid Ranking**: Story ranking uses both deterministic heuristics and LLM semantic evaluation.
-*   **Validation Loops**: The system verifies its own output by compiling LaTeX and checking the PDF.
-*   **Artifact Persistence**: Every step saves to PostgreSQL for debugging and history.
