@@ -28,3 +28,4 @@ COPY --from=builder /app/resume_agent .
 COPY templates/ templates/
 
 ENTRYPOINT ["./resume_agent"]
+CMD ["serve", "--port", "8080"]

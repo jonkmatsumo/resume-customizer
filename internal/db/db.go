@@ -170,3 +170,48 @@ func (db *DB) ListRuns(ctx context.Context, limit int) ([]Run, error) {
 	}
 	return runs, nil
 }
+
+// Artifact represents an artifact record
+type Artifact struct {
+	ID          uuid.UUID `json:"id"`
+	RunID       uuid.UUID `json:"run_id"`
+	Step        string    `json:"step"`
+	Category    string    `json:"category"`
+	Content     any       `json:"content,omitempty"`
+	TextContent string    `json:"text_content,omitempty"`
+}
+
+// GetArtifactByID retrieves an artifact by its UUID
+func (db *DB) GetArtifactByID(ctx context.Context, artifactID uuid.UUID) (*Artifact, error) {
+	var artifact Artifact
+	var contentBytes []byte
+	var textContent *string
+	var category *string
+
+	err := db.pool.QueryRow(ctx,
+		`SELECT id, run_id, step, category, content, text_content
+		 FROM artifacts WHERE id = $1`,
+		artifactID,
+	).Scan(&artifact.ID, &artifact.RunID, &artifact.Step, &category, &contentBytes, &textContent)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get artifact: %w", err)
+	}
+
+	if category != nil {
+		artifact.Category = *category
+	}
+	if textContent != nil {
+		artifact.TextContent = *textContent
+	}
+	if len(contentBytes) > 0 {
+		var content any
+		if err := json.Unmarshal(contentBytes, &content); err == nil {
+			artifact.Content = content
+		}
+	}
+
+	return &artifact, nil
+}

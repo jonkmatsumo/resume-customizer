@@ -11,7 +11,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./db:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U resume"]
+      test: [ "CMD-SHELL", "pg_isready -U resume" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -24,10 +24,13 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgres://resume:resume_dev@db:5432/resume_customizer?sslmode=disable
+    ports:
+      - "8080:8080"
     volumes:
       - ./artifacts:/app/artifacts
       - ./testdata:/app/testdata
       - ./templates:/app/templates
+    restart: unless-stopped
 
 volumes:
   pgdata:

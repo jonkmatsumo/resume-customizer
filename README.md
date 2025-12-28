@@ -24,6 +24,7 @@ flowchart LR
         APP[resume_agent]
     end
     
+    LLM[Gemini API] <--> APP
     JOB[Job URL] --> APP
     EXP[Experience Bank] --> APP
     APP --> DB
