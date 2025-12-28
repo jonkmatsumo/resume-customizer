@@ -217,17 +217,6 @@ curl http://localhost:8080/health
 | `GOOGLE_SEARCH_API_KEY` | No | Enables company website discovery |
 | `GOOGLE_SEARCH_CX` | No | Custom Search Engine ID |
 
-### API Request Fields
-
-| Field | Description |
-|-------|-------------|
-| `job_url` | URL to fetch job posting from |
-| `job` | Path to job text file (alternative) |
-| `user_id` | UUID of user in DB (required) |
-| `name`, `email`, `phone` | Candidate contact info |
-| `template` | LaTeX template path |
-| `max_bullets`, `max_lines` | Layout constraints |
-
 ---
 
 ## 6. Database & Artifacts

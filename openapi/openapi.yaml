@@ -851,15 +851,7 @@ components:
           type: string
         content:
           description: Arbitrary JSON content stored for this artifact.
-          oneOf:
-            - type: object
-              additionalProperties: true
-            - type: array
-              items: {}
-            - type: string
-            - type: number
-            - type: boolean
-            - type: "null"
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -1108,7 +1100,6 @@ components:
           type: string
           example: Invalid request payload
         details:
-          nullable: true
           description: Optional extra details
           oneOf:
             - type: object
