@@ -157,9 +157,9 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 				fmt.Printf("[VERBOSE] Created database run: %s\n", runID)
 			}
 			// Save initial artifacts
-			_ = database.SaveTextArtifact(ctx, runID, db.StepJobPosting, cleanedText)
-			_ = database.SaveArtifact(ctx, runID, db.StepJobMetadata, jobMetadata)
-			_ = database.SaveArtifact(ctx, runID, db.StepJobProfile, jobProfile)
+			_ = database.SaveTextArtifact(ctx, runID, db.StepJobPosting, db.CategoryIngestion, cleanedText)
+			_ = database.SaveArtifact(ctx, runID, db.StepJobMetadata, db.CategoryIngestion, jobMetadata)
+			_ = database.SaveArtifact(ctx, runID, db.StepJobProfile, db.CategoryIngestion, jobProfile)
 		}
 	}
 
@@ -176,6 +176,10 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		if opts.Verbose {
 			fmt.Printf("[VERBOSE] Saved education requirements to %s\n", eduReqPath)
 		}
+		// Save to database
+		if database != nil && runID != uuid.Nil {
+			_ = database.SaveArtifact(ctx, runID, db.StepEducationReq, db.CategoryIngestion, eduReq)
+		}
 	}
 
 	// =========================================================================
@@ -191,7 +195,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 
 	// Experience Branch (Steps 3-6)
 	g.Go(func() error {
-		result, err := runExperienceBranch(gCtx, opts, jobProfile, cleanedText, printer)
+		result, err := runExperienceBranch(gCtx, opts, jobProfile, cleanedText, printer, database, runID)
 		if err != nil {
 			return fmt.Errorf("experience branch failed: %w", err)
 		}
@@ -203,7 +207,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 
 	// Research Branch (Steps 7-8)
 	g.Go(func() error {
-		result, err := runResearchBranch(gCtx, opts, jobProfile, jobMetadata, printer)
+		result, err := runResearchBranch(gCtx, opts, jobProfile, jobMetadata, printer, database, runID)
 		if err != nil {
 			return fmt.Errorf("research branch failed: %w", err)
 		}
@@ -261,6 +265,12 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	if opts.Verbose {
 		fmt.Printf("[VERBOSE] Saved violations to %s\n", violationsPath)
 		printer.PrintViolations(violations)
+	}
+	// Save rewriting artifacts to database
+	if database != nil && runID != uuid.Nil {
+		_ = database.SaveArtifact(ctx, runID, db.StepRewrittenBullets, db.CategoryRewriting, rewrittenBullets)
+		_ = database.SaveTextArtifact(ctx, runID, db.StepResumeTex, db.CategoryValidation, latex)
+		_ = database.SaveArtifact(ctx, runID, db.StepViolations, db.CategoryValidation, violations)
 	}
 
 	if violations != nil && len(violations.Violations) > 0 {
@@ -325,6 +335,13 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 			fmt.Printf("[VERBOSE] Overwrote resume.tex with final version\n")
 		}
 
+		// Update database with final artifacts
+		if database != nil && runID != uuid.Nil {
+			_ = database.SaveArtifact(ctx, runID, db.StepRewrittenBullets, db.CategoryRewriting, finalBullets)
+			_ = database.SaveTextArtifact(ctx, runID, db.StepResumeTex, db.CategoryValidation, finalLaTeX)
+			_ = database.SaveArtifact(ctx, runID, db.StepViolations, db.CategoryValidation, finalViolations)
+		}
+
 		if finalViolations != nil && len(finalViolations.Violations) > 0 {
 			fmt.Printf("⚠️ Warning: Repair loop finished after %d iterations but %d violations remain.\n", iterations, len(finalViolations.Violations))
 		} else {
@@ -335,12 +352,17 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		fmt.Printf("Step 12/12: Validation passed! No repairs needed.\n")
 	}
 
+	// Mark run as completed
+	if database != nil && runID != uuid.Nil {
+		_ = database.CompleteRun(ctx, runID, "completed")
+	}
+
 	fmt.Printf("Done! Generated resume at %s\n", latexPath)
 	return nil
 }
 
 // runExperienceBranch executes Steps 3-6: Loading, ranking, selecting, and materializing experience
-func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types.JobProfile, cleanedText string, printer *observability.Printer) (*ExperienceBranchResult, error) {
+func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types.JobProfile, cleanedText string, printer *observability.Printer, database *db.DB, runID uuid.UUID) (*ExperienceBranchResult, error) {
 	prefix := prefixExperience
 
 	fmt.Printf("%sStep 3/12: Loading and normalizing experience bank from %s...\n", prefix, opts.ExperiencePath)
@@ -358,6 +380,10 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	if opts.Verbose {
 		fmt.Printf("%s[VERBOSE] Saved normalized experience bank to %s\n", prefix, expBankPath)
 	}
+	// Save to database
+	if database != nil && runID != uuid.Nil {
+		_ = database.SaveArtifact(ctx, runID, db.StepExperienceBank, db.CategoryExperience, experienceBank)
+	}
 
 	fmt.Printf("%sStep 4/12: Ranking stories...\n", prefix)
 	rankedStories, err := ranking.RankStories(jobProfile, experienceBank)
@@ -371,6 +397,10 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	if opts.Verbose {
 		fmt.Printf("%s[VERBOSE] Saved ranked stories to %s\n", prefix, rankedStoriesPath)
 		printer.PrintRankedStories(rankedStories)
+	}
+	// Save to database
+	if database != nil && runID != uuid.Nil {
+		_ = database.SaveArtifact(ctx, runID, db.StepRankedStories, db.CategoryExperience, rankedStories)
 	}
 
 	fmt.Printf("%sStep 4a/12: Scoring education relevance...\n", prefix)
@@ -386,6 +416,10 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 		}
 		if opts.Verbose {
 			fmt.Printf("%s[VERBOSE] Saved education scores to %s\n", prefix, eduScoresPath)
+		}
+		// Save to database
+		if database != nil && runID != uuid.Nil {
+			_ = database.SaveArtifact(ctx, runID, db.StepEducationScores, db.CategoryExperience, eduScores)
 		}
 		// Filter based on Included flag
 		for _, score := range eduScores {
@@ -415,6 +449,10 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	if opts.Verbose {
 		fmt.Printf("%s[VERBOSE] Saved resume plan to %s\n", prefix, planPath)
 	}
+	// Save to database
+	if database != nil && runID != uuid.Nil {
+		_ = database.SaveArtifact(ctx, runID, db.StepResumePlan, db.CategoryExperience, resumePlan)
+	}
 
 	fmt.Printf("%sStep 6/12: Materializing selected bullets...\n", prefix)
 	selectedBullets, err := selection.MaterializeBullets(resumePlan, experienceBank)
@@ -429,6 +467,10 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 		fmt.Printf("%s[VERBOSE] Saved selected bullets to %s\n", prefix, bulletsPath)
 		printer.PrintSelectedBullets(selectedBullets)
 	}
+	// Save to database
+	if database != nil && runID != uuid.Nil {
+		_ = database.SaveArtifact(ctx, runID, db.StepSelectedBullets, db.CategoryExperience, selectedBullets)
+	}
 
 	fmt.Printf("%s✅ Experience branch complete.\n", prefix)
 
@@ -442,7 +484,7 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 }
 
 // runResearchBranch executes Steps 7-8: Company research and voice summarization
-func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.JobProfile, jobMetadata *ingestion.Metadata, printer *observability.Printer) (*ResearchBranchResult, error) {
+func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.JobProfile, jobMetadata *ingestion.Metadata, printer *observability.Printer, database *db.DB, runID uuid.UUID) (*ResearchBranchResult, error) {
 	prefix := prefixResearch
 
 	fmt.Printf("%sStep 7/12: Researching company voice...\n", prefix)
@@ -515,7 +557,7 @@ func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.J
 		}
 	}
 
-	// Fallback/Augment with provided seed if not already in list
+	// Add user-provided company seed if set (not already in seeds)
 	if opts.CompanySeedURL != "" {
 		found := false
 		for _, s := range seeds {
@@ -568,6 +610,10 @@ func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.J
 	if opts.Verbose {
 		fmt.Printf("%s[VERBOSE] Saved research sources to %s\n", prefix, sourcesPath)
 	}
+	// Save to database
+	if database != nil && runID != uuid.Nil {
+		_ = database.SaveArtifact(ctx, runID, db.StepSources, db.CategoryResearch, companyCorpus.Sources)
+	}
 
 	// Save corpus text for debug
 	corpusPath := filepath.Join(opts.OutputDir, "company_corpus.txt")
@@ -577,6 +623,10 @@ func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.J
 	if opts.Verbose {
 		fmt.Printf("%s[VERBOSE] Saved company corpus text to %s\n", prefix, corpusPath)
 	}
+	// Save to database
+	if database != nil && runID != uuid.Nil {
+		_ = database.SaveTextArtifact(ctx, runID, db.StepCompanyCorpus, db.CategoryResearch, companyCorpus.Corpus)
+	}
 
 	// Save research session for debug
 	sessionPath := filepath.Join(opts.OutputDir, "research_session.json")
@@ -585,6 +635,10 @@ func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.J
 	}
 	if opts.Verbose {
 		fmt.Printf("%s[VERBOSE] Saved research session to %s\n", prefix, sessionPath)
+	}
+	// Save to database
+	if database != nil && runID != uuid.Nil {
+		_ = database.SaveArtifact(ctx, runID, db.StepResearchSession, db.CategoryResearch, researchSession)
 	}
 
 	fmt.Printf("%sStep 8/12: Summarizing company voice...\n", prefix)
@@ -599,6 +653,10 @@ func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.J
 	if opts.Verbose {
 		fmt.Printf("%s[VERBOSE] Saved company profile to %s\n", prefix, voiceProfilePath)
 		printer.PrintCompanyProfile(companyProfile)
+	}
+	// Save to database
+	if database != nil && runID != uuid.Nil {
+		_ = database.SaveArtifact(ctx, runID, db.StepCompanyProfile, db.CategoryResearch, companyProfile)
 	}
 
 	fmt.Printf("%s✅ Research branch complete.\n", prefix)

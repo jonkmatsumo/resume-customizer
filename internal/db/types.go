@@ -19,14 +19,36 @@ type Run struct {
 
 // ArtifactStep constants for known artifact types
 const (
-	StepJobPosting       = "job_posting"
-	StepJobMetadata      = "job_metadata"
-	StepJobProfile       = "job_profile"
-	StepRankedStories    = "ranked_stories"
-	StepResumePlan       = "resume_plan"
-	StepSelectedBullets  = "selected_bullets"
-	StepCompanyProfile   = "company_profile"
+	// Ingestion phase
+	StepJobPosting   = "job_posting"
+	StepJobMetadata  = "job_metadata"
+	StepJobProfile   = "job_profile"
+	StepEducationReq = "education_requirements"
+
+	// Experience branch
+	StepExperienceBank  = "experience_bank"
+	StepRankedStories   = "ranked_stories"
+	StepEducationScores = "education_scores"
+	StepResumePlan      = "resume_plan"
+	StepSelectedBullets = "selected_bullets"
+
+	// Research branch
+	StepResearchSession = "research_session"
+	StepCompanyCorpus   = "company_corpus"
+	StepSources         = "sources"
+	StepCompanyProfile  = "company_profile"
+
+	// Final steps
 	StepRewrittenBullets = "rewritten_bullets"
-	StepViolations       = "violations"
 	StepResumeTex        = "resume_tex"
+	StepViolations       = "violations"
+)
+
+// Category constants for grouping artifacts by pipeline phase
+const (
+	CategoryIngestion  = "ingestion"
+	CategoryExperience = "experience"
+	CategoryResearch   = "research"
+	CategoryRewriting  = "rewriting"
+	CategoryValidation = "validation"
 )

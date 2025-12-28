@@ -67,17 +67,17 @@ func (db *DB) CompleteRun(ctx context.Context, runID uuid.UUID, status string) e
 }
 
 // SaveArtifact stores a JSON artifact for a pipeline run
-func (db *DB) SaveArtifact(ctx context.Context, runID uuid.UUID, step string, content any) error {
+func (db *DB) SaveArtifact(ctx context.Context, runID uuid.UUID, step, category string, content any) error {
 	jsonBytes, err := json.Marshal(content)
 	if err != nil {
 		return fmt.Errorf("failed to marshal artifact: %w", err)
 	}
 
 	_, err = db.pool.Exec(ctx,
-		`INSERT INTO artifacts (run_id, step, content)
-		 VALUES ($1, $2, $3)
-		 ON CONFLICT (run_id, step) DO UPDATE SET content = $3, created_at = NOW()`,
-		runID, step, jsonBytes,
+		`INSERT INTO artifacts (run_id, step, category, content)
+		 VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (run_id, step) DO UPDATE SET category = $3, content = $4, created_at = NOW()`,
+		runID, step, category, jsonBytes,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save artifact %s: %w", step, err)
@@ -86,12 +86,12 @@ func (db *DB) SaveArtifact(ctx context.Context, runID uuid.UUID, step string, co
 }
 
 // SaveTextArtifact stores a text artifact (like .tex or .txt files) for a pipeline run
-func (db *DB) SaveTextArtifact(ctx context.Context, runID uuid.UUID, step string, text string) error {
+func (db *DB) SaveTextArtifact(ctx context.Context, runID uuid.UUID, step, category, text string) error {
 	_, err := db.pool.Exec(ctx,
-		`INSERT INTO artifacts (run_id, step, text_content)
-		 VALUES ($1, $2, $3)
-		 ON CONFLICT (run_id, step) DO UPDATE SET text_content = $3, created_at = NOW()`,
-		runID, step, text,
+		`INSERT INTO artifacts (run_id, step, category, text_content)
+		 VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (run_id, step) DO UPDATE SET category = $3, text_content = $4, created_at = NOW()`,
+		runID, step, category, text,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save text artifact %s: %w", step, err)
