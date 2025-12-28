@@ -139,14 +139,18 @@ The service exposes a comprehensive REST API. For full documentation including a
 
 ### Viewing the API Documentation
 
-The documentation is available as a static HTML file that renders the OpenAPI specification.
+The documentation is **automatically published to GitHub Pages** on every push to main.
+
+To preview changes locally:
 
 ```bash
-# Serve the documentation locally
-python3 -m http.server --directory docs/api 8000
-```
+# Lint the spec
+npx -y @stoplight/spectral-cli lint openapi/openapi.yaml
 
-Then visit [http://localhost:8000](http://localhost:8000) in your browser.
+# Render current spec
+npx -y redoc-cli bundle openapi/openapi.yaml -o docs/index.html
+# Then open docs/index.html in your browser
+```
 
 ### Key Examples
 

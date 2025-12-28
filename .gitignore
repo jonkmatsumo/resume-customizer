@@ -53,3 +53,6 @@ testdata/actual/
 
 # PostgreSQL data (bind mount)
 data/
+
+# Generated Documentation (GitHub Pages artifact)
+docs/
