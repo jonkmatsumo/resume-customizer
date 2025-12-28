@@ -21,6 +21,18 @@ test-coverage:
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 
+# Run unit tests only (no database required)
+test-unit:
+	go test -v -short ./...
+
+# Run integration tests (requires TEST_DATABASE_URL)
+test-integration:
+	go test -v -tags=integration ./...
+
+# Run companies-related tests
+test-companies:
+	go test -v ./internal/db/... -run 'Company|CrawledPage|Normalize|Hash|Extract'
+
 # Linting
 lint:
 	@golangci-lint run

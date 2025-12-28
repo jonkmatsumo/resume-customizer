@@ -19,8 +19,11 @@ type Run struct {
 
 // ArtifactStep constants for known artifact types
 const (
+	// Pipeline lifecycle
+	StepRunStarted = "run_started"
+
 	// Ingestion phase
-	StepJobPosting   = "job_posting"
+	StepJobPosting = "job_posting"
 	StepJobMetadata  = "job_metadata"
 	StepJobProfile   = "job_profile"
 	StepEducationReq = "education_requirements"
@@ -46,6 +49,7 @@ const (
 
 // Category constants for grouping artifacts by pipeline phase
 const (
+	CategoryLifecycle  = "lifecycle"
 	CategoryIngestion  = "ingestion"
 	CategoryExperience = "experience"
 	CategoryResearch   = "research"

@@ -25,9 +25,7 @@ var (
 	runConfigPath  string
 	runJob         string
 	runJobURL      string
-	runExperience  string
 	runCompanySeed string
-	runOut         string
 	runName        string
 	runEmail       string
 	runPhone       string
@@ -46,9 +44,7 @@ func init() {
 
 	runCommand.Flags().StringVarP(&runJob, "job", "j", "", "Path to job posting text file (mutually exclusive with --job-url)")
 	runCommand.Flags().StringVar(&runJobURL, "job-url", "", "URL to fetch job posting from (mutually exclusive with --job)")
-	runCommand.Flags().StringVarP(&runExperience, "experience", "e", "", "Path to experience bank JSON file (required)")
 	runCommand.Flags().StringVarP(&runCompanySeed, "company-seed", "c", "", "Company seed URL (optional, auto-discovered if not provided)")
-	runCommand.Flags().StringVarP(&runOut, "out", "o", "", "Output directory (required)")
 	runCommand.Flags().StringVarP(&runName, "name", "n", "", "Candidate name")
 	runCommand.Flags().StringVar(&runEmail, "email", "", "Candidate email")
 	runCommand.Flags().StringVar(&runPhone, "phone", "", "Candidate phone")
@@ -65,7 +61,6 @@ func init() {
 	runCommand.Flags().StringVar(&runDatabaseURL, "db-url", "", "PostgreSQL connection URL (optional, defaults to DATABASE_URL env var)")
 
 	// Note: --job is no longer required; we validate after merging config
-	// Note: --experience and --out may come from config file
 
 	rootCmd.AddCommand(runCommand)
 }
@@ -100,14 +95,8 @@ func runPipelineCmd(cmd *cobra.Command, _ []string) error {
 	if cmd.Flags().Changed("job-url") {
 		cfg.JobURL = runJobURL
 	}
-	if cmd.Flags().Changed("experience") {
-		cfg.Experience = runExperience
-	}
 	if cmd.Flags().Changed("company-seed") {
 		cfg.CompanySeed = runCompanySeed
-	}
-	if cmd.Flags().Changed("out") {
-		cfg.Output = runOut
 	}
 	if cmd.Flags().Changed("name") {
 		cfg.Name = runName
@@ -159,10 +148,7 @@ func runPipelineCmd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("--job and --job-url are mutually exclusive; provide only one")
 	}
 	if cfg.UserID == "" {
-		return fmt.Errorf("--user_id is required (via flag or config)")
-	}
-	if cfg.Output == "" {
-		return fmt.Errorf("--out is required (via flag or config)")
+		return fmt.Errorf("--user-id is required (via config file)")
 	}
 
 	// Step 5: API Key handling

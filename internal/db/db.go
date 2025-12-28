@@ -40,6 +40,16 @@ func (db *DB) Close() {
 	}
 }
 
+// Pool returns the underlying connection pool for direct access when needed
+func (db *DB) Pool() *pgxpool.Pool {
+	return db.pool
+}
+
+// New creates a new database connection (alias for Connect with background context)
+func New(databaseURL string) (*DB, error) {
+	return Connect(context.Background(), databaseURL)
+}
+
 // CreateRun creates a new pipeline run record and returns its ID
 func (db *DB) CreateRun(ctx context.Context, company, roleTitle, jobURL string) (uuid.UUID, error) {
 	var id uuid.UUID

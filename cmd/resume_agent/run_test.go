@@ -22,27 +22,20 @@ func TestRunCommand_MissingFlags(t *testing.T) {
 	assert.Contains(t, string(output), "either --job or --job-url must be provided")
 }
 
-func TestRunCommand_MissingAPIKey(t *testing.T) {
-	// Only run this test if GEMINI_API_KEY is NOT set in the environment
-	// OR if we explicitly unset it for the command.
+func TestRunCommand_MissingUserID(t *testing.T) {
+	// Test that run command requires user_id
 	binaryPath := getBinaryPath(t)
 
-	tmpDir := t.TempDir()
-	outDir := filepath.Join(tmpDir, "output")
-
-	// Provide all required flags but ensure NO API KEY
+	// Provide job but no user_id
 	cmd := exec.Command(binaryPath, "run",
 		"--job", "testdata/parsing/sample_job_plain.txt",
-		"--experience", "testdata/valid/experience_bank.json",
-		"--company-seed", "https://example.com",
-		"--out", outDir)
+		"--company-seed", "https://example.com")
 
-	// Clear environment to ensure no API Key
+	// Clear environment to ensure no API Key or DATABASE_URL
 	cmd.Env = os.Environ()
-	// Filter out GEMINI_API_KEY
 	var env []string
 	for _, e := range cmd.Env {
-		if !strings.HasPrefix(e, "GEMINI_API_KEY=") {
+		if !strings.HasPrefix(e, "GEMINI_API_KEY=") && !strings.HasPrefix(e, "DATABASE_URL=") {
 			env = append(env, e)
 		}
 	}
@@ -51,45 +44,41 @@ func TestRunCommand_MissingAPIKey(t *testing.T) {
 	output, err := cmd.CombinedOutput()
 
 	assert.Error(t, err)
-	// We expect the command to fail because of missing API key in RunPipeline wrapper
-	assert.Contains(t, string(output), "GEMINI_API_KEY environment variable or --api-key flag is required")
+	// Should fail because user_id is required
+	assert.Contains(t, string(output), "--user-id is required")
 }
 
-func TestRunCommand_APIKeyProvided(t *testing.T) {
-	// This test provides a dummy API key and expects the pipeline to START (and fail later)
+func TestRunCommand_MissingDatabaseURL(t *testing.T) {
+	// Test that run command requires DATABASE_URL when user_id is provided
 	binaryPath := getBinaryPath(t)
 
 	tmpDir := t.TempDir()
-	outDir := filepath.Join(tmpDir, "output")
 
-	// Create dummy input files if they don't exist in CWD (test runs in package dir, but binary runs in CWD usually)
-	// Actually exec runs in the Cwd of the parent process unless specified.
-	// We typically run tests from the project root in the provided makefile or `go test ./...`
-	// Let's create dummy files in tmpDir to be safe.
-	jobFile := filepath.Join(tmpDir, "job.txt")
-	_ = os.WriteFile(jobFile, []byte("Job Description"), 0644)
-
-	expFile := filepath.Join(tmpDir, "exp.json")
-	// Minimal valid experience bank JSON
-	expJSON := `{
-  "stories": []
+	// Create a config file with user_id
+	configFile := filepath.Join(tmpDir, "config.json")
+	configJSON := `{
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "job_url": "https://example.com/job"
 }`
-	_ = os.WriteFile(expFile, []byte(expJSON), 0644)
+	_ = os.WriteFile(configFile, []byte(configJSON), 0644)
 
 	cmd := exec.Command(binaryPath, "run",
-		"--job", jobFile,
-		"--experience", expFile,
-		"--company-seed", "https://example.com",
-		"--out", outDir,
+		"--config", configFile,
 		"--api-key", "dummy-key")
+
+	// Clear environment to ensure no DATABASE_URL
+	cmd.Env = os.Environ()
+	var env []string
+	for _, e := range cmd.Env {
+		if !strings.HasPrefix(e, "DATABASE_URL=") {
+			env = append(env, e)
+		}
+	}
+	cmd.Env = env
 
 	output, err := cmd.CombinedOutput()
 
-	// It should fail, but NOT because of missing API key.
-	// It will likely fail at parsing or ingestion since "job.txt" is minimal.
-	// Or it might fail at ingestion Step 1 if the file is valid but Step 2 parsing fails with 400 from API (invalid key).
-
 	assert.Error(t, err)
-	// Check that it started the pipeline
-	assert.Contains(t, string(output), "Step 1/12: Ingesting job posting")
+	// Should fail because DATABASE_URL is required
+	assert.Contains(t, string(output), "DATABASE_URL environment variable or --db-url flag is required")
 }

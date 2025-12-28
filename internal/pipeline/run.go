@@ -93,6 +93,18 @@ func emitProgress(opts *RunOptions, step, category, message string, content any)
 	}
 }
 
+// emitRunStarted emits the run_started event with the run ID as the first streamed event
+func emitRunStarted(opts *RunOptions, runID uuid.UUID) {
+	if opts.OnProgress != nil {
+		opts.OnProgress(ProgressEvent{
+			Step:     db.StepRunStarted,
+			Category: db.CategoryLifecycle,
+			Message:  "Pipeline run started",
+			RunID:    runID.String(),
+		})
+	}
+}
+
 // countBullets returns the total number of bullets in an experience bank
 func countBullets(bank *types.ExperienceBank) int {
 	count := 0
@@ -167,6 +179,8 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 			if opts.Verbose {
 				fmt.Printf("[VERBOSE] Created database run: %s\n", runID)
 			}
+			// Emit run_started as the first event with the run ID
+			emitRunStarted(&opts, runID)
 			// Save initial artifacts
 			_ = database.SaveTextArtifact(ctx, runID, db.StepJobPosting, db.CategoryIngestion, cleanedText)
 			_ = database.SaveArtifact(ctx, runID, db.StepJobMetadata, db.CategoryIngestion, jobMetadata)

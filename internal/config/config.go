@@ -14,9 +14,7 @@ type Config struct {
 	// Paths
 	Job         string `json:"job,omitempty"`          // Path to job posting text file
 	JobURL      string `json:"job_url,omitempty"`      // URL to fetch job posting from
-	Experience  string `json:"experience,omitempty"`   // Path to experience bank JSON
 	CompanySeed string `json:"company_seed,omitempty"` // Company seed URL for brand research
-	Output      string `json:"out,omitempty"`          // Output directory
 	Template    string `json:"template,omitempty"`     // Path to LaTeX template
 
 	// Candidate Info
@@ -85,12 +83,6 @@ func (c *Config) Validate() error {
 	}
 
 	// Validate file paths exist (if specified)
-	if c.Experience != "" {
-		if _, err := os.Stat(c.Experience); os.IsNotExist(err) {
-			return fmt.Errorf("config error: experience file not found: %s", c.Experience)
-		}
-	}
-
 	if c.Template != "" {
 		if _, err := os.Stat(c.Template); os.IsNotExist(err) {
 			return fmt.Errorf("config error: template file not found: %s", c.Template)
@@ -118,14 +110,8 @@ func (c *Config) MergeWithDefaults(defaults Config) Config {
 	if result.JobURL == "" {
 		result.JobURL = defaults.JobURL
 	}
-	if result.Experience == "" {
-		result.Experience = defaults.Experience
-	}
 	if result.CompanySeed == "" {
 		result.CompanySeed = defaults.CompanySeed
-	}
-	if result.Output == "" {
-		result.Output = defaults.Output
 	}
 	if result.Template == "" {
 		result.Template = defaults.Template

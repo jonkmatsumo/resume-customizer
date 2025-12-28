@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/fetch"
 	"github.com/jonathan/resume-customizer/internal/ingestion"
 	"github.com/jonathan/resume-customizer/internal/types"
@@ -20,13 +22,41 @@ const (
 	DefaultRateLimitDelay = 1 * time.Second
 )
 
+// CrawlOptions configures the crawl with optional database caching.
+type CrawlOptions struct {
+	// Database for caching (optional - if nil, no caching)
+	Database *db.DB
+	// CompanyID to associate pages with (optional)
+	CompanyID *uuid.UUID
+	// CacheTTL for cached pages (optional - defaults to 7 days)
+	CacheTTL time.Duration
+	// APIKey for link classification
+	APIKey string
+	// MaxPages to crawl
+	MaxPages int
+}
+
 // CrawlBrandCorpus crawls a company website and builds a text corpus.
 // It now delegates to the generic fetch package for URL fetching and HTML extraction.
 func CrawlBrandCorpus(ctx context.Context, seedURLs []string, maxPages int, apiKey string) (*types.CompanyCorpus, error) {
+	return CrawlBrandCorpusWithCache(ctx, seedURLs, &CrawlOptions{
+		MaxPages: maxPages,
+		APIKey:   apiKey,
+	})
+}
+
+// CrawlBrandCorpusWithCache crawls a company website with optional database caching.
+// When a database is provided, pages are cached and reused if fresh (within TTL).
+// Failed URLs are tracked to avoid repeated requests to broken pages.
+func CrawlBrandCorpusWithCache(ctx context.Context, seedURLs []string, opts *CrawlOptions) (*types.CompanyCorpus, error) {
 	if len(seedURLs) == 0 {
 		return nil, &CrawlError{
 			Message: "no seed URLs provided",
 		}
+	}
+
+	if opts == nil {
+		opts = &CrawlOptions{}
 	}
 
 	// Validate all seed URLs
@@ -46,6 +76,7 @@ func CrawlBrandCorpus(ctx context.Context, seedURLs []string, maxPages int, apiK
 	}
 
 	// Enforce max pages limit
+	maxPages := opts.MaxPages
 	if maxPages > MaxPagesLimit {
 		maxPages = MaxPagesLimit
 	}
@@ -53,10 +84,32 @@ func CrawlBrandCorpus(ctx context.Context, seedURLs []string, maxPages int, apiK
 		maxPages = 10 // Default
 	}
 
+	// Set up cached fetcher if database is available
+	var cachedFetcher *fetch.CachedFetcher
+	if opts.Database != nil {
+		config := fetch.DefaultCachedFetcherConfig()
+		if opts.CacheTTL > 0 {
+			config.CacheTTL = opts.CacheTTL
+		}
+		cachedFetcher = fetch.NewCachedFetcher(opts.Database, config)
+	}
+
 	var corpusParts []string
 	sources := make([]types.Source, 0)
 	visited := make(map[string]bool)
 	allLinks := make([]string, 0)
+
+	// Helper function for fetching with optional caching
+	fetchPage := func(pageURL string) (*fetch.Result, error) {
+		if cachedFetcher != nil {
+			result, err := cachedFetcher.FetchWithCompany(ctx, pageURL, opts.CompanyID, nil)
+			if err != nil {
+				return nil, err
+			}
+			return result.Result, nil
+		}
+		return fetch.URL(ctx, pageURL, nil)
+	}
 
 	// Phase 1: Fetch all seeds first
 	for _, seed := range validSeeds {
@@ -64,8 +117,8 @@ func CrawlBrandCorpus(ctx context.Context, seedURLs []string, maxPages int, apiK
 			continue
 		}
 
-		// Fetch seed page using the generic fetch package
-		result, err := fetch.URL(ctx, seed, nil)
+		// Fetch seed page
+		result, err := fetchPage(seed)
 		if err != nil {
 			// Log error but continue
 			continue
@@ -119,7 +172,7 @@ func CrawlBrandCorpus(ctx context.Context, seedURLs []string, maxPages int, apiK
 		}
 
 		if len(uniqueLinks) > 0 {
-			classified, err := ClassifyLinks(ctx, uniqueLinks, apiKey)
+			classified, err := ClassifyLinks(ctx, uniqueLinks, opts.APIKey)
 			if err == nil {
 				// Use the first valid seed as "homepage" for exclusion logic (best effort)
 				selectedURLs := selectPages(classified, maxPages-len(sources), validSeeds[0])
@@ -130,9 +183,12 @@ func CrawlBrandCorpus(ctx context.Context, seedURLs []string, maxPages int, apiK
 					}
 					visited[pageURL] = true
 
-					time.Sleep(DefaultRateLimitDelay)
+					// Only rate-limit if not using cache
+					if cachedFetcher == nil {
+						time.Sleep(DefaultRateLimitDelay)
+					}
 
-					result, err := fetch.URL(ctx, pageURL, nil)
+					result, err := fetchPage(pageURL)
 					if err != nil {
 						continue
 					}

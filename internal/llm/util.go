@@ -3,8 +3,8 @@ package llm
 
 import "strings"
 
-// CleanJSONBlock removes markdown code block wrappers from JSON responses.
-// LLMs often wrap JSON in ```json ... ``` blocks even when instructed not to.
+// CleanJSONBlock removes markdown code block wrappers and preamble text from JSON responses.
+// LLMs often wrap JSON in ```json ... ``` blocks or include conversational text before the JSON.
 func CleanJSONBlock(text string) string {
 	text = strings.TrimSpace(text)
 
@@ -36,5 +36,112 @@ func CleanJSONBlock(text string) string {
 		return text
 	}
 
+	// Handle preamble or trailing text around JSON
+	// Look for the first '{' or '[' which starts JSON
+	if jsonStart := strings.Index(text, "{"); jsonStart >= 0 {
+		// Find the matching closing brace
+		extracted := extractJSONObject(text[jsonStart:])
+		if extracted != "" {
+			return extracted
+		}
+	}
+	// Try to find JSON array
+	if jsonStart := strings.Index(text, "["); jsonStart >= 0 {
+		extracted := extractJSONArray(text[jsonStart:])
+		if extracted != "" {
+			return extracted
+		}
+	}
+
+	return text
+}
+
+// extractJSONObject attempts to extract a complete JSON object from text starting with '{'
+func extractJSONObject(text string) string {
+	if !strings.HasPrefix(text, "{") {
+		return ""
+	}
+
+	depth := 0
+	inString := false
+	escaped := false
+
+	for i, char := range text {
+		if escaped {
+			escaped = false
+			continue
+		}
+
+		if char == '\\' && inString {
+			escaped = true
+			continue
+		}
+
+		if char == '"' {
+			inString = !inString
+			continue
+		}
+
+		if inString {
+			continue
+		}
+
+		switch char {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return text[:i+1]
+			}
+		}
+	}
+
+	// No matching closing brace found, return original
+	return text
+}
+
+// extractJSONArray attempts to extract a complete JSON array from text starting with '['
+func extractJSONArray(text string) string {
+	if !strings.HasPrefix(text, "[") {
+		return ""
+	}
+
+	depth := 0
+	inString := false
+	escaped := false
+
+	for i, char := range text {
+		if escaped {
+			escaped = false
+			continue
+		}
+
+		if char == '\\' && inString {
+			escaped = true
+			continue
+		}
+
+		if char == '"' {
+			inString = !inString
+			continue
+		}
+
+		if inString {
+			continue
+		}
+
+		switch char {
+		case '[':
+			depth++
+		case ']':
+			depth--
+			if depth == 0 {
+				return text[:i+1]
+			}
+		}
+	}
+
+	// No matching closing bracket found, return original
 	return text
 }

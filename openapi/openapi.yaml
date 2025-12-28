@@ -89,17 +89,25 @@ paths:
               $ref: "#/components/schemas/RunCreateRequest"
       responses:
         "200":
-          description: SSE stream of progress events
+          description: |
+            SSE stream of progress events. The first event will always be `run_started`
+            containing the `run_id` for tracking. Subsequent events are `step` events
+            for pipeline progress, followed by `complete` or `error` at the end.
           content:
             text/event-stream:
               schema:
                 $ref: "#/components/schemas/SseEvent"
               examples:
-                progress:
-                  summary: Example SSE message (illustrative)
+                run_started:
+                  summary: First event with run_id for tracking
                   value: |
-                    event: progress
-                    data: {"run_id":"550e8400-e29b-41d4-a716-446655440000","step":"ingestion","status":"running"}
+                    event: step
+                    data: {"step":"run_started","category":"lifecycle","message":"Pipeline run started","run_id":"550e8400-e29b-41d4-a716-446655440000"}
+                progress:
+                  summary: Subsequent pipeline progress events
+                  value: |
+                    event: step
+                    data: {"step":"job_profile","category":"ingestion","message":"Parsed job profile: Software Engineer at Acme Corp"}
         "400":
           $ref: "#/components/responses/BadRequest"
         "500":

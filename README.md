@@ -167,6 +167,12 @@ curl -N -X POST http://localhost:8080/run/stream \
   }'
 ```
 
+The first SSE event will be `run_started` containing the `run_id` for tracking:
+```
+event: step
+data: {"step":"run_started","category":"lifecycle","message":"Pipeline run started","run_id":"..."}
+```
+
 #### 2. Check Run Status
 
 ```bash

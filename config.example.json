@@ -1,13 +1,13 @@
 {
+    "user_id": "",
     "job_url": "https://example.com/job-description",
-    "experience": "history.json",
-    "out": "artifacts/",
     "template": "templates/one_page_resume.tex",
     "name": "Jane Smith",
     "email": "jane@example.com",
     "phone": "555-0100",
     "max_bullets": 25,
     "max_lines": 35,
+    "database_url": "postgres://resume:resume_dev@localhost:5432/resume_customizer?sslmode=disable",
     "verbose": true,
-    "_comment": "Use 'job' for a local file path OR 'job_url' to fetch from URL (mutually exclusive)"
+    "_comment": "Use 'job' for a local file path OR 'job_url' to fetch from URL (mutually exclusive). Experience data is loaded from database via user_id."
 }

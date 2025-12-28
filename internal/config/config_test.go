@@ -12,8 +12,8 @@ import (
 func TestLoadConfig_ValidJSON(t *testing.T) {
 	// Create temp config file
 	content := `{
-		"experience": "history.json",
-		"out": "artifacts/",
+		"user_id": "550e8400-e29b-41d4-a716-446655440000",
+		"job_url": "https://example.com/job",
 		"name": "Test User",
 		"max_bullets": 20,
 		"verbose": true
@@ -27,8 +27,8 @@ func TestLoadConfig_ValidJSON(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
 
-	assert.Equal(t, "history.json", cfg.Experience)
-	assert.Equal(t, "artifacts/", cfg.Output)
+	assert.Equal(t, "550e8400-e29b-41d4-a716-446655440000", cfg.UserID)
+	assert.Equal(t, "https://example.com/job", cfg.JobURL)
 	assert.Equal(t, "Test User", cfg.Name)
 	assert.Equal(t, 20, cfg.MaxBullets)
 	assert.True(t, cfg.Verbose)
@@ -104,14 +104,14 @@ func TestMergeWithDefaults(t *testing.T) {
 
 	partial := Config{
 		Name:   "Custom Name",
-		Output: "custom_output/",
+		UserID: "custom-user-id",
 	}
 
 	merged := partial.MergeWithDefaults(defaults)
 
 	// Custom values should be preserved
 	assert.Equal(t, "Custom Name", merged.Name)
-	assert.Equal(t, "custom_output/", merged.Output)
+	assert.Equal(t, "custom-user-id", merged.UserID)
 
 	// Default values should fill in empty fields
 	assert.Equal(t, "default@example.com", merged.Email)
@@ -123,11 +123,11 @@ func TestMergeWithDefaults(t *testing.T) {
 func TestMergeWithDefaults_EmptyDefaults(t *testing.T) {
 	cfg := Config{
 		Name:   "Test",
-		Output: "out/",
+		UserID: "test-user",
 	}
 
 	merged := cfg.MergeWithDefaults(Config{})
 
 	assert.Equal(t, "Test", merged.Name)
-	assert.Equal(t, "out/", merged.Output)
+	assert.Equal(t, "test-user", merged.UserID)
 }
