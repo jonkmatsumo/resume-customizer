@@ -169,10 +169,16 @@ The service exposes a REST API for triggering pipelines and retrieving results.
 | `PUT /users/{id}` | Update User | Update fields |
 | `GET /users/{id}/jobs` | List Jobs | Returns employment history |
 | `POST /users/{id}/jobs` | Create Job | Body: `{"company","role_title",...}` |
+| `PUT /jobs/{id}` | Update Job | Body: `{"company","role_title",...}` |
+| `DELETE /jobs/{id}` | Delete Job | Deletes job and experiences |
 | `GET /jobs/{id}/experiences` | List Experiences | Returns bullet points |
 | `POST /jobs/{id}/experiences` | Add Experience | Body: `{"bullet_text","skills",...}` |
+| `PUT /experiences/{id}` | Update Experience | Body: `{"bullet_text","skills",...}` |
+| `DELETE /experiences/{id}` | Delete Experience | Deletes bullet point |
 | `GET /users/{id}/education` | List Education | Returns education history |
 | `POST /users/{id}/education` | Add Education | Body: `{"school","degree",...}` |
+| `PUT /education/{id}` | Update Education | Body: `{"school","degree",...}` |
+| `DELETE /education/{id}` | Delete Education | Deletes education entry |
 | `GET /users/{id}/experience-bank` | Export Experience JSON | Returns pipeline-compatible format |
 
 ### Example: Start Pipeline

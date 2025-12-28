@@ -15,6 +15,7 @@ import (
 // User Handlers
 // ---------------------------------------------------------------------
 
+// CreateUserRequest is the request body for creating a user
 type CreateUserRequest struct {
 	Name  string `json:"name"`
 	Email string `json:"email"`
