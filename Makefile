@@ -1,10 +1,10 @@
-.PHONY: build test test-failures validate-schemas clean lint fmt fmt-check test-race test-coverage ci \
-	resume-validate resume-ingest-job resume-parse-job resume-load-experience \
-	resume-build-skill-targets resume-rank-stories resume-plan resume-materialize \
-	resume-crawl-brand resume-summarize-voice resume-rewrite resume-render-latex \
-	resume-validate-latex resume-repair
+.PHONY: build test lint fmt clean docker-up docker-down docker-run docker-db
 
-# Build the binary
+# =============================================================================
+# Local Development
+# =============================================================================
+
+# Build the binary locally
 build:
 	go build -o bin/resume_agent ./cmd/resume_agent
 
@@ -12,111 +12,85 @@ build:
 test:
 	go test -v ./...
 
-# Show only failing tests
-test-failures:
-	@make test 2>&1 | grep -A 5 "FAIL" || true
+# Run tests with race detector
+test-race:
+	go test -race ./...
 
 # Run tests with coverage
 test-coverage:
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 
-# Run tests with race detector
-test-race:
-	go test -race ./...
-
 # Linting
 lint:
 	@golangci-lint run
 
-# Formatting
+# Format code
 fmt:
 	@go fmt ./...
 	@goimports -w .
-
-fmt-check:
-	@if [ $$(gofmt -s -l . | wc -l) -gt 0 ]; then \
-		echo "Code is not formatted. Run 'make fmt' to fix."; \
-		gofmt -s -d .; \
-		exit 1; \
-	fi
-	@if [ $$(goimports -l . | wc -l) -gt 0 ]; then \
-		echo "Imports are not formatted. Run 'make fmt' to fix."; \
-		goimports -d .; \
-		exit 1; \
-	fi
-
-# Validate all schema files are valid JSON
-validate-schemas:
-	@echo "Validating schema files..."
-	@for schema in schemas/*.json; do \
-		echo "Checking $$schema..."; \
-		python3 -m json.tool "$$schema" > /dev/null || (echo "$$schema is invalid JSON" && exit 1); \
-	done
-	@echo "All schema files are valid JSON"
-
-# CI checks (run locally)
-ci: fmt-check lint test validate-schemas build
-	@echo "All CI checks passed!"
-
-# Clean build artifacts
-clean:
-	rm -rf bin/
-	go clean
 
 # Install dependencies
 deps:
 	go mod tidy
 	go mod download
 
-# Resume Agent CLI command aliases
-# Usage: make resume-<command> ARGS="--flag value ..."
-# Example: make resume-plan ARGS="--ranked ranked.json --experience exp.json --out plan.json"
+# Clean build artifacts
+clean:
+	rm -rf bin/
+	go clean
 
-BINARY := ./bin/resume_agent
+# CI checks
+ci: fmt lint test build
+	@echo "All CI checks passed!"
 
-resume-validate:
-	@$(BINARY) validate $(ARGS)
+# =============================================================================
+# Docker Commands
+# =============================================================================
 
-resume-ingest-job:
-	@$(BINARY) ingest-job $(ARGS)
+# Start database and app containers
+docker-up:
+	docker compose up -d
 
-resume-parse-job:
-	@$(BINARY) parse-job $(ARGS)
+# Stop and remove containers (keeps data)
+docker-down:
+	docker compose down
 
-resume-load-experience:
-	@$(BINARY) load-experience $(ARGS)
+# Stop and remove containers AND data
+docker-reset:
+	docker compose down -v
+	docker compose up -d
 
-resume-build-skill-targets:
-	@$(BINARY) build-skill-targets $(ARGS)
+# Rebuild app container
+docker-build:
+	docker compose build --no-cache app
 
-resume-rank-stories:
-	@$(BINARY) rank-stories $(ARGS)
+# Run pipeline in Docker
+# Usage: make docker-run CONFIG=/app/config.json
+CONFIG ?= /app/config.json
+docker-run:
+	docker compose run --rm app run --config $(CONFIG) --verbose
 
-resume-plan:
-	@$(BINARY) plan $(ARGS)
+# Open database shell
+docker-db:
+	docker compose exec db psql -U resume -d resume_customizer
 
-resume-materialize:
-	@$(BINARY) materialize $(ARGS)
+# Show artifacts in database
+docker-artifacts:
+	docker compose exec db psql -U resume -d resume_customizer \
+		-c "SELECT step, category FROM artifacts ORDER BY created_at;"
 
-resume-crawl-brand:
-	@$(BINARY) crawl-brand $(ARGS)
+# Show pipeline runs
+docker-runs:
+	docker compose exec db psql -U resume -d resume_customizer \
+		-c "SELECT id, company, role_title, status, created_at FROM pipeline_runs ORDER BY created_at DESC;"
 
-resume-summarize-voice:
-	@$(BINARY) summarize-voice $(ARGS)
+# =============================================================================
+# Local Run (with Docker database)
+# =============================================================================
 
-resume-rewrite:
-	@$(BINARY) rewrite $(ARGS)
-
-resume-render-latex:
-	@$(BINARY) render-latex $(ARGS)
-
-resume-validate-latex:
-	@$(BINARY) validate-latex $(ARGS)
-
-resume-repair:
-	@$(BINARY) repair $(ARGS)
-
-resume-run:
-	@$(BINARY) run $(ARGS)
-
+# Run locally against Docker database
+# Usage: make run-local ARGS="--config config.json --verbose"
+DATABASE_URL ?= postgres://resume:resume_dev@localhost:5432/resume_customizer?sslmode=disable
+run-local:
+	./bin/resume_agent run --db-url "$(DATABASE_URL)" $(ARGS)
