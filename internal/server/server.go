@@ -87,6 +87,11 @@ func New(cfg Config) (*Server, error) {
 
 	// Export endpoint
 	mux.HandleFunc("GET /users/{id}/experience-bank", s.handleGetExperienceBank)
+	mux.HandleFunc("GET /users/{id}/experience-bank/stories", s.handleListStories)
+	mux.HandleFunc("GET /users/{id}/experience-bank/stories/{story_id}", s.handleGetStory)
+	mux.HandleFunc("GET /users/{id}/experience-bank/stories/{story_id}/bullets", s.handleGetStoryBullets)
+	mux.HandleFunc("GET /users/{id}/experience-bank/skills", s.handleListSkills)
+	mux.HandleFunc("GET /users/{id}/experience-bank/skills/{skill_id}/bullets", s.handleGetSkillBullets)
 
 	// Companies endpoints
 	mux.HandleFunc("GET /companies", s.handleListCompanies)

@@ -537,6 +537,99 @@ func (db *DB) GetSkillUsageCount(ctx context.Context) (map[string]int, error) {
 	return usage, nil
 }
 
+// ListSkillsByUserID retrieves all unique skills used by bullets in stories belonging to a user
+func (db *DB) ListSkillsByUserID(ctx context.Context, userID uuid.UUID) ([]Skill, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT DISTINCT s.id, s.name, s.name_normalized, s.category, s.created_at
+		 FROM skills s
+		 JOIN bullet_skills bs ON bs.skill_id = s.id
+		 JOIN bullets b ON b.id = bs.bullet_id
+		 JOIN stories st ON st.id = b.story_id
+		 WHERE st.user_id = $1
+		 ORDER BY s.name_normalized`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list skills by user: %w", err)
+	}
+	defer rows.Close()
+
+	var skills []Skill
+	for rows.Next() {
+		var s Skill
+		if err := rows.Scan(&s.ID, &s.Name, &s.NameNormalized, &s.Category, &s.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan skill: %w", err)
+		}
+		skills = append(skills, s)
+	}
+	return skills, nil
+}
+
+// GetBulletsByStoryID retrieves all bullets for a story
+func (db *DB) GetBulletsByStoryID(ctx context.Context, storyID uuid.UUID) ([]Bullet, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT id, bullet_id, story_id, job_id, text, metrics, length_chars,
+		        evidence_strength, risk_flags, ordinal, created_at, updated_at
+		 FROM bullets
+		 WHERE story_id = $1
+		 ORDER BY ordinal`,
+		storyID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bullets by story: %w", err)
+	}
+	defer rows.Close()
+
+	var bullets []Bullet
+	for rows.Next() {
+		var b Bullet
+		if err := rows.Scan(&b.ID, &b.BulletID, &b.StoryID, &b.JobID, &b.Text, &b.Metrics,
+			&b.LengthChars, &b.EvidenceStrength, &b.RiskFlags, &b.Ordinal,
+			&b.CreatedAt, &b.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan bullet: %w", err)
+		}
+		// Load skills for each bullet
+		skills, _ := db.GetBulletSkills(ctx, b.ID)
+		b.Skills = skills
+		bullets = append(bullets, b)
+	}
+	return bullets, nil
+}
+
+// GetBulletsBySkillIDAndUserID retrieves all bullets that use a specific skill, scoped to a user
+func (db *DB) GetBulletsBySkillIDAndUserID(ctx context.Context, skillID uuid.UUID, userID uuid.UUID) ([]Bullet, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT DISTINCT b.id, b.bullet_id, b.story_id, b.job_id, b.text, b.metrics,
+		        b.length_chars, b.evidence_strength, b.risk_flags, b.ordinal,
+		        b.created_at, b.updated_at
+		 FROM bullets b
+		 JOIN bullet_skills bs ON bs.bullet_id = b.id
+		 JOIN stories st ON st.id = b.story_id
+		 WHERE bs.skill_id = $1 AND st.user_id = $2
+		 ORDER BY b.created_at DESC`,
+		skillID, userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bullets by skill and user: %w", err)
+	}
+	defer rows.Close()
+
+	var bullets []Bullet
+	for rows.Next() {
+		var b Bullet
+		if err := rows.Scan(&b.ID, &b.BulletID, &b.StoryID, &b.JobID, &b.Text, &b.Metrics,
+			&b.LengthChars, &b.EvidenceStrength, &b.RiskFlags, &b.Ordinal,
+			&b.CreatedAt, &b.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan bullet: %w", err)
+		}
+		// Load skills for each bullet
+		skills, _ := db.GetBulletSkills(ctx, b.ID)
+		b.Skills = skills
+		bullets = append(bullets, b)
+	}
+	return bullets, nil
+}
+
 // -----------------------------------------------------------------------------
 // Education Highlight Methods
 // -----------------------------------------------------------------------------

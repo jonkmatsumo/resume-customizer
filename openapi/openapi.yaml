@@ -39,6 +39,8 @@ tags:
     description: Job profile endpoints
   - name: crawled-pages
     description: Crawled page endpoints
+  - name: experience-bank
+    description: Experience bank endpoints for user stories, bullets, and skills
 
 paths:
   /health:
@@ -650,6 +652,127 @@ paths:
                 $ref: "#/components/schemas/ExperienceBankExport"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /users/{id}/experience-bank/stories:
+    get:
+      tags: [experience-bank]
+      summary: List stories for user
+      description: Returns all stories for a specific user
+      operationId: listStories
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoryListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /users/{id}/experience-bank/stories/{story_id}:
+    get:
+      tags: [experience-bank]
+      summary: Get story by ID
+      description: Returns a single story by its UUID, scoped to the user
+      operationId: getStory
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+        - in: path
+          name: story_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Story ID
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Story"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /users/{id}/experience-bank/stories/{story_id}/bullets:
+    get:
+      tags: [experience-bank]
+      summary: Get bullets for a story
+      description: Returns all bullets for a specific story
+      operationId: getStoryBullets
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+        - in: path
+          name: story_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Story ID
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulletListResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /users/{id}/experience-bank/skills:
+    get:
+      tags: [experience-bank]
+      summary: List skills for user
+      description: Returns all unique skills used by the user across all their stories
+      operationId: listSkills
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /users/{id}/experience-bank/skills/{skill_id}/bullets:
+    get:
+      tags: [experience-bank]
+      summary: Get bullets with a specific skill
+      description: Returns all bullets that use a specific skill, scoped to the user
+      operationId: getSkillBullets
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+        - in: path
+          name: skill_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Skill ID
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulletListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -2369,4 +2492,158 @@ components:
           type: integer
       required:
         - pages
+        - count
+
+    Story:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        story_id:
+          type: string
+          description: Human-readable story identifier
+        user_id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        bullets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Bullet"
+      required:
+        - id
+        - story_id
+        - user_id
+        - job_id
+        - created_at
+        - updated_at
+
+    Bullet:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        bullet_id:
+          type: string
+          description: Human-readable bullet identifier
+        story_id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+          nullable: true
+        text:
+          type: string
+        metrics:
+          type: string
+          nullable: true
+        length_chars:
+          type: integer
+        evidence_strength:
+          type: string
+          enum: [high, medium, low]
+        risk_flags:
+          type: array
+          items:
+            type: string
+        ordinal:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        skills:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - bullet_id
+        - story_id
+        - text
+        - length_chars
+        - evidence_strength
+        - ordinal
+        - created_at
+        - updated_at
+
+    Skill:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        name_normalized:
+          type: string
+        category:
+          type: string
+          nullable: true
+          enum: [programming, framework, database, tool, cloud, soft_skill, other]
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - name_normalized
+        - created_at
+
+    StoryListResponse:
+      type: object
+      properties:
+        stories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Story"
+        count:
+          type: integer
+      required:
+        - stories
+        - count
+
+    BulletListResponse:
+      type: object
+      properties:
+        bullets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Bullet"
+        count:
+          type: integer
+      required:
+        - bullets
+        - count
+
+    SkillListResponse:
+      type: object
+      properties:
+        skills:
+          type: array
+          items:
+            $ref: "#/components/schemas/Skill"
+        count:
+          type: integer
+      required:
+        - skills
         - count
