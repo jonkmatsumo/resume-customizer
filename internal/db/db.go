@@ -65,6 +65,20 @@ func (db *DB) CreateRun(ctx context.Context, company, roleTitle, jobURL string) 
 	return id, nil
 }
 
+// UpdateRunCompanyAndRole updates the company and role title for an existing run
+func (db *DB) UpdateRunCompanyAndRole(ctx context.Context, runID uuid.UUID, company, roleTitle string) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE pipeline_runs
+		 SET company = $1, role_title = $2
+		 WHERE id = $3`,
+		company, roleTitle, runID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update run: %w", err)
+	}
+	return nil
+}
+
 // CompleteRun marks a pipeline run as completed
 func (db *DB) CompleteRun(ctx context.Context, runID uuid.UUID, status string) error {
 	_, err := db.pool.Exec(ctx,

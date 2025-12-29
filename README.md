@@ -18,7 +18,7 @@ Resume Customizer is a local tool (with a planned hosted version) that tailors y
 
 ## 2. Architecture
 
-At a high level, the system runs as a containerized Go application with PostgreSQL for artifact persistence:
+At a high level, the system runs as a containerized Go application with PostgreSQL for data persistence:
 
 ```mermaid
 flowchart LR
@@ -38,7 +38,7 @@ flowchart LR
     AGENT <--> DB
 ```
 
-The system uses hybrid ranking (deterministic heuristics + LLM semantic evaluation), validation loops that compile LaTeX and check the PDF, and persists every artifact to PostgreSQL for debugging. Under the hood, the pipeline orchestrates specialized agents that pass validated data between stages—green nodes below indicate LLM-powered steps:
+The system uses hybrid ranking (deterministic heuristics + LLM semantic evaluation), validation loops that compile LaTeX and check the PDF, and persists all data to PostgreSQL in normalized relational tables. Under the hood, the pipeline orchestrates specialized agents that pass validated data between stages—green nodes below indicate LLM-powered steps:
 
 ```mermaid
 flowchart TD
@@ -190,10 +190,7 @@ curl -O http://localhost:8080/runs/{run_id}/resume.tex
 
 ## 4. Quick Start with Docker
 
-### Prerequisites
-*   **Docker Desktop** (includes Docker Compose)
-*   **Google Gemini API Key**: [Get it here](https://makersuite.google.com/app/apikey)
-*   *(Optional)* **Google Search API** for company research
+To run this application locally first install [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
 ### Setup
 
@@ -217,51 +214,14 @@ curl http://localhost:8080/health
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GEMINI_API_KEY` | Yes | Google Gemini API key |
+| `GEMINI_API_KEY` | Yes | [Google Gemini](https://makersuite.google.com/app/apikey) API key |
 | `DATABASE_URL` | Auto | PostgreSQL connection string |
 | `GOOGLE_SEARCH_API_KEY` | No | Enables company website discovery |
 | `GOOGLE_SEARCH_CX` | No | Custom Search Engine ID |
 
 ---
 
-## 6. Database & Artifacts
-
-All artifacts persist to PostgreSQL for history and debugging.
-
-### Artifact Categories
-
-| Category | Steps |
-|----------|-------|
-| ingestion | job_posting, job_profile, education_requirements |
-| experience | experience_bank, ranked_stories, resume_plan, selected_bullets |
-| research | sources, company_corpus, company_profile |
-| rewriting | rewritten_bullets |
-| validation | resume_tex, violations |
-
-### User Profile Schema
-
-The system now supports storing user profiles in PostgreSQL:
-
-*   **users**: Core profile (name, email, phone)
-*   **jobs**: Employment history linked to user
-*   **experiences**: Bullet points linked to jobs, with embedded `skills` (JSONB) and `risk_flags`
-*   **education**: Academic history linked to user
-
-### Database Queries
-
-```bash
-# List runs
-docker compose exec db psql -U resume -d resume_customizer \
-  -c "SELECT id, company, status FROM pipeline_runs;"
-
-# Get artifacts for a run
-docker compose exec db psql -U resume -d resume_customizer \
-  -c "SELECT step, category FROM artifacts WHERE run_id='YOUR_ID';"
-```
-
----
-
-## 7. Development
+## 6. Development
 
 ### Testing & Linting
 

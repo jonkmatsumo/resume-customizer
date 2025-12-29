@@ -56,6 +56,8 @@ type RunOptions struct {
 	Verbose        bool
 	DatabaseURL    string
 	OnProgress     ProgressCallback
+	ExistingRunID  *uuid.UUID // Optional: Use existing run ID instead of creating new one
+	RunStartedSent bool       // Flag to indicate run_started event was already sent
 }
 
 // ExperienceBranchResult holds the outputs from the experience processing branch
@@ -81,6 +83,40 @@ const (
 	prefixResearch   logPrefix = "[Research]   "
 )
 
+// stepNameMap maps pipeline step constants to step registry names
+var stepNameMap = map[string]string{
+	db.StepJobPosting:       "ingest_job",
+	db.StepJobProfile:       "parse_job",
+	db.StepEducationReq:     "extract_education",
+	db.StepExperienceBank:   "load_experience",
+	db.StepRankedStories:    "rank_stories",
+	db.StepEducationScores:  "score_education",
+	db.StepResumePlan:       "select_plan",
+	db.StepSelectedBullets:  "materialize_bullets",
+	db.StepSources:          "research_company",
+	db.StepCompanyProfile:   "summarize_voice",
+	db.StepRewrittenBullets: "rewrite_bullets",
+	db.StepResumeTex:        "render_latex",
+	db.StepViolations:       "validate_latex",
+}
+
+// stepCategoryMap maps pipeline step constants to step categories
+var stepCategoryMap = map[string]string{
+	db.StepJobPosting:       db.StepCategoryIngestion,
+	db.StepJobProfile:       db.StepCategoryIngestion,
+	db.StepEducationReq:     db.StepCategoryIngestion,
+	db.StepExperienceBank:   db.StepCategoryExperience,
+	db.StepRankedStories:    db.StepCategoryExperience,
+	db.StepEducationScores:  db.StepCategoryExperience,
+	db.StepResumePlan:       db.StepCategoryExperience,
+	db.StepSelectedBullets:  db.StepCategoryExperience,
+	db.StepSources:          db.StepCategoryResearch,
+	db.StepCompanyProfile:   db.StepCategoryResearch,
+	db.StepRewrittenBullets: db.StepCategoryRewriting,
+	db.StepResumeTex:        db.StepCategoryValidation,
+	db.StepViolations:       db.StepCategoryValidation,
+}
+
 // emitProgress calls the progress callback if configured
 func emitProgress(opts *RunOptions, step, category, message string, content any) {
 	if opts.OnProgress != nil {
@@ -103,6 +139,103 @@ func emitRunStarted(opts *RunOptions, runID uuid.UUID) {
 			RunID:    runID.String(),
 		})
 	}
+}
+
+// startStep creates or updates a run step to "in_progress" status
+// stepConstant can be either a db.Step* constant or a direct step name (e.g., "repair_violations")
+func startStep(ctx context.Context, database *db.DB, runID uuid.UUID, stepConstant string) error {
+	if database == nil || runID == uuid.Nil {
+		return nil // Skip if no database connection
+	}
+
+	// Check if stepConstant is a mapped constant or a direct step name
+	stepName, ok := stepNameMap[stepConstant]
+	if !ok {
+		// If not in map, assume it's already a step name (e.g., "repair_violations")
+		stepName = stepConstant
+	}
+
+	category := stepCategoryMap[stepConstant]
+	if category == "" {
+		// Default category based on step name if not in map
+		if stepName == "repair_violations" {
+			category = db.StepCategoryValidation
+		} else {
+			category = db.StepCategoryIngestion // Default category
+		}
+	}
+
+	// Check if step already exists
+	existingStep, err := database.GetRunStep(ctx, runID, stepName)
+	if err != nil {
+		return fmt.Errorf("failed to get existing step: %w", err)
+	}
+
+	if existingStep == nil {
+		// Create new step
+		stepInput := &db.RunStepInput{
+			Step:     stepName,
+			Category: category,
+			Status:   db.StepStatusInProgress,
+		}
+		_, err = database.CreateRunStep(ctx, runID, stepInput)
+		if err != nil {
+			return fmt.Errorf("failed to create step: %w", err)
+		}
+	} else {
+		// Update existing step to in_progress
+		err = database.UpdateRunStepStatus(ctx, runID, stepName, db.StepStatusInProgress, nil, nil)
+		if err != nil {
+			return fmt.Errorf("failed to update step status: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// completeStep updates a run step to "completed" status
+// stepConstant can be either a db.Step* constant or a direct step name (e.g., "repair_violations")
+func completeStep(ctx context.Context, database *db.DB, runID uuid.UUID, stepConstant string, artifactID *uuid.UUID) error {
+	if database == nil || runID == uuid.Nil {
+		return nil // Skip if no database connection
+	}
+
+	// Check if stepConstant is a mapped constant or a direct step name
+	stepName, ok := stepNameMap[stepConstant]
+	if !ok {
+		// If not in map, assume it's already a step name (e.g., "repair_violations")
+		stepName = stepConstant
+	}
+
+	err := database.UpdateRunStepStatus(ctx, runID, stepName, db.StepStatusCompleted, nil, artifactID)
+	if err != nil {
+		return fmt.Errorf("failed to complete step: %w", err)
+	}
+
+	return nil
+}
+
+// failStep updates a run step to "failed" status with an error message
+// stepConstant can be either a db.Step* constant or a direct step name (e.g., "repair_violations")
+func failStep(ctx context.Context, database *db.DB, runID uuid.UUID, stepConstant string, err error) error {
+	if database == nil || runID == uuid.Nil {
+		return nil // Skip if no database connection
+	}
+
+	// Check if stepConstant is a mapped constant or a direct step name
+	stepName, ok := stepNameMap[stepConstant]
+	if !ok {
+		// If not in map, assume it's already a step name (e.g., "repair_violations")
+		stepName = stepConstant
+	}
+
+	errMsg := err.Error()
+	err = database.UpdateRunStepStatus(ctx, runID, stepName, db.StepStatusFailed, &errMsg, nil)
+	if err != nil {
+		return fmt.Errorf("failed to fail step: %w", err)
+	}
+
+	return nil
 }
 
 // countBullets returns the total number of bullets in an experience bank
@@ -162,6 +295,9 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	fmt.Printf("Step 2/12: Parsing job profile...\n")
 	jobProfile, err := parsing.ParseJobProfile(ctx, cleanedText, opts.APIKey)
 	if err != nil {
+		if database != nil && runID != uuid.Nil {
+			_ = failStep(ctx, database, runID, db.StepJobProfile, err)
+		}
 		return fmt.Errorf("job parsing failed: %w", err)
 	}
 	if opts.Verbose {
@@ -172,31 +308,59 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 
 	// Save to database if connected
 	if database != nil {
-		runID, err = database.CreateRun(ctx, jobProfile.Company, jobProfile.RoleTitle, opts.JobURL)
-		if err != nil {
-			fmt.Printf("Warning: Failed to create database run: %v\n", err)
-		} else {
-			if opts.Verbose {
-				fmt.Printf("[VERBOSE] Created database run: %s\n", runID)
+		if opts.ExistingRunID != nil {
+			// Use existing run ID and update company/role
+			runID = *opts.ExistingRunID
+			if err := database.UpdateRunCompanyAndRole(ctx, runID, jobProfile.Company, jobProfile.RoleTitle); err != nil {
+				fmt.Printf("Warning: Failed to update run company/role: %v\n", err)
 			}
-			// Emit run_started as the first event with the run ID
-			emitRunStarted(&opts, runID)
+			if opts.Verbose {
+				fmt.Printf("[VERBOSE] Using existing database run: %s\n", runID)
+			}
+			// Don't emit run_started again - it was already sent by handleRunStream
+		} else if !opts.RunStartedSent {
+			// Create new run
+			runID, err = database.CreateRun(ctx, jobProfile.Company, jobProfile.RoleTitle, opts.JobURL)
+			if err != nil {
+				fmt.Printf("Warning: Failed to create database run: %v\n", err)
+			} else {
+				if opts.Verbose {
+					fmt.Printf("[VERBOSE] Created database run: %s\n", runID)
+				}
+				// Emit run_started as the first event with the run ID
+				emitRunStarted(&opts, runID)
+			}
+		}
+
+		if runID != uuid.Nil {
+			// Track job posting step (already completed, but we track it now that we have runID)
+			_ = startStep(ctx, database, runID, db.StepJobPosting)
+			_ = completeStep(ctx, database, runID, db.StepJobPosting, nil)
 			// Save initial artifacts
 			_ = database.SaveTextArtifact(ctx, runID, db.StepJobPosting, db.CategoryIngestion, cleanedText)
 			_ = database.SaveArtifact(ctx, runID, db.StepJobMetadata, db.CategoryIngestion, jobMetadata)
+			// Track job profile step
+			_ = startStep(ctx, database, runID, db.StepJobProfile)
 			_ = database.SaveArtifact(ctx, runID, db.StepJobProfile, db.CategoryIngestion, jobProfile)
+			_ = completeStep(ctx, database, runID, db.StepJobProfile, nil)
 		}
 	}
 
 	fmt.Printf("Step 2a/12: Extracting education requirements...\n")
+	if err := startStep(ctx, database, runID, db.StepEducationReq); err != nil {
+		fmt.Printf("Warning: Failed to start step tracking: %v\n", err)
+	}
+
 	eduReq, err := parsing.ExtractEducationRequirements(ctx, cleanedText, opts.APIKey)
 	if err != nil {
 		fmt.Printf("Warning: Failed to extract education requirements: %v\n", err)
+		_ = failStep(ctx, database, runID, db.StepEducationReq, err)
 	} else {
 		jobProfile.EducationRequirements = eduReq
 		// Save to database
 		if database != nil && runID != uuid.Nil {
 			_ = database.SaveArtifact(ctx, runID, db.StepEducationReq, db.CategoryIngestion, eduReq)
+			_ = completeStep(ctx, database, runID, db.StepEducationReq, nil)
 		}
 	}
 
@@ -245,8 +409,13 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 
 	// Step 9: Rewrite bullets (requires both branches)
 	fmt.Printf("Step 9/12: Rewriting bullets to match voice...\n")
+	if err := startStep(ctx, database, runID, db.StepRewrittenBullets); err != nil {
+		fmt.Printf("Warning: Failed to start step tracking: %v\n", err)
+	}
+
 	rewrittenBullets, err := rewriting.RewriteBullets(ctx, experienceResult.SelectedBullets, jobProfile, researchResult.CompanyProfile, opts.APIKey)
 	if err != nil {
+		_ = failStep(ctx, database, runID, db.StepRewrittenBullets, err)
 		return fmt.Errorf("rewriting bullets failed: %w", err)
 	}
 	if opts.Verbose {
@@ -256,15 +425,25 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		fmt.Sprintf("Rewritten %d bullets", len(rewrittenBullets.Bullets)), nil)
 
 	fmt.Printf("Step 10/12: Rendering LaTeX resume...\n")
+	if err := startStep(ctx, database, runID, db.StepResumeTex); err != nil {
+		fmt.Printf("Warning: Failed to start step tracking: %v\n", err)
+	}
+
 	latex, err := rendering.RenderLaTeX(experienceResult.ResumePlan, rewrittenBullets, opts.TemplatePath, opts.CandidateName, opts.CandidateEmail, opts.CandidatePhone, experienceResult.ExperienceBank, experienceResult.SelectedEducation)
 	if err != nil {
+		_ = failStep(ctx, database, runID, db.StepResumeTex, err)
 		return fmt.Errorf("rendering latex failed: %w", err)
 	}
 	emitProgress(&opts, db.StepResumeTex, db.CategoryValidation, "Rendered LaTeX resume", nil)
 
 	fmt.Printf("Step 11/12: Validating LaTeX constraints...\n")
+	if err := startStep(ctx, database, runID, db.StepViolations); err != nil {
+		fmt.Printf("Warning: Failed to start step tracking: %v\n", err)
+	}
+
 	violations, err := validation.ValidateFromContent(latex, researchResult.CompanyProfile, 1, 200) // Default max 1 page, 200 chars per line (2 lines)
 	if err != nil {
+		_ = failStep(ctx, database, runID, db.StepViolations, err)
 		return fmt.Errorf("validating latex failed: %w", err)
 	}
 	if opts.Verbose {
@@ -273,12 +452,20 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	// Save rewriting artifacts to database
 	if database != nil && runID != uuid.Nil {
 		_ = database.SaveArtifact(ctx, runID, db.StepRewrittenBullets, db.CategoryRewriting, rewrittenBullets)
+		_ = completeStep(ctx, database, runID, db.StepRewrittenBullets, nil)
 		_ = database.SaveTextArtifact(ctx, runID, db.StepResumeTex, db.CategoryValidation, latex)
+		_ = completeStep(ctx, database, runID, db.StepResumeTex, nil)
 		_ = database.SaveArtifact(ctx, runID, db.StepViolations, db.CategoryValidation, violations)
+		_ = completeStep(ctx, database, runID, db.StepViolations, nil)
 	}
 
 	if violations != nil && len(violations.Violations) > 0 {
 		fmt.Printf("Step 12/12: Violations found (%d), entering repair loop...\n", len(violations.Violations))
+
+		// Track repair_violations step
+		if database != nil && runID != uuid.Nil {
+			_ = startStep(ctx, database, runID, "repair_violations")
+		}
 
 		candidateInfo := repair.CandidateInfo{
 			Name:  opts.CandidateName,
@@ -304,6 +491,9 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 			opts.APIKey,
 		)
 		if err != nil {
+			if database != nil && runID != uuid.Nil {
+				_ = failStep(ctx, database, runID, "repair_violations", err)
+			}
 			return fmt.Errorf("repair loop failed: %w", err)
 		}
 
@@ -313,6 +503,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 			_ = database.SaveArtifact(ctx, runID, db.StepRewrittenBullets, db.CategoryRewriting, finalBullets)
 			_ = database.SaveTextArtifact(ctx, runID, db.StepResumeTex, db.CategoryValidation, finalLaTeX)
 			_ = database.SaveArtifact(ctx, runID, db.StepViolations, db.CategoryValidation, finalViolations)
+			_ = completeStep(ctx, database, runID, "repair_violations", nil)
 		}
 
 		if finalViolations != nil && len(finalViolations.Violations) > 0 {
@@ -340,15 +531,22 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 
 	fmt.Printf("%sStep 3/12: Loading and normalizing experience bank...\n", prefix)
 
+	if err := startStep(ctx, database, runID, db.StepExperienceBank); err != nil {
+		fmt.Printf("%sWarning: Failed to start step tracking: %v\n", prefix, err)
+	}
+
 	// Determine experience data source
 	if opts.ExperienceData == nil {
-		return nil, fmt.Errorf("experience data is missing (legacy file path support removed)")
+		err := fmt.Errorf("experience data is missing (legacy file path support removed)")
+		_ = failStep(ctx, database, runID, db.StepExperienceBank, err)
+		return nil, err
 	}
 
 	fmt.Printf("%sUsing provided experience data (from DB)...\n", prefix)
 	experienceBank := opts.ExperienceData
 
 	if err := experience.NormalizeExperienceBank(experienceBank); err != nil {
+		_ = failStep(ctx, database, runID, db.StepExperienceBank, err)
 		return nil, fmt.Errorf("normalizing experience bank failed: %w", err)
 	}
 	emitProgress(&opts, db.StepExperienceBank, db.CategoryExperience,
@@ -356,11 +554,17 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	// Save to database
 	if database != nil && runID != uuid.Nil {
 		_ = database.SaveArtifact(ctx, runID, db.StepExperienceBank, db.CategoryExperience, experienceBank)
+		_ = completeStep(ctx, database, runID, db.StepExperienceBank, nil)
 	}
 
 	fmt.Printf("%sStep 4/12: Ranking stories...\n", prefix)
+	if err := startStep(ctx, database, runID, db.StepRankedStories); err != nil {
+		fmt.Printf("%sWarning: Failed to start step tracking: %v\n", prefix, err)
+	}
+
 	rankedStories, err := ranking.RankStories(jobProfile, experienceBank)
 	if err != nil {
+		_ = failStep(ctx, database, runID, db.StepRankedStories, err)
 		return nil, fmt.Errorf("ranking stories failed: %w", err)
 	}
 	if opts.Verbose {
@@ -369,19 +573,26 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	// Save to database
 	if database != nil && runID != uuid.Nil {
 		_ = database.SaveArtifact(ctx, runID, db.StepRankedStories, db.CategoryExperience, rankedStories)
+		_ = completeStep(ctx, database, runID, db.StepRankedStories, nil)
 	}
 	emitProgress(&opts, db.StepRankedStories, db.CategoryExperience, "Ranked stories by relevance", rankedStories)
 
 	fmt.Printf("%sStep 4a/12: Scoring education relevance...\n", prefix)
+	if err := startStep(ctx, database, runID, db.StepEducationScores); err != nil {
+		fmt.Printf("%sWarning: Failed to start step tracking: %v\n", prefix, err)
+	}
+
 	var selectedEducation []types.Education
 	eduScores, err := ranking.ScoreEducation(ctx, experienceBank.Education, jobProfile.EducationRequirements, cleanedText, opts.APIKey)
 	if err != nil {
 		fmt.Printf("%sWarning: Education scoring failed: %v. Including all education.\n", prefix, err)
 		selectedEducation = experienceBank.Education
+		_ = failStep(ctx, database, runID, db.StepEducationScores, err)
 	} else {
 		// Save to database
 		if database != nil && runID != uuid.Nil {
 			_ = database.SaveArtifact(ctx, runID, db.StepEducationScores, db.CategoryExperience, eduScores)
+			_ = completeStep(ctx, database, runID, db.StepEducationScores, nil)
 		}
 		// Filter based on Included flag
 		for _, score := range eduScores {
@@ -396,22 +607,33 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	}
 
 	fmt.Printf("%sStep 5/12: Selecting optimum resume plan...\n", prefix)
+	if err := startStep(ctx, database, runID, db.StepResumePlan); err != nil {
+		fmt.Printf("%sWarning: Failed to start step tracking: %v\n", prefix, err)
+	}
+
 	spaceBudget := &types.SpaceBudget{
 		MaxBullets: opts.MaxBullets,
 		MaxLines:   opts.MaxLines,
 	}
 	resumePlan, err := selection.SelectPlan(rankedStories, jobProfile, experienceBank, spaceBudget)
 	if err != nil {
+		_ = failStep(ctx, database, runID, db.StepResumePlan, err)
 		return nil, fmt.Errorf("selecting plan failed: %w", err)
 	}
 	// Save to database
 	if database != nil && runID != uuid.Nil {
 		_ = database.SaveArtifact(ctx, runID, db.StepResumePlan, db.CategoryExperience, resumePlan)
+		_ = completeStep(ctx, database, runID, db.StepResumePlan, nil)
 	}
 
 	fmt.Printf("%sStep 6/12: Materializing selected bullets...\n", prefix)
+	if err := startStep(ctx, database, runID, db.StepSelectedBullets); err != nil {
+		fmt.Printf("%sWarning: Failed to start step tracking: %v\n", prefix, err)
+	}
+
 	selectedBullets, err := selection.MaterializeBullets(resumePlan, experienceBank)
 	if err != nil {
+		_ = failStep(ctx, database, runID, db.StepSelectedBullets, err)
 		return nil, fmt.Errorf("materializing bullets failed: %w", err)
 	}
 	if opts.Verbose {
@@ -420,6 +642,7 @@ func runExperienceBranch(ctx context.Context, opts RunOptions, jobProfile *types
 	// Save to database
 	if database != nil && runID != uuid.Nil {
 		_ = database.SaveArtifact(ctx, runID, db.StepSelectedBullets, db.CategoryExperience, selectedBullets)
+		_ = completeStep(ctx, database, runID, db.StepSelectedBullets, nil)
 	}
 	emitProgress(&opts, db.StepSelectedBullets, db.CategoryExperience,
 		fmt.Sprintf("Selected %d bullets for resume", len(selectedBullets.Bullets)), selectedBullets)
@@ -440,6 +663,10 @@ func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.J
 	prefix := prefixResearch
 
 	fmt.Printf("%sStep 7/12: Researching company voice...\n", prefix)
+
+	if err := startStep(ctx, database, runID, db.StepSources); err != nil {
+		fmt.Printf("%sWarning: Failed to start step tracking: %v\n", prefix, err)
+	}
 
 	// Determine seeds and company info for research
 	var seeds []string
@@ -545,6 +772,7 @@ func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.J
 		UseBrowser:    opts.UseBrowser,
 	})
 	if err != nil {
+		_ = failStep(ctx, database, runID, db.StepSources, err)
 		return nil, fmt.Errorf("research failed: %w", err)
 	}
 
@@ -559,11 +787,17 @@ func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.J
 		_ = database.SaveArtifact(ctx, runID, db.StepSources, db.CategoryResearch, companyCorpus.Sources)
 		_ = database.SaveTextArtifact(ctx, runID, db.StepCompanyCorpus, db.CategoryResearch, companyCorpus.Corpus)
 		_ = database.SaveArtifact(ctx, runID, db.StepResearchSession, db.CategoryResearch, researchSession)
+		_ = completeStep(ctx, database, runID, db.StepSources, nil)
 	}
 
 	fmt.Printf("%sStep 8/12: Summarizing company voice...\n", prefix)
+	if err := startStep(ctx, database, runID, db.StepCompanyProfile); err != nil {
+		fmt.Printf("%sWarning: Failed to start step tracking: %v\n", prefix, err)
+	}
+
 	companyProfile, err := voice.SummarizeVoice(ctx, companyCorpus.Corpus, companyCorpus.Sources, opts.APIKey)
 	if err != nil {
+		_ = failStep(ctx, database, runID, db.StepCompanyProfile, err)
 		return nil, fmt.Errorf("summarizing voice failed: %w", err)
 	}
 	if opts.Verbose {
@@ -572,6 +806,7 @@ func runResearchBranch(ctx context.Context, opts RunOptions, jobProfile *types.J
 	// Save to database
 	if database != nil && runID != uuid.Nil {
 		_ = database.SaveArtifact(ctx, runID, db.StepCompanyProfile, db.CategoryResearch, companyProfile)
+		_ = completeStep(ctx, database, runID, db.StepCompanyProfile, nil)
 	}
 	emitProgress(&opts, db.StepCompanyProfile, db.CategoryResearch,
 		fmt.Sprintf("Analyzed company voice: %s", companyProfile.Company), companyProfile)

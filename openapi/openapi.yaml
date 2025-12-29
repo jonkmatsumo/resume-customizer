@@ -41,6 +41,8 @@ tags:
     description: Crawled page endpoints
   - name: experience-bank
     description: Experience bank endpoints for user stories, bullets, and skills
+  - name: pipeline-steps
+    description: Step-by-step pipeline execution with checkpoint support
 
 paths:
   /health:

@@ -282,6 +282,43 @@ func (s *Server) handleRunStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create run early (before ingestion) so we can send run_id as first event
+	ctx := r.Context()
+	var runID *uuid.UUID
+	if s.databaseURL != "" {
+		// Create run with placeholder company/role (will be updated after parsing)
+		jobURL := req.JobURL
+		if jobURL == "" {
+			jobURL = req.JobPath // Use path if URL not provided
+		}
+		createdRunID, err := s.db.CreateRun(ctx, "", "", jobURL)
+		if err != nil {
+			log.Printf("Warning: Failed to create database run: %v", err)
+		} else {
+			runID = &createdRunID
+			// Send run_id as the FIRST SSE event before any ingestion
+			// Use the same format as the pipeline's emitRunStarted for consistency
+			// This MUST be sent and flushed before pipeline starts
+			runStartedEvent := pipeline.ProgressEvent{
+				Step:     db.StepRunStarted,
+				Category: db.CategoryLifecycle,
+				Message:  "Pipeline run started",
+				RunID:    createdRunID.String(),
+			}
+			if err := sse.WriteEvent("step", runStartedEvent); err != nil {
+				log.Printf("Error writing run_started SSE event: %v", err)
+			} else {
+				log.Printf("Created run %s, sent run_id as first SSE event (before pipeline start)", createdRunID)
+				// WriteEvent already flushes, but we ensure it's sent before pipeline starts
+			}
+		}
+	}
+
+	// Ensure we have a run ID before starting pipeline
+	if runID == nil && s.databaseURL != "" {
+		log.Printf("Warning: Failed to create run before pipeline start, pipeline will create one later")
+	}
+
 	log.Printf("Starting streaming pipeline run...")
 
 	// Build pipeline options with progress callback
@@ -298,6 +335,8 @@ func (s *Server) handleRunStream(w http.ResponseWriter, r *http.Request) {
 		APIKey:         s.apiKey,
 		DatabaseURL:    s.databaseURL,
 		Verbose:        true,
+		ExistingRunID:  runID,        // Pass existing run ID to pipeline
+		RunStartedSent: runID != nil, // Mark that we already sent run_started
 		OnProgress: func(event pipeline.ProgressEvent) {
 			if err := sse.WriteEvent("step", event); err != nil {
 				log.Printf("Error writing SSE event: %v", err)
@@ -306,7 +345,6 @@ func (s *Server) handleRunStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Run pipeline synchronously (blocking until complete)
-	ctx := r.Context()
 	if err := pipeline.RunPipeline(ctx, opts); err != nil {
 		log.Printf("Pipeline run failed: %v", err)
 		sse.WriteError(err.Error())

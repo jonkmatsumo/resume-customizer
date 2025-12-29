@@ -52,6 +52,16 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /artifact/{id}", s.handleArtifact)
 	mux.HandleFunc("GET /health", s.handleHealth)
 
+	// Step-by-step pipeline API endpoints
+	mux.HandleFunc("POST /runs", s.handleCreateRun)
+	mux.HandleFunc("POST /runs/{run_id}/steps/{step_name}", s.handleExecuteStep)
+	mux.HandleFunc("GET /runs/{run_id}/steps", s.handleListRunSteps)
+	mux.HandleFunc("GET /runs/{run_id}/steps/{step_name}", s.handleGetStepStatus)
+	mux.HandleFunc("GET /runs/{run_id}/checkpoint", s.handleGetCheckpoint)
+	mux.HandleFunc("POST /runs/{run_id}/resume", s.handleResumeFromCheckpoint)
+	mux.HandleFunc("POST /runs/{run_id}/steps/{step_name}/skip", s.handleSkipStep)
+	mux.HandleFunc("POST /runs/{run_id}/steps/{step_name}/retry", s.handleRetryStep)
+
 	// CRUD endpoints for runs
 	mux.HandleFunc("GET /runs", s.handleListRuns)
 	mux.HandleFunc("DELETE /runs/{id}", s.handleDeleteRun)
