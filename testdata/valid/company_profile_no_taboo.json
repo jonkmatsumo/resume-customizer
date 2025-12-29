@@ -1,0 +1,18 @@
+{
+  "company": "Test Corp",
+  "tone": "professional and innovative",
+  "style_rules": [
+    "Use active voice",
+    "Quantify achievements"
+  ],
+  "taboo_phrases": [],
+  "domain_context": "Technology, SaaS",
+  "values": [
+    "Innovation",
+    "Customer focus"
+  ],
+  "evidence_urls": [
+    "https://example.com/values"
+  ]
+}
+

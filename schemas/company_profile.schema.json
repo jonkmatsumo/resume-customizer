@@ -4,7 +4,7 @@
   "title": "Company Profile",
   "description": "Brand voice and style rules for a company",
   "type": "object",
-  "required": ["company", "tone", "style_rules", "taboo_phrases", "domain_context", "values", "evidence_urls"],
+  "required": ["company", "tone", "style_rules", "domain_context", "values", "evidence_urls"],
   "properties": {
     "company": {
       "type": "string",

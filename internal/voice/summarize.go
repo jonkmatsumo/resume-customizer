@@ -197,12 +197,7 @@ func postProcessProfile(profile *types.CompanyProfile, sources []types.Source) e
 			Message: "at least one style rule is required",
 		}
 	}
-	if len(profile.TabooPhrases) == 0 {
-		return &ValidationError{
-			Field:   "taboo_phrases",
-			Message: "at least one taboo phrase is required",
-		}
-	}
+	// Taboo phrases are optional - not all companies have obvious phrases to avoid
 	if profile.DomainContext == "" {
 		return &ValidationError{
 			Field:   "domain_context",

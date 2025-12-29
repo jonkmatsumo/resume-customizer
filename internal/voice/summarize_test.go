@@ -163,20 +163,24 @@ func TestPostProcessProfile_EmptyStyleRules(t *testing.T) {
 }
 
 func TestPostProcessProfile_EmptyTabooPhrases(t *testing.T) {
+	// Taboo phrases are optional - test that empty array is allowed
 	profile := &types.CompanyProfile{
 		Company:       "Test",
 		Tone:          "professional",
 		StyleRules:    []string{"Use active voice"},
-		TabooPhrases:  []string{},
+		TabooPhrases:  []string{}, // Empty is now allowed
 		DomainContext: "Technology",
 		Values:        []string{"Ownership"},
 	}
 
-	err := postProcessProfile(profile, []types.Source{})
-	assert.Error(t, err)
-	var validationErr *ValidationError
-	assert.ErrorAs(t, err, &validationErr)
-	assert.Equal(t, "taboo_phrases", validationErr.Field)
+	sources := []types.Source{
+		{URL: "https://example.com/values"},
+	}
+
+	err := postProcessProfile(profile, sources)
+	require.NoError(t, err) // Should succeed with empty taboo phrases
+	assert.Len(t, profile.TabooPhrases, 0)
+	assert.Len(t, profile.EvidenceURLs, 1)
 }
 
 func TestPostProcessProfile_MissingDomainContext(t *testing.T) {
