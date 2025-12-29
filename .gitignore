@@ -60,5 +60,6 @@ docs/
 # Accidentally compiled tool binaries
 test_company_profiles
 test_companies
+test_job_postings
 migrate_companies
 migrate_company_profiles

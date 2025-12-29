@@ -1,6 +1,4 @@
 -- Company Profiles & Brand Signals Schema
--- Phase 2 of the database normalization project
--- Dependencies: companies table (Phase 1)
 
 -- =============================================================================
 -- COMPANY PROFILES TABLE

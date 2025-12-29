@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt clean docker-up docker-down docker-run docker-db
+.PHONY: build test lint fmt clean docker-up docker-down docker-run docker-db test-jobs test-profiles test-companies
 
 # =============================================================================
 # Local Development
@@ -36,6 +36,10 @@ test-companies:
 # Run profile-related tests (Phase 2)
 test-profiles:
 	go test -v ./internal/db/... -run 'Profile|Signal|Source|Taboo'
+
+# Run job posting-related tests (Phase 3)
+test-jobs:
+	go test -v ./internal/db/... -run 'Job|Posting|Requirement|Keyword'
 
 # Linting
 lint:
