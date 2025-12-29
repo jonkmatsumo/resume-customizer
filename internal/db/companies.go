@@ -203,6 +203,27 @@ func (db *DB) ListCompaniesWithProfiles(ctx context.Context, limit, offset int) 
 // Crawled Page Methods
 // -----------------------------------------------------------------------------
 
+// GetCrawledPageByID retrieves a crawled page by its ID
+func (db *DB) GetCrawledPageByID(ctx context.Context, id uuid.UUID) (*CrawledPage, error) {
+	var p CrawledPage
+	err := db.pool.QueryRow(ctx,
+		`SELECT id, company_id, url, page_type, raw_html, parsed_text, content_hash, 
+		        http_status, fetch_status, error_message, is_permanent_failure, retry_count, retry_after,
+		        fetched_at, expires_at, last_accessed_at, created_at, updated_at
+		 FROM crawled_pages WHERE id = $1`,
+		id,
+	).Scan(&p.ID, &p.CompanyID, &p.URL, &p.PageType, &p.RawHTML, &p.ParsedText, &p.ContentHash,
+		&p.HTTPStatus, &p.FetchStatus, &p.ErrorMessage, &p.IsPermanentFailure, &p.RetryCount, &p.RetryAfter,
+		&p.FetchedAt, &p.ExpiresAt, &p.LastAccessedAt, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get crawled page: %w", err)
+	}
+	return &p, nil
+}
+
 // GetCrawledPageByURL retrieves a cached page by URL
 func (db *DB) GetCrawledPageByURL(ctx context.Context, pageURL string) (*CrawledPage, error) {
 	var p CrawledPage
@@ -376,6 +397,36 @@ func (db *DB) TouchCrawledPage(ctx context.Context, id uuid.UUID) error {
 		return fmt.Errorf("failed to touch crawled page: %w", err)
 	}
 	return nil
+}
+
+// ListCrawledPagesByCompany retrieves all crawled pages for a company (without freshness filtering)
+func (db *DB) ListCrawledPagesByCompany(ctx context.Context, companyID uuid.UUID) ([]CrawledPage, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT id, company_id, url, page_type, parsed_text, content_hash, 
+		        http_status, fetch_status, error_message, is_permanent_failure, retry_count, retry_after,
+		        fetched_at, expires_at, last_accessed_at, created_at, updated_at
+		 FROM crawled_pages 
+		 WHERE company_id = $1
+		 ORDER BY fetched_at DESC`,
+		companyID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list crawled pages: %w", err)
+	}
+	defer rows.Close()
+
+	var pages []CrawledPage
+	for rows.Next() {
+		var p CrawledPage
+		// Note: raw_html intentionally omitted (large field, use GetCrawledPageByID if needed)
+		if err := rows.Scan(&p.ID, &p.CompanyID, &p.URL, &p.PageType, &p.ParsedText, &p.ContentHash,
+			&p.HTTPStatus, &p.FetchStatus, &p.ErrorMessage, &p.IsPermanentFailure, &p.RetryCount, &p.RetryAfter,
+			&p.FetchedAt, &p.ExpiresAt, &p.LastAccessedAt, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan page: %w", err)
+		}
+		pages = append(pages, p)
+	}
+	return pages, nil
 }
 
 // ListFreshPagesByCompany retrieves all non-expired pages for a company

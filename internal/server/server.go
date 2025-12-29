@@ -114,6 +114,11 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /job-profiles/{id}/responsibilities", s.handleGetResponsibilities)
 	mux.HandleFunc("GET /job-profiles/{id}/keywords", s.handleGetKeywords)
 
+	// Crawled Pages endpoints
+	mux.HandleFunc("GET /crawled-pages/{id}", s.handleGetCrawledPage)
+	mux.HandleFunc("GET /crawled-pages/by-url", s.handleGetCrawledPageByURL)
+	mux.HandleFunc("GET /companies/{company_id}/crawled-pages", s.handleListCrawledPagesByCompany)
+
 	// Create HTTP server
 	s.httpServer = &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),

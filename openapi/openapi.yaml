@@ -37,6 +37,8 @@ tags:
     description: Job posting endpoints
   - name: job-profiles
     description: Job profile endpoints
+  - name: crawled-pages
+    description: Crawled page endpoints
 
 paths:
   /health:
@@ -1110,6 +1112,94 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /crawled-pages/{id}:
+    get:
+      tags: [crawled-pages]
+      summary: Get crawled page by ID
+      description: Returns a crawled page by its UUID. By default, excludes the `raw_html` field. Use `include_html=true` query parameter to include it.
+      operationId: getCrawledPage
+      parameters:
+        - $ref: "#/components/parameters/CrawledPageIdPath"
+        - name: include_html
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include raw HTML content in response
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrawledPage"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /crawled-pages/by-url:
+    get:
+      tags: [crawled-pages]
+      summary: Get crawled page by URL
+      description: Returns a crawled page by its URL. By default, excludes the `raw_html` field. Use `include_html=true` query parameter to include it.
+      operationId: getCrawledPageByURL
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: Page URL
+        - name: include_html
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include raw HTML content in response
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrawledPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /companies/{company_id}/crawled-pages:
+    get:
+      tags: [crawled-pages]
+      summary: List crawled pages for a company
+      description: Returns all crawled pages associated with a company. The `raw_html` field is never included in list responses.
+      operationId: listCrawledPagesByCompany
+      parameters:
+        - in: path
+          name: company_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Company ID
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrawledPageListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 components:
   parameters:
     RunIdPath:
@@ -1248,6 +1338,15 @@ components:
         default: 0
         minimum: 0
       description: Pagination offset
+
+    CrawledPageIdPath:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Crawled page ID
 
   responses:
     BadRequest:
@@ -2186,4 +2285,88 @@ components:
           type: integer
       required:
         - keywords
+        - count
+
+    CrawledPage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_id:
+          type: string
+          format: uuid
+          nullable: true
+        url:
+          type: string
+          format: uri
+        page_type:
+          type: string
+          nullable: true
+          enum: [values, culture, about, careers, engineering, press, other]
+        parsed_text:
+          type: string
+          nullable: true
+        content_hash:
+          type: string
+          nullable: true
+        http_status:
+          type: integer
+          nullable: true
+        fetch_status:
+          type: string
+          enum: [success, error, not_found, timeout, blocked]
+        error_message:
+          type: string
+          nullable: true
+        is_permanent_failure:
+          type: boolean
+        retry_count:
+          type: integer
+        retry_after:
+          type: string
+          format: date-time
+          nullable: true
+        fetched_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_accessed_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        raw_html:
+          type: string
+          nullable: true
+          description: Only included when include_html=true query parameter is set
+      required:
+        - id
+        - url
+        - fetch_status
+        - is_permanent_failure
+        - retry_count
+        - fetched_at
+        - last_accessed_at
+        - created_at
+        - updated_at
+
+    CrawledPageListResponse:
+      type: object
+      properties:
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/CrawledPage"
+        count:
+          type: integer
+      required:
+        - pages
         - count
