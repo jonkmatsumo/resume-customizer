@@ -61,5 +61,6 @@ docs/
 test_company_profiles
 test_companies
 test_job_postings
+test_experience_bank
 migrate_companies
 migrate_company_profiles
