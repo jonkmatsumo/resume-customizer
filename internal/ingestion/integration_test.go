@@ -26,23 +26,12 @@ func TestEndToEnd_TextFile(t *testing.T) {
 	cleanedText, metadata, err := IngestFromFile(context.Background(), testFile, "")
 	require.NoError(t, err)
 
-	// Write output
-	outDir := filepath.Join(tmpDir, "output")
-	err = WriteOutput(outDir, cleanedText, metadata)
-	require.NoError(t, err)
-
-	// Verify output files
-	cleanedPath := filepath.Join(outDir, "job_posting.cleaned.txt")
-	cleanedFileContent, err := os.ReadFile(cleanedPath)
-	require.NoError(t, err)
-	assert.Contains(t, string(cleanedFileContent), "Senior Software Engineer")
-	assert.Contains(t, string(cleanedFileContent), "Requirements")
-
-	metaPath := filepath.Join(outDir, "job_posting.cleaned.meta.json")
-	metaFileContent, err := os.ReadFile(metaPath)
-	require.NoError(t, err)
-	assert.Contains(t, string(metaFileContent), "timestamp")
-	assert.Contains(t, string(metaFileContent), "hash")
+	// Verify ingestion results (file writing removed - data should be saved to database)
+	assert.Contains(t, cleanedText, "Senior Software Engineer")
+	assert.Contains(t, cleanedText, "Requirements")
+	assert.NotNil(t, metadata)
+	assert.NotEmpty(t, metadata.Timestamp)
+	assert.NotEmpty(t, metadata.Hash)
 }
 
 func TestEndToEnd_URL_MockServer(t *testing.T) {
@@ -71,47 +60,32 @@ func TestEndToEnd_URL_MockServer(t *testing.T) {
 	}))
 	defer server.Close()
 
-	tmpDir := t.TempDir()
-
 	// Ingest from URL
 	cleanedText, metadata, err := IngestFromURL(context.Background(), server.URL, "", false, false)
 	require.NoError(t, err)
 
-	// Write output
-	outDir := filepath.Join(tmpDir, "output")
-	err = WriteOutput(outDir, cleanedText, metadata)
-	require.NoError(t, err)
-
-	// Verify output
-	cleanedPath := filepath.Join(outDir, "job_posting.cleaned.txt")
-	cleanedFileContent, err := os.ReadFile(cleanedPath)
-	require.NoError(t, err)
-	assert.Contains(t, string(cleanedFileContent), "Senior Software Engineer")
-	assert.Contains(t, string(cleanedFileContent), "Requirements")
-	assert.NotContains(t, string(cleanedFileContent), "Nav")
-	assert.NotContains(t, string(cleanedFileContent), "Footer")
-
-	metaPath := filepath.Join(outDir, "job_posting.cleaned.meta.json")
-	metaFileContent, err := os.ReadFile(metaPath)
-	require.NoError(t, err)
-	assert.Contains(t, string(metaFileContent), server.URL)
+	// Verify ingestion results (file writing removed - data should be saved to database)
+	assert.Contains(t, cleanedText, "Senior Software Engineer")
+	assert.Contains(t, cleanedText, "Requirements")
+	assert.NotContains(t, cleanedText, "Nav")
+	assert.NotContains(t, cleanedText, "Footer")
+	assert.NotNil(t, metadata)
+	assert.Equal(t, server.URL, metadata.URL)
 }
 
-func TestOutputFileFormat_ValidJSON(t *testing.T) {
-	tmpDir := t.TempDir()
+func TestMetadata_ValidJSON(t *testing.T) {
+	// Test that metadata can be serialized to valid JSON
+	// (file writing removed - data should be saved to database)
 	cleanedText := "Test content"
 	metadata := NewMetadata(cleanedText, "https://example.com/job")
 
-	err := WriteOutput(tmpDir, cleanedText, metadata)
-	require.NoError(t, err)
-
-	metaPath := filepath.Join(tmpDir, "job_posting.cleaned.meta.json")
-	metaFileContent, err := os.ReadFile(metaPath)
+	// Verify metadata can be serialized to JSON
+	metaJSON, err := metadata.ToJSON()
 	require.NoError(t, err)
 
 	// Verify it's valid JSON
 	var unmarshaled Metadata
-	err = json.Unmarshal(metaFileContent, &unmarshaled)
+	err = json.Unmarshal(metaJSON, &unmarshaled)
 	require.NoError(t, err)
 	assert.Equal(t, metadata.URL, unmarshaled.URL)
 	assert.Equal(t, metadata.Timestamp, unmarshaled.Timestamp)

@@ -1,5 +1,4 @@
 -- Research Sessions Schema
--- Phase 6 of the database normalization project
 -- Depends on: companies.sql, resumes.sql (pipeline_runs), companies.sql (crawled_pages)
 
 -- =============================================================================

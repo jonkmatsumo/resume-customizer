@@ -2,55 +2,44 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 
 	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/parsing"
-	"github.com/jonathan/resume-customizer/internal/schemas"
 	"github.com/spf13/cobra"
 )
 
 var parseJobCmd = &cobra.Command{
 	Use:   "parse-job",
-	Short: "Parse a cleaned job posting into structured JobProfile JSON",
-	Long:  "Parse a cleaned job posting text file into a structured JobProfile JSON that validates against the job_profile schema.",
+	Short: "Parse a job posting into structured JobProfile",
+	Long:  "Parses a job posting from the database (by run-id) into a structured JobProfile and saves it back to the database.",
 	RunE:  runParseJob,
 }
 
 var (
-	parseInputFile   string
-	parseOutputFile  string
 	parseRunID       string
 	parseDatabaseURL string
 	parseAPIKey      string
 )
 
 func init() {
-	parseJobCmd.Flags().StringVarP(&parseInputFile, "in", "i", "", "Path to cleaned text file (deprecated: use --run-id)")
-	parseJobCmd.Flags().StringVarP(&parseOutputFile, "out", "o", "", "Path to output JSON file (deprecated: use --run-id)")
-	parseJobCmd.Flags().StringVar(&parseRunID, "run-id", "", "Run ID to load job posting from database (required if not using --in)")
-	parseJobCmd.Flags().StringVar(&parseDatabaseURL, "db-url", "", "Database URL (required with --run-id)")
+	parseJobCmd.Flags().StringVar(&parseRunID, "run-id", "", "Run ID to load job posting from database (required)")
+	parseJobCmd.Flags().StringVar(&parseDatabaseURL, "db-url", "", "Database URL (required)")
 	parseJobCmd.Flags().StringVar(&parseAPIKey, "api-key", "", "Gemini API key (overrides GEMINI_API_KEY env var)")
+
+	if err := parseJobCmd.MarkFlagRequired("run-id"); err != nil {
+		panic(fmt.Sprintf("failed to mark run-id flag as required: %v", err))
+	}
+	if err := parseJobCmd.MarkFlagRequired("db-url"); err != nil {
+		panic(fmt.Sprintf("failed to mark db-url flag as required: %v", err))
+	}
 
 	rootCmd.AddCommand(parseJobCmd)
 }
 
 func runParseJob(_ *cobra.Command, _ []string) error {
-	// Determine mode: database or file
-	useDatabase := parseRunID != ""
-	useFiles := parseInputFile != "" || parseOutputFile != ""
-
-	if useDatabase && useFiles {
-		return fmt.Errorf("cannot use --run-id with --in/--out flags")
-	}
-	if !useDatabase && !useFiles {
-		return fmt.Errorf("must provide either --run-id or --in/--out flags")
-	}
-
 	// Get API key
 	apiKey := parseAPIKey
 	if apiKey == "" {
@@ -62,60 +51,6 @@ func runParseJob(_ *cobra.Command, _ []string) error {
 
 	ctx := context.Background()
 
-	if useFiles {
-		// File mode (deprecated)
-		fmt.Fprintf(os.Stderr, "Warning: File-based mode is deprecated. Use --run-id instead.\n")
-
-		// Read input file
-		inputContent, err := os.ReadFile(parseInputFile)
-		if err != nil {
-			return fmt.Errorf("failed to read input file: %w", err)
-		}
-
-		// Parse job profile
-		profile, err := parsing.ParseJobProfile(ctx, string(inputContent), apiKey)
-		if err != nil {
-			return fmt.Errorf("failed to parse job profile: %w", err)
-		}
-
-		// Marshal to JSON with indentation
-		jsonBytes, err := json.MarshalIndent(profile, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-
-		// Write output file
-		if err := os.WriteFile(parseOutputFile, jsonBytes, 0644); err != nil {
-			return fmt.Errorf("failed to write output file: %w", err)
-		}
-
-		// Validate against schema (if schema file exists)
-		schemaPath := schemas.ResolveSchemaPath("schemas/job_profile.schema.json")
-		if schemaPath != "" {
-			if err := schemas.ValidateJSON(schemaPath, parseOutputFile); err != nil {
-				// Distinguish between validation errors (data doesn't match schema) and schema load errors
-				var validationErr *schemas.ValidationError
-				var schemaLoadErr *schemas.SchemaLoadError
-				if errors.As(err, &validationErr) {
-					// Actual validation failure - return error
-					return fmt.Errorf("generated JSON does not validate against schema: %w", err)
-				} else if errors.As(err, &schemaLoadErr) {
-					// Schema loading issue - log warning and continue
-					_, _ = fmt.Fprintf(os.Stderr, "Warning: Could not validate output against schema (schema loading failed): %v\n", err)
-				} else {
-					// Other errors - log warning and continue
-					_, _ = fmt.Fprintf(os.Stderr, "Warning: Could not validate output against schema: %v\n", err)
-				}
-			}
-		}
-
-		_, _ = fmt.Fprintf(os.Stdout, "Successfully parsed job profile\n")
-		_, _ = fmt.Fprintf(os.Stdout, "Output: %s\n", parseOutputFile)
-
-		return nil
-	}
-
-	// Database mode
 	runID, err := uuid.Parse(parseRunID)
 	if err != nil {
 		return fmt.Errorf("invalid run-id: %w", err)
@@ -126,7 +61,7 @@ func runParseJob(_ *cobra.Command, _ []string) error {
 		parseDatabaseURL = os.Getenv("DATABASE_URL")
 	}
 	if parseDatabaseURL == "" {
-		return fmt.Errorf("DATABASE_URL required when using --run-id")
+		return fmt.Errorf("DATABASE_URL required (set DATABASE_URL environment variable or use --db-url flag)")
 	}
 
 	database, err := db.Connect(ctx, parseDatabaseURL)

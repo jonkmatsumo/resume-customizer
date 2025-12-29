@@ -2,7 +2,6 @@ package ingestion
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -161,52 +160,10 @@ func TestIngestFromFile_HashUniqueness(t *testing.T) {
 	assert.NotEqual(t, metadata1.Hash, metadata2.Hash)
 }
 
-func TestWriteOutput_Success(t *testing.T) {
-	tmpDir := t.TempDir()
-	cleanedText := "Cleaned text content"
-	metadata := NewMetadata(cleanedText, "https://example.com")
+// TestWriteOutput_Success removed - WriteOutput() function has been removed
+// File writing is now only used for debugging in ingest-job command
 
-	err := WriteOutput(tmpDir, cleanedText, metadata)
-	require.NoError(t, err)
-
-	// Check cleaned text file exists
-	cleanedPath := filepath.Join(tmpDir, "job_posting.cleaned.txt")
-	cleanedContent, err := os.ReadFile(cleanedPath)
-	require.NoError(t, err)
-	assert.Equal(t, cleanedText, string(cleanedContent))
-
-	// Check metadata file exists
-	metaPath := filepath.Join(tmpDir, "job_posting.cleaned.meta.json")
-	metaContent, err := os.ReadFile(metaPath)
-	require.NoError(t, err)
-	assert.NotEmpty(t, metaContent)
-
-	// Verify it's valid JSON
-	var unmarshaled Metadata
-	jsonBytes, err := metadata.ToJSON()
-	require.NoError(t, err)
-	_, err = os.ReadFile(metaPath)
-	require.NoError(t, err)
-	err = json.Unmarshal(jsonBytes, &unmarshaled)
-	require.NoError(t, err)
-	assert.Equal(t, metadata.URL, unmarshaled.URL)
-}
-
-func TestWriteOutput_CreatesDirectory(t *testing.T) {
-	tmpDir := t.TempDir()
-	outDir := filepath.Join(tmpDir, "new", "sub", "directory")
-
-	cleanedText := "Test content"
-	metadata := NewMetadata(cleanedText, "")
-
-	err := WriteOutput(outDir, cleanedText, metadata)
-	require.NoError(t, err)
-
-	// Directory should be created
-	cleanedPath := filepath.Join(outDir, "job_posting.cleaned.txt")
-	_, err = os.Stat(cleanedPath)
-	assert.NoError(t, err)
-}
+// TestWriteOutput_CreatesDirectory removed - WriteOutput() function has been removed
 
 func TestCleanText_ComplexFormatting(t *testing.T) {
 	// Read test fixture

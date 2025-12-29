@@ -1,5 +1,4 @@
 -- Experience Bank Normalization Schema
--- Phase 4 of the database normalization project
 -- Extends users.sql with skills normalization and story groupings
 
 -- =============================================================================

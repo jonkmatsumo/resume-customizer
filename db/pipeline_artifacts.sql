@@ -1,5 +1,4 @@
 -- Pipeline Run Artifacts Schema
--- Phase 5 of the database normalization project
 -- Depends on: resumes.sql, experience_bank.sql, job_postings.sql, company_profiles.sql
 
 -- =============================================================================

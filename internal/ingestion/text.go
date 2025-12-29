@@ -251,34 +251,3 @@ func IngestFromFile(ctx context.Context, path string, apiKey string) (string, *M
 
 	return cleanedText, metadata, nil
 }
-
-// WriteOutput writes the cleaned text and metadata to output files.
-//
-// DEPRECATED: This function is deprecated and should only be used for debugging.
-// Production code should save job postings directly to the database via the pipeline.
-// This function will be removed in a future version.
-func WriteOutput(outDir string, cleanedText string, metadata *Metadata) error {
-	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(outDir, 0755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
-	}
-
-	// Write cleaned text file
-	cleanedPath := filepath.Join(outDir, "job_posting.cleaned.txt")
-	if err := os.WriteFile(cleanedPath, []byte(cleanedText), 0644); err != nil {
-		return fmt.Errorf("failed to write cleaned text file: %w", err)
-	}
-
-	// Write metadata JSON file
-	// Note: Must match the pattern IngestFromFile expects (stripped extension + .meta.json)
-	metaPath := filepath.Join(outDir, "job_posting.cleaned.meta.json")
-	metaJSON, err := metadata.ToJSON()
-	if err != nil {
-		return fmt.Errorf("failed to marshal metadata: %w", err)
-	}
-	if err := os.WriteFile(metaPath, metaJSON, 0644); err != nil {
-		return fmt.Errorf("failed to write metadata file: %w", err)
-	}
-
-	return nil
-}
