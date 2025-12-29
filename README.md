@@ -231,12 +231,13 @@ make lint   # Static analysis
 make ci     # All quality checks
 ```
 
-### CLI (Internal)
-
-The CLI is for local development and debugging:
+### Running the Server Locally
 
 ```bash
-./bin/resume_agent run --config config.json --verbose
+# Build the binary
+make build
+
+# Run the server (requires DATABASE_URL and GEMINI_API_KEY env vars)
 ./bin/resume_agent serve --port 8080
 ```
 

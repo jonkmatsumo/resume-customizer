@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt clean docker-up docker-down docker-run docker-db test-jobs test-profiles test-companies test-experience test-artifacts test-research
+.PHONY: build test lint fmt clean docker-up docker-down docker-db test-jobs test-profiles test-companies test-experience test-artifacts test-research
 
 # =============================================================================
 # Local Development
@@ -97,12 +97,6 @@ docker-reset:
 docker-build:
 	docker compose build --no-cache app
 
-# Run pipeline in Docker
-# Usage: make docker-run CONFIG=/app/config.json
-CONFIG ?= /app/config.json
-docker-run:
-	docker compose run --rm app run --config $(CONFIG) --verbose
-
 # Open database shell
 docker-db:
 	docker compose exec db psql -U resume -d resume_customizer
@@ -117,12 +111,3 @@ docker-runs:
 	docker compose exec db psql -U resume -d resume_customizer \
 		-c "SELECT id, company, role_title, status, created_at FROM pipeline_runs ORDER BY created_at DESC;"
 
-# =============================================================================
-# Local Run (with Docker database)
-# =============================================================================
-
-# Run locally against Docker database
-# Usage: make run-local ARGS="--config config.json --verbose"
-DATABASE_URL ?= postgres://resume:resume_dev@localhost:5432/resume_customizer?sslmode=disable
-run-local:
-	./bin/resume_agent run --db-url "$(DATABASE_URL)" $(ARGS)
