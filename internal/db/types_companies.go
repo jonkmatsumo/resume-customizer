@@ -61,6 +61,7 @@ const (
 	PageTypeAbout       = "about"
 	PageTypeCareers     = "careers"
 	PageTypeEngineering = "engineering"
+	PageTypePress       = "press"
 	PageTypeOther       = "other"
 )
 

@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt clean docker-up docker-down docker-run docker-db test-jobs test-profiles test-companies test-experience test-artifacts
+.PHONY: build test lint fmt clean docker-up docker-down docker-run docker-db test-jobs test-profiles test-companies test-experience test-artifacts test-research
 
 # =============================================================================
 # Local Development
@@ -48,6 +48,10 @@ test-experience:
 # Run pipeline artifacts-related tests (Phase 5)
 test-artifacts:
 	go test -v ./internal/db/... -run 'RunRanked|RunResume|RunSelected|RunRewritten|RunViolation|Severity|Section'
+
+# Run research-related tests (Phase 6)
+test-research:
+	go test -v ./internal/db/... -run 'Research|Frontier|BrandSignal|PageType'
 
 # Linting
 lint:

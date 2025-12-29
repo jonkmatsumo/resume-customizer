@@ -252,7 +252,11 @@ func IngestFromFile(ctx context.Context, path string, apiKey string) (string, *M
 	return cleanedText, metadata, nil
 }
 
-// WriteOutput writes the cleaned text and metadata to output files
+// WriteOutput writes the cleaned text and metadata to output files.
+//
+// DEPRECATED: This function is deprecated and should only be used for debugging.
+// Production code should save job postings directly to the database via the pipeline.
+// This function will be removed in a future version.
 func WriteOutput(outDir string, cleanedText string, metadata *Metadata) error {
 	// Create output directory if it doesn't exist
 	if err := os.MkdirAll(outDir, 0755); err != nil {
