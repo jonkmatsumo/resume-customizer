@@ -49,10 +49,9 @@ func TestCompaniesEndpoints_Integration(t *testing.T) {
 
 	// Test 2: Get company by name
 	t.Run("GetCompanyByName", func(t *testing.T) {
-		// URL-encode the company name for the path
-		encodedName := url.PathEscape(company.Name)
-		req := httptest.NewRequest(http.MethodGet, "/companies/by-name/"+encodedName, nil)
-		req.SetPathValue("name", company.Name)
+		// Use query parameter instead of path parameter to avoid route conflict
+		encodedName := url.QueryEscape(company.Name)
+		req := httptest.NewRequest(http.MethodGet, "/companies/by-name?name="+encodedName, nil)
 		w := httptest.NewRecorder()
 
 		s.handleGetCompanyByName(w, req)

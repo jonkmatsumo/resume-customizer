@@ -67,7 +67,8 @@ func (s *Server) handleGetCompany(w http.ResponseWriter, r *http.Request) {
 
 // handleGetCompanyByName retrieves a company by normalized name
 func (s *Server) handleGetCompanyByName(w http.ResponseWriter, r *http.Request) {
-	name := r.PathValue("name")
+	// Changed from path parameter to query parameter to avoid route conflict
+	name := r.URL.Query().Get("name")
 	if name == "" {
 		s.errorResponse(w, http.StatusBadRequest, "Company name is required")
 		return

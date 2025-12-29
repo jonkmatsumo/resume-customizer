@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jonathan/resume-customizer/internal/db"
+	"github.com/jonathan/resume-customizer/internal/server/ratelimit"
 )
 
 // Server represents the HTTP server
@@ -21,6 +23,7 @@ type Server struct {
 	db          *db.DB
 	apiKey      string
 	databaseURL string
+	rateLimiter *ratelimit.Limiter
 }
 
 // Config holds server configuration
@@ -43,6 +46,9 @@ func New(cfg Config) (*Server, error) {
 		apiKey:      cfg.APIKey,
 		databaseURL: cfg.DatabaseURL,
 	}
+
+	// Initialize rate limiter
+	s.rateLimiter = ratelimit.NewLimiter(ratelimit.LoadConfig())
 
 	// Setup router
 	mux := http.NewServeMux()
@@ -104,9 +110,13 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /users/{id}/experience-bank/skills/{skill_id}/bullets", s.handleGetSkillBullets)
 
 	// Companies endpoints
+	// Note: In Go 1.22+ ServeMux, the route /companies/by-name/{name} conflicts
+	// with /companies/{id}/domains because both could match /companies/by-name/domains.
+	// Solution: Change /companies/by-name/{name} to use query parameter /companies/by-name?name={name}
+	// This avoids the route conflict while maintaining functionality.
 	mux.HandleFunc("GET /companies", s.handleListCompanies)
+	mux.HandleFunc("GET /companies/by-name", s.handleGetCompanyByName) // Changed to use query parameter
 	mux.HandleFunc("GET /companies/{id}", s.handleGetCompany)
-	mux.HandleFunc("GET /companies/by-name/{name}", s.handleGetCompanyByName)
 	mux.HandleFunc("GET /companies/{id}/domains", s.handleListCompanyDomains)
 
 	// Company profiles endpoints
@@ -137,7 +147,7 @@ func New(cfg Config) (*Server, error) {
 	// Create HTTP server
 	s.httpServer = &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
-		Handler:      s.withLogging(s.withCORS(mux)),
+		Handler:      s.withRateLimit(s.withLogging(s.withCORS(mux))),
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 300 * time.Second, // Long timeout for pipeline runs
 		IdleTimeout:  60 * time.Second,
@@ -169,6 +179,11 @@ func (s *Server) Start() error {
 		return fmt.Errorf("server shutdown failed: %w", err)
 	}
 
+	// Stop rate limiter cleanup goroutine
+	if s.rateLimiter != nil {
+		s.rateLimiter.Stop()
+	}
+
 	s.db.Close()
 	log.Println("Server stopped")
 	return nil
@@ -186,6 +201,29 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 			return
 		}
 
+		next.ServeHTTP(w, r)
+	})
+}
+
+// withRateLimit adds rate limiting middleware
+func (s *Server) withRateLimit(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Extract client identifier (IP address)
+		clientID := s.extractClientID(r)
+
+		// Check rate limit
+		allowed, info := s.rateLimiter.Allow(clientID, r.URL.Path, r.Method)
+
+		if !allowed {
+			// Set rate limit headers
+			s.setRateLimitHeaders(w, info)
+			// Return 429 Too Many Requests
+			s.rateLimitResponse(w, info)
+			return
+		}
+
+		// Set rate limit headers for successful requests
+		s.setRateLimitHeaders(w, info)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -217,4 +255,48 @@ func (s *Server) jsonResponse(w http.ResponseWriter, status int, data any) {
 // errorResponse writes an error JSON response
 func (s *Server) errorResponse(w http.ResponseWriter, status int, message string) {
 	s.jsonResponse(w, status, map[string]string{"error": message})
+}
+
+// extractClientID extracts the client identifier from the request.
+// For MVP, this uses the IP address from RemoteAddr.
+// In the future, this could use X-Forwarded-For header (only from trusted proxies).
+func (s *Server) extractClientID(r *http.Request) string {
+	// Get IP from RemoteAddr (format: "IP:port")
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		// If parsing fails, use the whole RemoteAddr
+		return r.RemoteAddr
+	}
+	return ip
+}
+
+// setRateLimitHeaders sets standard rate limit headers on the response.
+func (s *Server) setRateLimitHeaders(w http.ResponseWriter, info ratelimit.Info) {
+	if info.Limit > 0 {
+		w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", info.Limit))
+		w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", info.Remaining))
+		w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", info.ResetTime.Unix()))
+	}
+}
+
+// rateLimitResponse writes a 429 Too Many Requests response with rate limit information.
+func (s *Server) rateLimitResponse(w http.ResponseWriter, info ratelimit.Info) {
+	response := map[string]interface{}{
+		"error":     "rate_limit_exceeded",
+		"message":   "Rate limit exceeded. Please try again later.",
+		"limit":     info.Limit,
+		"remaining": info.Remaining,
+		"reset_at":  info.ResetTime.Format(time.RFC3339),
+	}
+
+	if info.RetryAfter > 0 {
+		response["retry_after"] = int(info.RetryAfter.Seconds())
+		w.Header().Set("Retry-After", fmt.Sprintf("%d", int(info.RetryAfter.Seconds())))
+	}
+
+	// Log rate limit hit
+	log.Printf("[rate-limit] Rate limit exceeded: Limit=%d Remaining=%d Reset=%s",
+		info.Limit, info.Remaining, info.ResetTime.Format(time.RFC3339))
+
+	s.jsonResponse(w, http.StatusTooManyRequests, response)
 }

@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/db"
+	"github.com/jonathan/resume-customizer/internal/server/ratelimit"
 )
 
 // mockDB implements a minimal mock for testing
@@ -52,9 +54,35 @@ type testServer struct {
 
 func newTestServer() *testServer {
 	mock := newMockDB()
+	// Create rate limiter with test config (disabled by default for most tests)
+	rateLimitConfig := &ratelimit.Config{
+		Enabled:       false,
+		DefaultLimit:  1000,
+		DefaultWindow: time.Minute,
+	}
 	s := &Server{
-		db:     nil, // Will use mock methods directly
-		apiKey: "test-api-key",
+		db:          nil, // Will use mock methods directly
+		apiKey:      "test-api-key",
+		rateLimiter: ratelimit.NewLimiter(rateLimitConfig),
+	}
+	return &testServer{Server: s, mock: mock}
+}
+
+func newTestServerWithRateLimit(enabled bool, limit int, window time.Duration) *testServer {
+	mock := newMockDB()
+	rateLimitConfig := &ratelimit.Config{
+		Enabled:       enabled,
+		DefaultLimit:  limit,
+		DefaultWindow: window,
+		EndpointConfigs: []ratelimit.EndpointConfig{
+			{Path: "/run", Method: "POST", Limit: 5, Window: time.Hour, Burst: 5},
+			{Path: "/health", Method: "GET", Limit: 0, Window: 0}, // Unlimited
+		},
+	}
+	s := &Server{
+		db:          nil,
+		apiKey:      "test-api-key",
+		rateLimiter: ratelimit.NewLimiter(rateLimitConfig),
 	}
 	return &testServer{Server: s, mock: mock}
 }
@@ -436,5 +464,236 @@ func TestRunResumeTex_InvalidID(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected status 400, got %d", w.Code)
+	}
+}
+
+// TestRateLimitMiddleware_Headers tests that rate limit headers are set
+func TestRateLimitMiddleware_Headers(t *testing.T) {
+	s := newTestServerWithRateLimit(true, 10, time.Minute)
+
+	handler := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Header().Get("X-RateLimit-Limit") == "" {
+		t.Error("expected X-RateLimit-Limit header")
+	}
+	if w.Header().Get("X-RateLimit-Remaining") == "" {
+		t.Error("expected X-RateLimit-Remaining header")
+	}
+	if w.Header().Get("X-RateLimit-Reset") == "" {
+		t.Error("expected X-RateLimit-Reset header")
+	}
+}
+
+// TestRateLimitMiddleware_429Response tests 429 response when limit exceeded
+func TestRateLimitMiddleware_429Response(t *testing.T) {
+	s := newTestServerWithRateLimit(true, 2, time.Minute)
+
+	handler := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+
+	// Make requests up to limit
+	for i := 0; i < 2; i++ {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Errorf("expected status 200 for request %d, got %d", i+1, w.Code)
+		}
+	}
+
+	// 3rd request should be rate limited
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Errorf("expected status 429, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp["error"] != "rate_limit_exceeded" {
+		t.Errorf("expected error 'rate_limit_exceeded', got '%v'", resp["error"])
+	}
+
+	if w.Header().Get("Retry-After") == "" {
+		t.Error("expected Retry-After header in 429 response")
+	}
+}
+
+// TestRateLimitMiddleware_EndpointSpecific tests different limits for different endpoints
+func TestRateLimitMiddleware_EndpointSpecific(t *testing.T) {
+	s := newTestServerWithRateLimit(true, 1000, time.Minute)
+
+	handler := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/run", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+
+	// Make 5 requests (endpoint limit)
+	for i := 0; i < 5; i++ {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Errorf("expected status 200 for request %d, got %d", i+1, w.Code)
+		}
+		limit, _ := strconv.Atoi(w.Header().Get("X-RateLimit-Limit"))
+		if limit != 5 {
+			t.Errorf("expected limit 5 for /run endpoint, got %d", limit)
+		}
+	}
+
+	// 6th request should be rate limited
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Errorf("expected status 429, got %d", w.Code)
+	}
+}
+
+// TestRateLimitMiddleware_HealthCheckExempt tests that health check is unlimited
+func TestRateLimitMiddleware_HealthCheckExempt(t *testing.T) {
+	s := newTestServerWithRateLimit(true, 1, time.Minute)
+
+	handler := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+
+	// Make many requests - all should succeed
+	for i := 0; i < 100; i++ {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Errorf("expected status 200 for health check request %d, got %d", i+1, w.Code)
+		}
+		// Health check should not have rate limit headers (unlimited)
+		if w.Header().Get("X-RateLimit-Limit") != "" {
+			t.Error("health check should not have rate limit headers")
+		}
+	}
+}
+
+// TestRateLimitMiddleware_Whitelist tests whitelist functionality
+func TestRateLimitMiddleware_Whitelist(t *testing.T) {
+	config := &ratelimit.Config{
+		Enabled:       true,
+		DefaultLimit:  1,
+		DefaultWindow: time.Minute,
+		Whitelist:     map[string]bool{"127.0.0.1": true},
+	}
+	s := &Server{
+		db:          nil,
+		apiKey:      "test-api-key",
+		rateLimiter: ratelimit.NewLimiter(config),
+	}
+
+	handler := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+
+	// Make many requests - all should succeed (whitelisted)
+	for i := 0; i < 100; i++ {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Errorf("expected status 200 for whitelisted request %d, got %d", i+1, w.Code)
+		}
+	}
+}
+
+// TestRateLimitMiddleware_Blacklist tests blacklist functionality
+func TestRateLimitMiddleware_Blacklist(t *testing.T) {
+	config := &ratelimit.Config{
+		Enabled:       true,
+		DefaultLimit:  1000,
+		DefaultWindow: time.Minute,
+		Blacklist:     map[string]bool{"192.168.1.1": true},
+	}
+	s := &Server{
+		db:          nil,
+		apiKey:      "test-api-key",
+		rateLimiter: ratelimit.NewLimiter(config),
+	}
+
+	handler := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.RemoteAddr = "192.168.1.1:12345"
+
+	// Request should be denied (blacklisted)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Errorf("expected status 429 for blacklisted IP, got %d", w.Code)
+	}
+}
+
+// TestRateLimitMiddleware_Disabled tests that rate limiting can be disabled
+func TestRateLimitMiddleware_Disabled(t *testing.T) {
+	s := newTestServerWithRateLimit(false, 1, time.Minute)
+
+	handler := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+
+	// Make many requests - all should succeed (rate limiting disabled)
+	for i := 0; i < 100; i++ {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Errorf("expected status 200 when rate limiting disabled, got %d", w.Code)
+		}
+	}
+}
+
+// TestExtractClientID tests client ID extraction
+func TestExtractClientID(t *testing.T) {
+	s := newTestServer()
+
+	tests := []struct {
+		remoteAddr string
+		expected   string
+	}{
+		{"127.0.0.1:12345", "127.0.0.1"},
+		{"192.168.1.1:8080", "192.168.1.1"},
+		{"[::1]:12345", "::1"},
+		{"invalid", "invalid"},
+	}
+
+	for _, tt := range tests {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.RemoteAddr = tt.remoteAddr
+		got := s.extractClientID(req)
+		if got != tt.expected {
+			t.Errorf("extractClientID(%q) = %q, want %q", tt.remoteAddr, got, tt.expected)
+		}
 	}
 }
