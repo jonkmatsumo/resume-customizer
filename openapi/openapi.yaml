@@ -33,6 +33,10 @@ tags:
     description: Company information and domains
   - name: company-profiles
     description: Company research profiles, style rules, and values
+  - name: job-postings
+    description: Job posting endpoints
+  - name: job-profiles
+    description: Job profile endpoints
 
 paths:
   /health:
@@ -902,6 +906,210 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /job-postings:
+    get:
+      tags: [job-postings]
+      summary: List job postings
+      description: Returns a paginated list of job postings with optional filters
+      operationId: listJobPostings
+      parameters:
+        - $ref: "#/components/parameters/PlatformQuery"
+        - $ref: "#/components/parameters/CompanyIdQuery"
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/OffsetQuery"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobPostingListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /job-postings/{id}:
+    get:
+      tags: [job-postings]
+      summary: Get job posting by ID
+      description: Returns a single job posting by its UUID
+      operationId: getJobPosting
+      parameters:
+        - $ref: "#/components/parameters/JobPostingIdPath"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobPosting"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /job-postings/by-url:
+    get:
+      tags: [job-postings]
+      summary: Get job posting by URL
+      description: Returns a job posting by its URL
+      operationId: getJobPostingByURL
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: Job posting URL
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobPosting"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /companies/{company_id}/job-postings:
+    get:
+      tags: [job-postings]
+      summary: List job postings for a company
+      description: Returns all job postings associated with a company
+      operationId: listJobPostingsByCompany
+      parameters:
+        - in: path
+          name: company_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Company ID
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  postings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/JobPosting"
+                  count:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /job-profiles/{id}:
+    get:
+      tags: [job-profiles]
+      summary: Get job profile by ID
+      description: Returns a single job profile by its UUID
+      operationId: getJobProfile
+      parameters:
+        - $ref: "#/components/parameters/JobProfileIdPath"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobProfile"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /job-postings/{posting_id}/profile:
+    get:
+      tags: [job-profiles]
+      summary: Get job profile for a posting
+      description: Returns the job profile associated with a job posting
+      operationId: getJobProfileByPostingID
+      parameters:
+        - $ref: "#/components/parameters/PostingIdPath"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobProfile"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /job-profiles/{id}/requirements:
+    get:
+      tags: [job-profiles]
+      summary: Get requirements for a job profile
+      description: Returns all requirements (hard and nice-to-have) for a job profile
+      operationId: getRequirements
+      parameters:
+        - $ref: "#/components/parameters/JobProfileIdPath"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRequirementListResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /job-profiles/{id}/responsibilities:
+    get:
+      tags: [job-profiles]
+      summary: Get responsibilities for a job profile
+      description: Returns all responsibilities for a job profile
+      operationId: getResponsibilities
+      parameters:
+        - $ref: "#/components/parameters/JobProfileIdPath"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobResponsibilityListResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /job-profiles/{id}/keywords:
+    get:
+      tags: [job-profiles]
+      summary: Get keywords for a job profile
+      description: Returns all keywords for a job profile
+      operationId: getKeywords
+      parameters:
+        - $ref: "#/components/parameters/JobProfileIdPath"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobKeywordListResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 components:
   parameters:
     RunIdPath:
@@ -974,6 +1182,72 @@ components:
       schema:
         type: string
       description: Company name (will be normalized)
+
+    JobPostingIdPath:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Job posting ID
+
+    JobProfileIdPath:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Job profile ID
+
+    PostingIdPath:
+      in: path
+      name: posting_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Job posting ID
+
+    PlatformQuery:
+      name: platform
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [greenhouse, lever, linkedin, workday, ashby, unknown]
+      description: Filter by platform
+
+    CompanyIdQuery:
+      name: company_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+      description: Filter by company ID
+
+    LimitQuery:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 50
+        maximum: 100
+        minimum: 1
+      description: Pagination limit
+
+    OffsetQuery:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+      description: Pagination offset
 
   responses:
     BadRequest:
@@ -1609,3 +1883,307 @@ components:
         - profile_id
         - url
         - created_at
+
+    JobPosting:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_id:
+          type: string
+          format: uuid
+          nullable: true
+        url:
+          type: string
+          format: uri
+        role_title:
+          type: string
+          nullable: true
+        platform:
+          type: string
+          nullable: true
+        cleaned_text:
+          type: string
+          nullable: true
+        content_hash:
+          type: string
+          nullable: true
+        about_company:
+          type: string
+          nullable: true
+        admin_info:
+          $ref: "#/components/schemas/AdminInfo"
+        extracted_links:
+          type: array
+          items:
+            type: string
+        http_status:
+          type: integer
+          nullable: true
+        fetch_status:
+          type: string
+        error_message:
+          type: string
+          nullable: true
+        fetched_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_accessed_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - url
+        - fetch_status
+        - fetched_at
+        - last_accessed_at
+        - created_at
+        - updated_at
+
+    AdminInfo:
+      type: object
+      properties:
+        salary:
+          type: string
+          nullable: true
+        salary_min:
+          type: integer
+          nullable: true
+        salary_max:
+          type: integer
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        remote_policy:
+          type: string
+          nullable: true
+        employment_type:
+          type: string
+          nullable: true
+
+    JobPostingListResponse:
+      type: object
+      properties:
+        postings:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobPosting"
+        count:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+        - postings
+        - count
+        - limit
+        - offset
+
+    JobProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        posting_id:
+          type: string
+          format: uuid
+        company_name:
+          type: string
+        role_title:
+          type: string
+        eval_latency:
+          type: boolean
+        eval_reliability:
+          type: boolean
+        eval_ownership:
+          type: boolean
+        eval_scale:
+          type: boolean
+        eval_collaboration:
+          type: boolean
+        eval_signals_raw:
+          type: object
+          additionalProperties: true
+        education_min_degree:
+          type: string
+          nullable: true
+        education_preferred_fields:
+          type: array
+          items:
+            type: string
+        education_is_required:
+          type: boolean
+        education_evidence:
+          type: string
+          nullable: true
+        parsed_at:
+          type: string
+          format: date-time
+        parser_version:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        responsibilities:
+          type: array
+          items:
+            type: string
+        hard_requirements:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobRequirement"
+        nice_to_haves:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobRequirement"
+        keywords:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - posting_id
+        - company_name
+        - role_title
+        - parsed_at
+        - created_at
+        - updated_at
+
+    JobRequirement:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_profile_id:
+          type: string
+          format: uuid
+        requirement_type:
+          type: string
+          enum: [hard, nice_to_have]
+        skill:
+          type: string
+        level:
+          type: string
+          nullable: true
+        evidence:
+          type: string
+          nullable: true
+        ordinal:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - job_profile_id
+        - requirement_type
+        - skill
+        - ordinal
+        - created_at
+
+    JobRequirementListResponse:
+      type: object
+      properties:
+        requirements:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobRequirement"
+        count:
+          type: integer
+      required:
+        - requirements
+        - count
+
+    JobResponsibility:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_profile_id:
+          type: string
+          format: uuid
+        text:
+          type: string
+        ordinal:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - job_profile_id
+        - text
+        - ordinal
+        - created_at
+
+    JobResponsibilityListResponse:
+      type: object
+      properties:
+        responsibilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobResponsibility"
+        count:
+          type: integer
+      required:
+        - responsibilities
+        - count
+
+    JobKeyword:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_profile_id:
+          type: string
+          format: uuid
+        keyword:
+          type: string
+        keyword_normalized:
+          type: string
+        source:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - job_profile_id
+        - keyword
+        - keyword_normalized
+        - created_at
+
+    JobKeywordListResponse:
+      type: object
+      properties:
+        keywords:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobKeyword"
+        count:
+          type: integer
+      required:
+        - keywords
+        - count

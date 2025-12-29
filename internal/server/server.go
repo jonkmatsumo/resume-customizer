@@ -101,6 +101,19 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /companies/{company_id}/profile/values", s.handleGetValues)
 	mux.HandleFunc("GET /companies/{company_id}/profile/sources", s.handleGetSources)
 
+	// Job Postings endpoints
+	mux.HandleFunc("GET /job-postings", s.handleListJobPostings)
+	mux.HandleFunc("GET /job-postings/{id}", s.handleGetJobPosting)
+	mux.HandleFunc("GET /job-postings/by-url", s.handleGetJobPostingByURL)
+	mux.HandleFunc("GET /companies/{company_id}/job-postings", s.handleListJobPostingsByCompany)
+
+	// Job Profiles endpoints
+	mux.HandleFunc("GET /job-profiles/{id}", s.handleGetJobProfile)
+	mux.HandleFunc("GET /job-postings/{posting_id}/profile", s.handleGetJobProfileByPostingID)
+	mux.HandleFunc("GET /job-profiles/{id}/requirements", s.handleGetRequirements)
+	mux.HandleFunc("GET /job-profiles/{id}/responsibilities", s.handleGetResponsibilities)
+	mux.HandleFunc("GET /job-profiles/{id}/keywords", s.handleGetKeywords)
+
 	// Create HTTP server
 	s.httpServer = &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),

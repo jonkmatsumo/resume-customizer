@@ -212,6 +212,111 @@ func (db *DB) ListJobPostingsByCompany(ctx context.Context, companyID uuid.UUID)
 	return postings, nil
 }
 
+// ListJobPostingsOptions contains filters for listing job postings
+type ListJobPostingsOptions struct {
+	Platform  *string    // Filter by platform (greenhouse, lever, etc.)
+	CompanyID *uuid.UUID // Filter by company
+	Limit     int        // Pagination limit
+	Offset    int        // Pagination offset
+}
+
+// ListJobPostings lists job postings with optional filters and pagination
+func (db *DB) ListJobPostings(ctx context.Context, opts ListJobPostingsOptions) ([]JobPosting, int, error) {
+	// Build WHERE clause dynamically
+	var conditions []string
+	var args []interface{}
+	argIndex := 1
+
+	if opts.Platform != nil && *opts.Platform != "" {
+		conditions = append(conditions, fmt.Sprintf("platform = $%d", argIndex))
+		args = append(args, *opts.Platform)
+		argIndex++
+	}
+
+	if opts.CompanyID != nil {
+		conditions = append(conditions, fmt.Sprintf("company_id = $%d", argIndex))
+		args = append(args, *opts.CompanyID)
+		argIndex++
+	}
+
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = "WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	// Get total count
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM job_postings %s", whereClause)
+	var total int
+	err := db.pool.QueryRow(ctx, countQuery, args...).Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count job postings: %w", err)
+	}
+
+	// Get postings
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	offset := opts.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	args = append(args, limit, offset)
+	query := fmt.Sprintf(
+		`SELECT id, company_id, url, role_title, platform, cleaned_text,
+		        content_hash, about_company, admin_info, extracted_links,
+		        http_status, fetch_status, error_message, fetched_at, expires_at,
+		        last_accessed_at, created_at, updated_at
+		 FROM job_postings %s
+		 ORDER BY created_at DESC
+		 LIMIT $%d OFFSET $%d`,
+		whereClause, argIndex, argIndex+1,
+	)
+
+	rows, err := db.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list job postings: %w", err)
+	}
+	defer rows.Close()
+
+	var postings []JobPosting
+	for rows.Next() {
+		var p JobPosting
+		var adminInfoJSON, linksJSON []byte
+		var companyID *uuid.UUID
+
+		err := rows.Scan(
+			&p.ID, &companyID, &p.URL, &p.RoleTitle, &p.Platform,
+			&p.CleanedText, &p.ContentHash, &p.AboutCompany, &adminInfoJSON, &linksJSON,
+			&p.HTTPStatus, &p.FetchStatus, &p.ErrorMessage, &p.FetchedAt, &p.ExpiresAt,
+			&p.LastAccessed, &p.CreatedAt, &p.UpdatedAt,
+		)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		p.CompanyID = companyID
+
+		// Parse JSONB fields
+		if adminInfoJSON != nil {
+			p.AdminInfo = &AdminInfo{}
+			_ = json.Unmarshal(adminInfoJSON, p.AdminInfo)
+		}
+		if linksJSON != nil {
+			_ = json.Unmarshal(linksJSON, &p.ExtractedLinks)
+		}
+
+		postings = append(postings, p)
+	}
+
+	return postings, total, nil
+}
+
 // -----------------------------------------------------------------------------
 // Job Profile Methods
 // -----------------------------------------------------------------------------
@@ -506,6 +611,86 @@ func (db *DB) DeleteJobProfile(ctx context.Context, id uuid.UUID) error {
 		return fmt.Errorf("failed to delete job profile: %w", err)
 	}
 	return nil
+}
+
+// GetRequirementsByProfileID retrieves all requirements (hard + nice-to-have) for a job profile
+func (db *DB) GetRequirementsByProfileID(ctx context.Context, profileID uuid.UUID) ([]JobRequirement, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT id, job_profile_id, requirement_type, skill, level, evidence, ordinal, created_at
+		 FROM job_requirements
+		 WHERE job_profile_id = $1
+		 ORDER BY requirement_type, ordinal`,
+		profileID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get requirements: %w", err)
+	}
+	defer rows.Close()
+
+	var requirements []JobRequirement
+	for rows.Next() {
+		var r JobRequirement
+		if err := rows.Scan(&r.ID, &r.JobProfileID, &r.RequirementType, &r.Skill,
+			&r.Level, &r.Evidence, &r.Ordinal, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		requirements = append(requirements, r)
+	}
+
+	return requirements, nil
+}
+
+// GetResponsibilitiesByProfileID retrieves all responsibilities for a job profile
+func (db *DB) GetResponsibilitiesByProfileID(ctx context.Context, profileID uuid.UUID) ([]JobResponsibility, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT id, job_profile_id, text, ordinal, created_at
+		 FROM job_responsibilities
+		 WHERE job_profile_id = $1
+		 ORDER BY ordinal`,
+		profileID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get responsibilities: %w", err)
+	}
+	defer rows.Close()
+
+	var responsibilities []JobResponsibility
+	for rows.Next() {
+		var r JobResponsibility
+		if err := rows.Scan(&r.ID, &r.JobProfileID, &r.Text, &r.Ordinal, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		responsibilities = append(responsibilities, r)
+	}
+
+	return responsibilities, nil
+}
+
+// GetKeywordsByProfileID retrieves all keywords for a job profile
+func (db *DB) GetKeywordsByProfileID(ctx context.Context, profileID uuid.UUID) ([]JobKeyword, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT id, job_profile_id, keyword, keyword_normalized, source, created_at
+		 FROM job_keywords
+		 WHERE job_profile_id = $1
+		 ORDER BY keyword`,
+		profileID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get keywords: %w", err)
+	}
+	defer rows.Close()
+
+	var keywords []JobKeyword
+	for rows.Next() {
+		var k JobKeyword
+		if err := rows.Scan(&k.ID, &k.JobProfileID, &k.Keyword, &k.KeywordNormalized,
+			&k.Source, &k.CreatedAt); err != nil {
+			return nil, err
+		}
+		keywords = append(keywords, k)
+	}
+
+	return keywords, nil
 }
 
 // -----------------------------------------------------------------------------
