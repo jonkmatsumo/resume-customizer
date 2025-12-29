@@ -88,6 +88,19 @@ func New(cfg Config) (*Server, error) {
 	// Export endpoint
 	mux.HandleFunc("GET /users/{id}/experience-bank", s.handleGetExperienceBank)
 
+	// Companies endpoints
+	mux.HandleFunc("GET /companies", s.handleListCompanies)
+	mux.HandleFunc("GET /companies/{id}", s.handleGetCompany)
+	mux.HandleFunc("GET /companies/by-name/{name}", s.handleGetCompanyByName)
+	mux.HandleFunc("GET /companies/{id}/domains", s.handleListCompanyDomains)
+
+	// Company profiles endpoints
+	mux.HandleFunc("GET /companies/{company_id}/profile", s.handleGetCompanyProfile)
+	mux.HandleFunc("GET /companies/{company_id}/profile/style-rules", s.handleGetStyleRules)
+	mux.HandleFunc("GET /companies/{company_id}/profile/taboo-phrases", s.handleGetTabooPhrases)
+	mux.HandleFunc("GET /companies/{company_id}/profile/values", s.handleGetValues)
+	mux.HandleFunc("GET /companies/{company_id}/profile/sources", s.handleGetSources)
+
 	// Create HTTP server
 	s.httpServer = &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),

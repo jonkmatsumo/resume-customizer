@@ -158,6 +158,47 @@ func (db *DB) ListCompanyDomains(ctx context.Context, companyID uuid.UUID) ([]Co
 	return domains, nil
 }
 
+// ListCompaniesWithProfiles returns companies that have research profiles, with pagination
+func (db *DB) ListCompaniesWithProfiles(ctx context.Context, limit, offset int) ([]Company, int, error) {
+	// Get total count
+	var total int
+	err := db.pool.QueryRow(ctx,
+		`SELECT COUNT(DISTINCT c.id)
+		 FROM companies c
+		 INNER JOIN company_profiles cp ON cp.company_id = c.id`,
+	).Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count companies: %w", err)
+	}
+
+	// Get companies
+	rows, err := db.pool.Query(ctx,
+		`SELECT DISTINCT c.id, c.name, c.name_normalized, c.domain, c.industry, 
+		        c.created_at, c.updated_at
+		 FROM companies c
+		 INNER JOIN company_profiles cp ON cp.company_id = c.id
+		 ORDER BY c.name
+		 LIMIT $1 OFFSET $2`,
+		limit, offset,
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list companies: %w", err)
+	}
+	defer rows.Close()
+
+	var companies []Company
+	for rows.Next() {
+		var c Company
+		if err := rows.Scan(&c.ID, &c.Name, &c.NameNormalized, &c.Domain, &c.Industry,
+			&c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, 0, err
+		}
+		companies = append(companies, c)
+	}
+
+	return companies, total, nil
+}
+
 // -----------------------------------------------------------------------------
 // Crawled Page Methods
 // -----------------------------------------------------------------------------

@@ -29,6 +29,10 @@ tags:
     description: Experience bullet CRUD
   - name: education
     description: Education history CRUD
+  - name: companies
+    description: Company information and domains
+  - name: company-profiles
+    description: Company research profiles, style rules, and values
 
 paths:
   /health:
@@ -627,7 +631,7 @@ paths:
     get:
       tags: [users]
       summary: Export experience bank
-      description: Exports the user’s experience bank JSON in a pipeline-compatible format.
+      description: Exports the user's experience bank JSON in a pipeline-compatible format.
       operationId: exportExperienceBank
       parameters:
         - $ref: "#/components/parameters/UserIdPath"
@@ -638,6 +642,261 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ExperienceBankExport"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /companies:
+    get:
+      tags: [companies]
+      summary: List all companies with research profiles
+      description: Returns a paginated list of companies that have research profiles
+      operationId: listCompanies
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /companies/{id}:
+    get:
+      tags: [companies]
+      summary: Get company by ID
+      description: Returns a single company by its UUID
+      operationId: getCompany
+      parameters:
+        - $ref: "#/components/parameters/CompanyIdPath"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /companies/by-name/{name}:
+    get:
+      tags: [companies]
+      summary: Get company by normalized name
+      description: Returns a company by its normalized name
+      operationId: getCompanyByName
+      parameters:
+        - $ref: "#/components/parameters/CompanyNamePath"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /companies/{id}/domains:
+    get:
+      tags: [companies]
+      summary: List domains for a company
+      description: Returns all domains associated with a company
+      operationId: listCompanyDomains
+      parameters:
+        - $ref: "#/components/parameters/CompanyIdPath"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  domains:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CompanyDomain"
+                  count:
+                    type: integer
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /companies/{company_id}/profile:
+    get:
+      tags: [company-profiles]
+      summary: Get company profile
+      description: Returns the research profile for a company
+      operationId: getCompanyProfile
+      parameters:
+        - in: path
+          name: company_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Company ID
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyProfile"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /companies/{company_id}/profile/style-rules:
+    get:
+      tags: [company-profiles]
+      summary: Get style rules for company
+      description: Returns style rules extracted from the company profile
+      operationId: getStyleRules
+      parameters:
+        - in: path
+          name: company_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Company ID
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  style_rules:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CompanyStyleRule"
+                  count:
+                    type: integer
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /companies/{company_id}/profile/taboo-phrases:
+    get:
+      tags: [company-profiles]
+      summary: Get taboo phrases for company
+      description: Returns phrases to avoid based on company profile
+      operationId: getTabooPhrases
+      parameters:
+        - in: path
+          name: company_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Company ID
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  taboo_phrases:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CompanyTabooPhrase"
+                  count:
+                    type: integer
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /companies/{company_id}/profile/values:
+    get:
+      tags: [company-profiles]
+      summary: Get company values
+      description: Returns core values extracted from company profile
+      operationId: getCompanyValues
+      parameters:
+        - in: path
+          name: company_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Company ID
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  values:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CompanyValue"
+                  count:
+                    type: integer
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /companies/{company_id}/profile/sources:
+    get:
+      tags: [company-profiles]
+      summary: Get evidence URLs for company profile
+      description: Returns URLs used as evidence for the company profile
+      operationId: getProfileSources
+      parameters:
+        - in: path
+          name: company_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Company ID
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sources:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CompanyProfileSource"
+                  count:
+                    type: integer
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -698,6 +957,23 @@ components:
         type: string
         format: uuid
       description: Education ID
+
+    CompanyIdPath:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Company ID
+
+    CompanyNamePath:
+      in: path
+      name: name
+      required: true
+      schema:
+        type: string
+      description: Company name (will be normalized)
 
   responses:
     BadRequest:
@@ -1116,3 +1392,220 @@ components:
               items: {}
             - type: string
       required: [error, message]
+
+    Company:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        name_normalized:
+          type: string
+        domain:
+          type: string
+          nullable: true
+        industry:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - name_normalized
+        - created_at
+        - updated_at
+
+    CompanyListResponse:
+      type: object
+      properties:
+        companies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Company"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+        - companies
+        - total
+        - limit
+        - offset
+
+    CompanyDomain:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_id:
+          type: string
+          format: uuid
+        domain:
+          type: string
+        domain_type:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - company_id
+        - domain
+        - domain_type
+        - created_at
+
+    CompanyProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_id:
+          type: string
+          format: uuid
+        tone:
+          type: string
+        domain_context:
+          type: string
+          nullable: true
+        version:
+          type: integer
+        last_verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        style_rules:
+          type: array
+          items:
+            type: string
+        taboo_phrases:
+          type: array
+          items:
+            type: string
+        values:
+          type: array
+          items:
+            type: string
+        evidence_urls:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - company_id
+        - tone
+        - version
+        - created_at
+        - updated_at
+
+    CompanyStyleRule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        profile_id:
+          type: string
+          format: uuid
+        rule_text:
+          type: string
+        priority:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - profile_id
+        - rule_text
+        - priority
+        - created_at
+
+    CompanyTabooPhrase:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        profile_id:
+          type: string
+          format: uuid
+        phrase:
+          type: string
+        reason:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - profile_id
+        - phrase
+        - created_at
+
+    CompanyValue:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        profile_id:
+          type: string
+          format: uuid
+        value_text:
+          type: string
+        priority:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - profile_id
+        - value_text
+        - priority
+        - created_at
+
+    CompanyProfileSource:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        profile_id:
+          type: string
+          format: uuid
+        crawled_page_id:
+          type: string
+          format: uuid
+          nullable: true
+        url:
+          type: string
+        source_type:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - profile_id
+        - url
+        - created_at

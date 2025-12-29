@@ -283,6 +283,106 @@ func (db *DB) loadProfileRelations(ctx context.Context, p *CompanyProfile) error
 	return nil
 }
 
+// GetStyleRulesByProfileID retrieves style rules for a profile
+func (db *DB) GetStyleRulesByProfileID(ctx context.Context, profileID uuid.UUID) ([]CompanyStyleRule, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT id, profile_id, rule_text, priority, created_at
+		 FROM company_style_rules
+		 WHERE profile_id = $1
+		 ORDER BY priority DESC, created_at`,
+		profileID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get style rules: %w", err)
+	}
+	defer rows.Close()
+
+	var rules []CompanyStyleRule
+	for rows.Next() {
+		var r CompanyStyleRule
+		if err := rows.Scan(&r.ID, &r.ProfileID, &r.RuleText, &r.Priority, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		rules = append(rules, r)
+	}
+	return rules, nil
+}
+
+// GetTabooPhrasesByProfileID retrieves taboo phrases for a profile
+func (db *DB) GetTabooPhrasesByProfileID(ctx context.Context, profileID uuid.UUID) ([]CompanyTabooPhrase, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT id, profile_id, phrase, reason, created_at
+		 FROM company_taboo_phrases
+		 WHERE profile_id = $1
+		 ORDER BY created_at`,
+		profileID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get taboo phrases: %w", err)
+	}
+	defer rows.Close()
+
+	var phrases []CompanyTabooPhrase
+	for rows.Next() {
+		var p CompanyTabooPhrase
+		if err := rows.Scan(&p.ID, &p.ProfileID, &p.Phrase, &p.Reason, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		phrases = append(phrases, p)
+	}
+	return phrases, nil
+}
+
+// GetValuesByProfileID retrieves company values for a profile
+func (db *DB) GetValuesByProfileID(ctx context.Context, profileID uuid.UUID) ([]CompanyValue, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT id, profile_id, value_text, priority, created_at
+		 FROM company_values
+		 WHERE profile_id = $1
+		 ORDER BY priority DESC, created_at`,
+		profileID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get values: %w", err)
+	}
+	defer rows.Close()
+
+	var values []CompanyValue
+	for rows.Next() {
+		var v CompanyValue
+		if err := rows.Scan(&v.ID, &v.ProfileID, &v.ValueText, &v.Priority, &v.CreatedAt); err != nil {
+			return nil, err
+		}
+		values = append(values, v)
+	}
+	return values, nil
+}
+
+// GetSourcesByProfileID retrieves evidence URLs for a profile
+func (db *DB) GetSourcesByProfileID(ctx context.Context, profileID uuid.UUID) ([]CompanyProfileSource, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT id, profile_id, crawled_page_id, url, source_type, created_at
+		 FROM company_profile_sources
+		 WHERE profile_id = $1
+		 ORDER BY created_at`,
+		profileID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sources: %w", err)
+	}
+	defer rows.Close()
+
+	var sources []CompanyProfileSource
+	for rows.Next() {
+		var s CompanyProfileSource
+		if err := rows.Scan(&s.ID, &s.ProfileID, &s.CrawledPageID, &s.URL, &s.SourceType, &s.CreatedAt); err != nil {
+			return nil, err
+		}
+		sources = append(sources, s)
+	}
+	return sources, nil
+}
+
 // -----------------------------------------------------------------------------
 // Brand Signal Methods
 // -----------------------------------------------------------------------------
