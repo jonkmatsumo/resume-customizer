@@ -13,7 +13,13 @@ import (
 )
 
 func TestHandleCreateRun_MissingUserID(t *testing.T) {
-	s := setupTestServer(t)
+	// Use integration test server setup instead of unit test setup
+	// since we need a real database connection
+	if testing.Short() {
+		t.Skip("Skipping test that requires database")
+	}
+
+	s := setupIntegrationTestServer(t)
 	defer s.db.Close()
 
 	req := RunCreateRequest{
@@ -34,7 +40,11 @@ func TestHandleCreateRun_MissingUserID(t *testing.T) {
 }
 
 func TestHandleCreateRun_InvalidUserID(t *testing.T) {
-	s := setupTestServer(t)
+	if testing.Short() {
+		t.Skip("Skipping test that requires database")
+	}
+
+	s := setupIntegrationTestServer(t)
 	defer s.db.Close()
 
 	req := RunCreateRequest{
@@ -56,12 +66,17 @@ func TestHandleCreateRun_InvalidUserID(t *testing.T) {
 }
 
 func TestHandleCreateRun_MissingJobInput(t *testing.T) {
-	s := setupTestServer(t)
+	if testing.Short() {
+		t.Skip("Skipping test that requires database")
+	}
+
+	s := setupIntegrationTestServer(t)
 	defer s.db.Close()
 
-	userID := uuid.New()
-	// Create user first
-	_, err := s.db.CreateUser(httptest.NewRequest(http.MethodPost, "/", nil).Context(), "Test User", "test@example.com", "123")
+	ctx := httptest.NewRequest(http.MethodPost, "/", nil).Context()
+	// Create user first with unique email
+	uniqueEmail := "test-" + uuid.New().String() + "@example.com"
+	userID, err := s.db.CreateUser(ctx, "Test User", uniqueEmail, "123")
 	require.NoError(t, err)
 
 	req := RunCreateRequest{
@@ -79,11 +94,17 @@ func TestHandleCreateRun_MissingJobInput(t *testing.T) {
 }
 
 func TestHandleGetStepStatus_NotFound(t *testing.T) {
-	s := setupTestServer(t)
+	if testing.Short() {
+		t.Skip("Skipping test that requires database")
+	}
+
+	s := setupIntegrationTestServer(t)
 	defer s.db.Close()
 
 	runID := uuid.New()
 	httpReq := httptest.NewRequest(http.MethodGet, "/runs/"+runID.String()+"/steps/test_step", nil)
+	httpReq.SetPathValue("run_id", runID.String())
+	httpReq.SetPathValue("step_name", "test_step")
 	w := httptest.NewRecorder()
 
 	s.handleGetStepStatus(w, httpReq)
@@ -92,11 +113,16 @@ func TestHandleGetStepStatus_NotFound(t *testing.T) {
 }
 
 func TestHandleListRunSteps_NotFound(t *testing.T) {
-	s := setupTestServer(t)
+	if testing.Short() {
+		t.Skip("Skipping test that requires database")
+	}
+
+	s := setupIntegrationTestServer(t)
 	defer s.db.Close()
 
 	runID := uuid.New()
 	httpReq := httptest.NewRequest(http.MethodGet, "/runs/"+runID.String()+"/steps", nil)
+	httpReq.SetPathValue("run_id", runID.String())
 	w := httptest.NewRecorder()
 
 	s.handleListRunSteps(w, httpReq)
@@ -105,11 +131,16 @@ func TestHandleListRunSteps_NotFound(t *testing.T) {
 }
 
 func TestHandleGetCheckpoint_NotFound(t *testing.T) {
-	s := setupTestServer(t)
+	if testing.Short() {
+		t.Skip("Skipping test that requires database")
+	}
+
+	s := setupIntegrationTestServer(t)
 	defer s.db.Close()
 
 	runID := uuid.New()
 	httpReq := httptest.NewRequest(http.MethodGet, "/runs/"+runID.String()+"/checkpoint", nil)
+	httpReq.SetPathValue("run_id", runID.String())
 	w := httptest.NewRecorder()
 
 	s.handleGetCheckpoint(w, httpReq)
@@ -118,15 +149,21 @@ func TestHandleGetCheckpoint_NotFound(t *testing.T) {
 }
 
 func TestHandleSkipStep_UnknownStep(t *testing.T) {
-	s := setupTestServer(t)
+	if testing.Short() {
+		t.Skip("Skipping test that requires database")
+	}
+
+	s := setupIntegrationTestServer(t)
 	defer s.db.Close()
 
-	runID := uuid.New()
+	ctx := httptest.NewRequest(http.MethodPost, "/", nil).Context()
 	// Create run first
-	_, err := s.db.CreateRun(httptest.NewRequest(http.MethodPost, "/", nil).Context(), "Test", "", "")
+	runID, err := s.db.CreateRun(ctx, "Test", "", "")
 	require.NoError(t, err)
 
 	httpReq := httptest.NewRequest(http.MethodPost, "/runs/"+runID.String()+"/steps/unknown_step/skip", nil)
+	httpReq.SetPathValue("run_id", runID.String())
+	httpReq.SetPathValue("step_name", "unknown_step")
 	w := httptest.NewRecorder()
 
 	s.handleSkipStep(w, httpReq)
@@ -135,31 +172,25 @@ func TestHandleSkipStep_UnknownStep(t *testing.T) {
 }
 
 func TestHandleRetryStep_NotFailed(t *testing.T) {
-	s := setupTestServer(t)
+	if testing.Short() {
+		t.Skip("Skipping test that requires database")
+	}
+
+	s := setupIntegrationTestServer(t)
 	defer s.db.Close()
 
-	runID := uuid.New()
+	ctx := httptest.NewRequest(http.MethodPost, "/", nil).Context()
 	// Create run first
-	_, err := s.db.CreateRun(httptest.NewRequest(http.MethodPost, "/", nil).Context(), "Test", "", "")
+	runID, err := s.db.CreateRun(ctx, "Test", "", "")
 	require.NoError(t, err)
 
 	httpReq := httptest.NewRequest(http.MethodPost, "/runs/"+runID.String()+"/steps/test_step/retry", nil)
+	httpReq.SetPathValue("run_id", runID.String())
+	httpReq.SetPathValue("step_name", "test_step")
 	w := httptest.NewRecorder()
 
 	s.handleRetryStep(w, httpReq)
 
 	// Should fail because step doesn't exist or isn't in failed state
 	assert.True(t, w.Code == http.StatusNotFound || w.Code == http.StatusBadRequest)
-}
-
-// setupTestServer creates a test server with a test database
-func setupTestServer(t *testing.T) *Server {
-	// Use a test database URL - in real tests this would be a test database
-	// For now, we'll skip tests that require database
-	if testing.Short() {
-		t.Skip("Skipping test that requires database")
-	}
-
-	// This is a placeholder - real integration tests would set up a test database
-	return nil
 }

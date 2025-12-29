@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/google/uuid"
@@ -48,7 +49,9 @@ func TestCompaniesEndpoints_Integration(t *testing.T) {
 
 	// Test 2: Get company by name
 	t.Run("GetCompanyByName", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/companies/by-name/"+company.Name, nil)
+		// URL-encode the company name for the path
+		encodedName := url.PathEscape(company.Name)
+		req := httptest.NewRequest(http.MethodGet, "/companies/by-name/"+encodedName, nil)
 		req.SetPathValue("name", company.Name)
 		w := httptest.NewRecorder()
 

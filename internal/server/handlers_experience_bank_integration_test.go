@@ -19,8 +19,9 @@ func TestExperienceBankEndpoints_Integration(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Create test user
-	userID, err := s.db.CreateUser(ctx, "Test User", "test-experience@example.com", "")
+	// Create test user with unique email to avoid conflicts
+	uniqueEmail := "test-experience-" + uuid.New().String() + "@example.com"
+	userID, err := s.db.CreateUser(ctx, "Test User", uniqueEmail, "")
 	require.NoError(t, err)
 
 	// Create test job
@@ -33,22 +34,23 @@ func TestExperienceBankEndpoints_Integration(t *testing.T) {
 	require.NoError(t, err)
 	job.ID = jobID
 
-	// Create test story
+	// Create test story with unique story_id to avoid conflicts from previous test runs
+	uniqueStoryID := "test-story-" + uuid.New().String()
 	story, err := s.db.CreateStory(ctx, &db.StoryCreateInput{
-		StoryID: "test-story-1",
+		StoryID: uniqueStoryID,
 		UserID:  userID,
 		JobID:   job.ID,
 		Title:   "Test Story",
 		Bullets: []db.BulletCreateInput{
 			{
-				BulletID:         "bullet-1",
+				BulletID:         "bullet-1-" + uuid.New().String(),
 				Text:             "Implemented feature X using Go",
 				EvidenceStrength: db.EvidenceStrengthHigh,
 				Skills:           []string{"Go", "Backend"},
 				Ordinal:          1,
 			},
 			{
-				BulletID:         "bullet-2",
+				BulletID:         "bullet-2-" + uuid.New().String(),
 				Text:             "Optimized database queries",
 				EvidenceStrength: db.EvidenceStrengthMedium,
 				Skills:           []string{"SQL", "Database"},
@@ -64,28 +66,56 @@ func TestExperienceBankEndpoints_Integration(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, skill)
 
-	// Create another user for security testing
-	otherUserID, err := s.db.CreateUser(ctx, "Other User", "other-user@example.com", "")
+	// Create another user for security testing with unique email
+	otherUniqueEmail := "other-user-" + uuid.New().String() + "@example.com"
+	otherUserID, err := s.db.CreateUser(ctx, "Other User", otherUniqueEmail, "")
 	require.NoError(t, err)
 
 	// Test 1: List stories for user
 	t.Run("ListStories_Integration", func(t *testing.T) {
+		// Verify story was created
+		verifyStory, verifyErr := s.db.GetStoryByID(ctx, story.ID)
+		require.NoError(t, verifyErr)
+		require.NotNil(t, verifyStory, "Story should exist in database")
+		require.Equal(t, userID, verifyStory.UserID, "Story should belong to the test user")
+
 		req := httptest.NewRequest(http.MethodGet, "/users/"+userID.String()+"/experience-bank/stories", nil)
 		req.SetPathValue("id", userID.String())
 		w := httptest.NewRecorder()
 
 		s.handleListStories(w, req)
 
-		require.Equal(t, http.StatusOK, w.Code)
+		require.Equal(t, http.StatusOK, w.Code, "Response body: %s", w.Body.String())
 		var resp map[string]any
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
-		require.NoError(t, err)
-		assert.Contains(t, resp, "stories")
-		assert.Contains(t, resp, "count")
+		require.NoError(t, err, "Failed to unmarshal response: %s", w.Body.String())
+		t.Logf("Response: %+v", resp)
+		require.Contains(t, resp, "stories", "Response keys: %v", resp)
+		require.Contains(t, resp, "count")
 
-		stories, ok := resp["stories"].([]any)
-		require.True(t, ok)
-		assert.GreaterOrEqual(t, len(stories), 1)
+		// JSON unmarshaling converts []Story to []interface{} where each element is map[string]interface{}
+		storiesAny := resp["stories"]
+		// Handle case where stories might be nil (empty array in JSON)
+		if storiesAny == nil {
+			t.Logf("stories is nil, checking if it's an empty array in JSON")
+			// Try to check if the response has stories as an empty array
+			bodyStr := w.Body.String()
+			if bodyStr != "" {
+				t.Logf("Full response body: %s", bodyStr)
+			}
+			// If stories is nil, it means the array was empty, which is valid
+			// But we expect at least one story from the test setup
+			storiesSlice := []interface{}{}
+			assert.GreaterOrEqual(t, len(storiesSlice), 1, "Expected at least one story, but got empty array")
+		} else {
+			storiesSlice, ok := storiesAny.([]interface{})
+			require.True(t, ok, "stories should be an array, got: %T, value: %v", storiesAny, storiesAny)
+			assert.GreaterOrEqual(t, len(storiesSlice), 1)
+		}
+
+		count, ok := resp["count"].(float64)
+		require.True(t, ok, "count should be a number")
+		assert.GreaterOrEqual(t, int(count), 1)
 	})
 
 	// Test 2: Get story by ID
@@ -140,15 +170,21 @@ func TestExperienceBankEndpoints_Integration(t *testing.T) {
 		assert.Contains(t, resp, "bullets")
 		assert.Contains(t, resp, "count")
 
-		bullets, ok := resp["bullets"].([]any)
-		require.True(t, ok)
-		assert.GreaterOrEqual(t, len(bullets), 2)
+		bulletsAny, ok := resp["bullets"]
+		require.True(t, ok, "bullets key should exist")
+		bulletsSlice, ok := bulletsAny.([]interface{})
+		require.True(t, ok, "bullets should be an array, got: %T", bulletsAny)
+		assert.GreaterOrEqual(t, len(bulletsSlice), 2)
+
+		count, ok := resp["count"].(float64)
+		require.True(t, ok, "count should be a number")
+		assert.GreaterOrEqual(t, int(count), 2)
 
 		// Verify bullets are ordered by ordinal
-		if len(bullets) >= 2 {
-			firstBullet, ok := bullets[0].(map[string]any)
+		if len(bulletsSlice) >= 2 {
+			firstBullet, ok := bulletsSlice[0].(map[string]any)
 			require.True(t, ok)
-			secondBullet, ok := bullets[1].(map[string]any)
+			secondBullet, ok := bulletsSlice[1].(map[string]any)
 			require.True(t, ok)
 			firstOrdinal, _ := firstBullet["ordinal"].(float64)
 			secondOrdinal, _ := secondBullet["ordinal"].(float64)
@@ -171,13 +207,19 @@ func TestExperienceBankEndpoints_Integration(t *testing.T) {
 		assert.Contains(t, resp, "skills")
 		assert.Contains(t, resp, "count")
 
-		skills, ok := resp["skills"].([]any)
-		require.True(t, ok)
-		assert.GreaterOrEqual(t, len(skills), 1)
+		skillsAny, ok := resp["skills"]
+		require.True(t, ok, "skills key should exist")
+		skillsSlice, ok := skillsAny.([]interface{})
+		require.True(t, ok, "skills should be an array, got: %T", skillsAny)
+		assert.GreaterOrEqual(t, len(skillsSlice), 1)
+
+		count, ok := resp["count"].(float64)
+		require.True(t, ok, "count should be a number")
+		assert.GreaterOrEqual(t, int(count), 1)
 
 		// Verify skills are unique and ordered
 		skillNames := make(map[string]bool)
-		for _, skillAny := range skills {
+		for _, skillAny := range skillsSlice {
 			skill, ok := skillAny.(map[string]any)
 			require.True(t, ok)
 			name, ok := skill["name"].(string)
@@ -203,18 +245,26 @@ func TestExperienceBankEndpoints_Integration(t *testing.T) {
 		assert.Contains(t, resp, "bullets")
 		assert.Contains(t, resp, "count")
 
-		bullets, ok := resp["bullets"].([]any)
-		require.True(t, ok)
-		assert.GreaterOrEqual(t, len(bullets), 1)
+		bulletsAny, ok := resp["bullets"]
+		require.True(t, ok, "bullets key should exist")
+		bulletsSlice, ok := bulletsAny.([]interface{})
+		require.True(t, ok, "bullets should be an array, got: %T", bulletsAny)
+		assert.GreaterOrEqual(t, len(bulletsSlice), 1)
+
+		count, ok := resp["count"].(float64)
+		require.True(t, ok, "count should be a number")
+		assert.GreaterOrEqual(t, int(count), 1)
 
 		// Verify bullets contain the skill
-		if len(bullets) > 0 {
-			firstBullet, ok := bullets[0].(map[string]any)
-			require.True(t, ok)
-			skills, ok := firstBullet["skills"].([]any)
-			require.True(t, ok)
+		if len(bulletsSlice) > 0 {
+			firstBullet, ok := bulletsSlice[0].(map[string]any)
+			require.True(t, ok, "bullet should be a map")
+			skillsAny, ok := firstBullet["skills"]
+			require.True(t, ok, "skills key should exist in bullet")
+			skillsSlice, ok := skillsAny.([]interface{})
+			require.True(t, ok, "skills should be an array, got: %T", skillsAny)
 			hasGoSkill := false
-			for _, skillAny := range skills {
+			for _, skillAny := range skillsSlice {
 				if skillStr, ok := skillAny.(string); ok && skillStr == "Go" {
 					hasGoSkill = true
 					break
