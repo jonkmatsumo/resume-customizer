@@ -4,8 +4,18 @@ CREATE TABLE users (
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     phone TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    password_hash TEXT NOT NULL DEFAULT '',
+    password_set BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration: Add password authentication fields (if table already exists)
+-- Run these ALTER TABLE statements if the table was created before this migration:
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT '';
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS password_set BOOLEAN DEFAULT FALSE;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+-- UPDATE users SET password_set = FALSE WHERE password_hash = '';
 
 -- Jobs table (employment history)
 CREATE TABLE jobs (

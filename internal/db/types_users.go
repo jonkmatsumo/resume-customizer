@@ -11,11 +11,14 @@ import (
 
 // User represents a user profile
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	Phone     string    `json:"phone,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Email       string    `json:"email"`
+	Phone       string    `json:"phone,omitempty"`
+	PasswordHash string   `json:"-" db:"password_hash"` // Never serialize to JSON
+	PasswordSet  bool     `json:"password_set" db:"password_set"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Job represents an employment history entry

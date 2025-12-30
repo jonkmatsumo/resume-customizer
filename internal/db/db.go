@@ -325,9 +325,9 @@ func (db *DB) CreateUser(ctx context.Context, name, email, phone string) (uuid.U
 func (db *DB) GetUser(ctx context.Context, id uuid.UUID) (*User, error) {
 	var u User
 	err := db.pool.QueryRow(ctx,
-		`SELECT id, name, email, phone, created_at FROM users WHERE id = $1`,
+		`SELECT id, name, email, phone, password_hash, password_set, created_at, updated_at FROM users WHERE id = $1`,
 		id,
-	).Scan(&u.ID, &u.Name, &u.Email, &u.Phone, &u.CreatedAt)
+	).Scan(&u.ID, &u.Name, &u.Email, &u.Phone, &u.PasswordHash, &u.PasswordSet, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -340,7 +340,7 @@ func (db *DB) GetUser(ctx context.Context, id uuid.UUID) (*User, error) {
 // UpdateUser updates a user profile
 func (db *DB) UpdateUser(ctx context.Context, u *User) error {
 	_, err := db.pool.Exec(ctx,
-		`UPDATE users SET name = $1, email = $2, phone = $3 WHERE id = $4`,
+		`UPDATE users SET name = $1, email = $2, phone = $3, updated_at = NOW() WHERE id = $4`,
 		u.Name, u.Email, u.Phone, u.ID,
 	)
 	if err != nil {

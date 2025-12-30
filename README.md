@@ -22,7 +22,7 @@ At a high level, the system runs as a containerized Go application with PostgreS
 
 ```mermaid
 flowchart LR
-    USER[Frontend User] <--> APP[Angular App]
+    USER[User] <--> APP[Angular App]
     APP <--> API[REST API]
     
     subgraph Docker
@@ -236,6 +236,8 @@ curl http://localhost:8080/health
 | `DATABASE_URL` | Auto | PostgreSQL connection string |
 | `GOOGLE_SEARCH_API_KEY` | No | Enables company website discovery |
 | `GOOGLE_SEARCH_CX` | No | Custom Search Engine ID |
+| `BCRYPT_COST` | No | Bcrypt work factor for password hashing (default: 12, range: 10-14) |
+| `PASSWORD_PEPPER` | No | Optional global secret for additional password security. Generate with: `openssl rand -base64 32` (32 bytes recommended to stay within bcrypt's 72-byte limit) |
 
 ---
 
