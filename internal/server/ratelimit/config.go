@@ -51,6 +51,11 @@ func DefaultEndpointConfigs() []EndpointConfig {
 		{Path: "/run/stream", Method: "POST", Limit: 10, Window: time.Hour, Burst: 2},
 		{Path: "/runs/", Method: "POST", Limit: 10, Window: time.Hour, Burst: 2},
 
+		// Authentication endpoints (strictest limits to prevent brute force and spam)
+		{Path: "/auth/login", Method: "POST", Limit: 5, Window: 15 * time.Minute, Burst: 1},
+		{Path: "/auth/register", Method: "POST", Limit: 3, Window: time.Hour, Burst: 1},
+		{Path: "/users/me/password", Method: "PUT", Limit: 5, Window: 15 * time.Minute, Burst: 1},
+
 		// Tier 2: Write operations (moderate limits)
 		{Path: "/users", Method: "POST", Limit: 100, Window: time.Minute, Burst: 10},
 		{Path: "/users/", Method: "PUT", Limit: 100, Window: time.Minute, Burst: 10},
