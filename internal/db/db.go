@@ -361,6 +361,47 @@ func (db *DB) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// GetUserByEmail retrieves a user by email (for login)
+func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+	var u User
+	err := db.pool.QueryRow(ctx,
+		`SELECT id, name, email, phone, password_hash, password_set, created_at, updated_at FROM users WHERE email = $1`,
+		email,
+	).Scan(&u.ID, &u.Name, &u.Email, &u.Phone, &u.PasswordHash, &u.PasswordSet, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get user by email: %w", err)
+	}
+	return &u, nil
+}
+
+// UpdatePassword updates a user's password hash
+func (db *DB) UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error {
+	cmd, err := db.pool.Exec(ctx,
+		`UPDATE users SET password_hash = $1, password_set = TRUE, updated_at = NOW() WHERE id = $2`,
+		passwordHash, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return fmt.Errorf("user not found: %s", userID)
+	}
+	return nil
+}
+
+// CheckEmailExists checks if an email is already registered
+func (db *DB) CheckEmailExists(ctx context.Context, email string) (bool, error) {
+	var exists bool
+	err := db.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`, email).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check email existence: %w", err)
+	}
+	return exists, nil
+}
+
 // ---------------------------------------------------------------------
 // Job Methods
 // ---------------------------------------------------------------------
