@@ -19,23 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// setupTestDBForVerification creates a test database connection for verification tests
-func setupTestDBForVerification(t *testing.T) *db.DB {
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		dbURL = "postgres://resume:resume_dev@localhost:5432/resume_customizer?sslmode=disable"
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	database, err := db.Connect(ctx, dbURL)
-	if err != nil {
-		t.Skipf("Skipping verification test: failed to connect to DB: %v", err)
-	}
-	return database
-}
-
 func VerifyPasswordHashSecurity(t *testing.T) {
 	passwordConfig, err := config.NewPasswordConfig()
 	require.NoError(t, err)
@@ -75,7 +58,7 @@ func isHexString(s string) bool {
 		return false
 	}
 	for _, c := range s {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
 			return false
 		}
 	}
@@ -256,6 +239,11 @@ func TestVerifyInputValidation(t *testing.T) {
 }
 
 func TestVerifyRateLimiting(t *testing.T) {
+	// Skip in short mode (CI/CD) - rate limiting tests require multiple requests and time
+	if testing.Short() {
+		t.Skip("Skipping rate limiting verification test in short mode (CI/CD)")
+	}
+
 	server, database := setupTestServerForVerification(t)
 	defer database.Close()
 

@@ -68,6 +68,8 @@ func TestIntegration_Register_EndToEnd(t *testing.T) {
 	body, _ := json.Marshal(reqBody)
 	req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	// Use unique IP address to avoid rate limiting interference between tests
+	req.RemoteAddr = "192.0.2.20:1234"
 	w := httptest.NewRecorder()
 
 	server.httpServer.Handler.ServeHTTP(w, req)
@@ -116,6 +118,8 @@ func TestIntegration_Login_EndToEnd(t *testing.T) {
 	registerBody, _ := json.Marshal(registerReq)
 	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBody))
 	registerHTTPReq.Header.Set("Content-Type", "application/json")
+	// Use unique IP address to avoid rate limiting interference between tests
+	registerHTTPReq.RemoteAddr = "192.0.2.21:1234"
 	registerW := httptest.NewRecorder()
 	server.httpServer.Handler.ServeHTTP(registerW, registerHTTPReq)
 
@@ -131,6 +135,8 @@ func TestIntegration_Login_EndToEnd(t *testing.T) {
 	loginBody, _ := json.Marshal(loginReq)
 	loginHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBody))
 	loginHTTPReq.Header.Set("Content-Type", "application/json")
+	// Use unique IP address to avoid rate limiting interference between tests
+	loginHTTPReq.RemoteAddr = "192.0.2.22:1234"
 	loginW := httptest.NewRecorder()
 
 	server.httpServer.Handler.ServeHTTP(loginW, loginHTTPReq)
@@ -170,6 +176,8 @@ func TestIntegration_UpdatePassword_EndToEnd(t *testing.T) {
 	registerBody, _ := json.Marshal(registerReq)
 	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBody))
 	registerHTTPReq.Header.Set("Content-Type", "application/json")
+	// Use unique IP address to avoid rate limiting interference between tests
+	registerHTTPReq.RemoteAddr = "192.0.2.21:1234"
 	registerW := httptest.NewRecorder()
 	server.httpServer.Handler.ServeHTTP(registerW, registerHTTPReq)
 
@@ -187,6 +195,8 @@ func TestIntegration_UpdatePassword_EndToEnd(t *testing.T) {
 	updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
 	updateHTTPReq.Header.Set("Content-Type", "application/json")
 	updateHTTPReq.Header.Set("Authorization", "Bearer "+token)
+	// Use unique IP address to avoid rate limiting interference between tests
+	updateHTTPReq.RemoteAddr = "192.0.2.23:1234"
 	updateW := httptest.NewRecorder()
 
 	server.httpServer.Handler.ServeHTTP(updateW, updateHTTPReq)
@@ -206,6 +216,8 @@ func TestIntegration_UpdatePassword_EndToEnd(t *testing.T) {
 	loginBodyOld, _ := json.Marshal(loginReqOld)
 	loginHTTPReqOld := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBodyOld))
 	loginHTTPReqOld.Header.Set("Content-Type", "application/json")
+	// Use unique IP address to avoid rate limiting interference between tests
+	loginHTTPReqOld.RemoteAddr = "192.0.2.28:1234"
 	loginWOld := httptest.NewRecorder()
 	server.httpServer.Handler.ServeHTTP(loginWOld, loginHTTPReqOld)
 	assert.Equal(t, http.StatusUnauthorized, loginWOld.Code)
@@ -218,6 +230,8 @@ func TestIntegration_UpdatePassword_EndToEnd(t *testing.T) {
 	loginBodyNew, _ := json.Marshal(loginReqNew)
 	loginHTTPReqNew := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBodyNew))
 	loginHTTPReqNew.Header.Set("Content-Type", "application/json")
+	// Use unique IP address to avoid rate limiting interference between tests
+	loginHTTPReqNew.RemoteAddr = "192.0.2.29:1234"
 	loginWNew := httptest.NewRecorder()
 	server.httpServer.Handler.ServeHTTP(loginWNew, loginHTTPReqNew)
 	assert.Equal(t, http.StatusOK, loginWNew.Code)
@@ -239,6 +253,8 @@ func TestIntegration_UpdatePassword_Unauthorized(t *testing.T) {
 	// Test without token
 	updateHTTPReq1 := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
 	updateHTTPReq1.Header.Set("Content-Type", "application/json")
+	// Use unique IP address to avoid rate limiting interference between tests
+	updateHTTPReq1.RemoteAddr = "192.0.2.30:1234"
 	updateW1 := httptest.NewRecorder()
 	server.httpServer.Handler.ServeHTTP(updateW1, updateHTTPReq1)
 	assert.Equal(t, http.StatusUnauthorized, updateW1.Code)
@@ -247,6 +263,8 @@ func TestIntegration_UpdatePassword_Unauthorized(t *testing.T) {
 	updateHTTPReq2 := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
 	updateHTTPReq2.Header.Set("Content-Type", "application/json")
 	updateHTTPReq2.Header.Set("Authorization", "Bearer invalid-token")
+	// Use unique IP address to avoid rate limiting interference between tests
+	updateHTTPReq2.RemoteAddr = "192.0.2.31:1234"
 	updateW2 := httptest.NewRecorder()
 	server.httpServer.Handler.ServeHTTP(updateW2, updateHTTPReq2)
 	assert.Equal(t, http.StatusUnauthorized, updateW2.Code)
@@ -284,6 +302,8 @@ func TestIntegration_Register_EmailAlreadyExists(t *testing.T) {
 	body2, _ := json.Marshal(reqBody2)
 	req2 := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(body2))
 	req2.Header.Set("Content-Type", "application/json")
+	// Use unique IP address to avoid rate limiting interference between tests
+	req2.RemoteAddr = "192.0.2.24:1234"
 	w2 := httptest.NewRecorder()
 	server.httpServer.Handler.ServeHTTP(w2, req2)
 
@@ -307,6 +327,8 @@ func TestIntegration_Login_InvalidCredentials(t *testing.T) {
 	registerBody, _ := json.Marshal(registerReq)
 	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBody))
 	registerHTTPReq.Header.Set("Content-Type", "application/json")
+	// Use unique IP address to avoid rate limiting interference between tests
+	registerHTTPReq.RemoteAddr = "192.0.2.21:1234"
 	registerW := httptest.NewRecorder()
 	server.httpServer.Handler.ServeHTTP(registerW, registerHTTPReq)
 
@@ -322,6 +344,8 @@ func TestIntegration_Login_InvalidCredentials(t *testing.T) {
 	loginBody, _ := json.Marshal(loginReq)
 	loginHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBody))
 	loginHTTPReq.Header.Set("Content-Type", "application/json")
+	// Use unique IP address to avoid rate limiting interference between tests
+	loginHTTPReq.RemoteAddr = "192.0.2.22:1234"
 	loginW := httptest.NewRecorder()
 
 	server.httpServer.Handler.ServeHTTP(loginW, loginHTTPReq)
@@ -337,6 +361,8 @@ func TestIntegration_Login_InvalidCredentials(t *testing.T) {
 	loginBody2, _ := json.Marshal(loginReq2)
 	loginHTTPReq2 := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBody2))
 	loginHTTPReq2.Header.Set("Content-Type", "application/json")
+	// Use unique IP address to avoid rate limiting interference between tests
+	loginHTTPReq2.RemoteAddr = "192.0.2.25:1234"
 	loginW2 := httptest.NewRecorder()
 
 	server.httpServer.Handler.ServeHTTP(loginW2, loginHTTPReq2)

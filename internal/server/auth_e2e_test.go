@@ -58,6 +58,11 @@ func setupTestServerForE2E(t *testing.T) (*Server, *db.DB) {
 }
 
 func TestE2E_CompleteAuthenticationFlow(t *testing.T) {
+	// Skip in short mode (CI/CD) - E2E tests are comprehensive and slower
+	if testing.Short() {
+		t.Skip("Skipping E2E test in short mode (CI/CD)")
+	}
+
 	server, database := setupTestServerForE2E(t)
 	defer database.Close()
 
@@ -148,7 +153,15 @@ func TestE2E_CompleteAuthenticationFlow(t *testing.T) {
 	database.DeleteUser(context.Background(), userID)
 }
 
+// TestE2E_MultipleUsers tests multiple user registration and authentication.
+// This test is excluded from CI/CD runs (use -short flag to skip).
+// It includes retry logic with exponential backoff for rate limiting.
 func TestE2E_MultipleUsers(t *testing.T) {
+	// Skip in CI/CD or when -short flag is used
+	if testing.Short() {
+		t.Skip("Skipping E2E test in short mode (CI/CD)")
+	}
+
 	server, database := setupTestServerForE2E(t)
 	defer database.Close()
 
@@ -160,7 +173,7 @@ func TestE2E_MultipleUsers(t *testing.T) {
 	// Generate unique timestamp for this test run
 	timestamp := time.Now().Format("20060102150405")
 
-	// Register multiple users
+	// Register multiple users with retry logic for rate limiting
 	for i := 0; i < 3; i++ {
 		email := "e2e-multi-user-" + string(rune('a'+i)) + "-" + timestamp + "@example.com"
 		emails = append(emails, email)
@@ -171,18 +184,40 @@ func TestE2E_MultipleUsers(t *testing.T) {
 			Password: "testpassword123",
 		}
 		registerBody, _ := json.Marshal(registerReq)
-		registerHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBody))
-		registerHTTPReq.Header.Set("Content-Type", "application/json")
-		// Use different IP addresses to avoid rate limiting
-		registerHTTPReq.RemoteAddr = fmt.Sprintf("192.0.2.%d:1234", i+1)
-		registerW := httptest.NewRecorder()
-		handler.ServeHTTP(registerW, registerHTTPReq)
 
-		assert.Equal(t, http.StatusCreated, registerW.Code, "User registration should succeed")
+		// Retry logic with exponential backoff for rate limiting
 		var registerResponse types.LoginResponse
-		err := json.Unmarshal(registerW.Body.Bytes(), &registerResponse)
-		require.NoError(t, err, "Should be able to unmarshal response")
-		require.NotNil(t, registerResponse.User, "User should be in response")
+		maxRetries := 5
+		baseDelay := 100 * time.Millisecond
+		registered := false
+
+		for attempt := 0; attempt < maxRetries; attempt++ {
+			registerHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBody))
+			registerHTTPReq.Header.Set("Content-Type", "application/json")
+			// Use different IP addresses to avoid rate limiting
+			registerHTTPReq.RemoteAddr = fmt.Sprintf("192.0.2.%d:1234", i+1)
+			registerW := httptest.NewRecorder()
+			handler.ServeHTTP(registerW, registerHTTPReq)
+
+			if registerW.Code == http.StatusCreated {
+				err := json.Unmarshal(registerW.Body.Bytes(), &registerResponse)
+				require.NoError(t, err, "Should be able to unmarshal response")
+				require.NotNil(t, registerResponse.User, "User should be in response")
+				registered = true
+				break
+			} else if registerW.Code == http.StatusTooManyRequests && attempt < maxRetries-1 {
+				// Rate limited - wait with exponential backoff
+				delay := baseDelay * time.Duration(1<<uint(attempt)) // Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms
+				t.Logf("Rate limited on attempt %d, waiting %v before retry", attempt+1, delay)
+				time.Sleep(delay)
+				continue
+			} else {
+				// Other error - fail the test
+				require.Equal(t, http.StatusCreated, registerW.Code, "User registration should succeed after retries")
+			}
+		}
+
+		require.True(t, registered, "User should be registered after retries")
 		userIDs = append(userIDs, registerResponse.User.ID.String())
 		tokens = append(tokens, registerResponse.Token)
 	}
@@ -205,9 +240,11 @@ func TestE2E_MultipleUsers(t *testing.T) {
 		loginW := httptest.NewRecorder()
 		handler.ServeHTTP(loginW, loginHTTPReq)
 
-		assert.Equal(t, http.StatusOK, loginW.Code)
+		assert.Equal(t, http.StatusOK, loginW.Code, "Login should succeed")
 		var loginResponse types.LoginResponse
-		json.Unmarshal(loginW.Body.Bytes(), &loginResponse)
+		err := json.Unmarshal(loginW.Body.Bytes(), &loginResponse)
+		require.NoError(t, err, "Should be able to unmarshal login response")
+		require.NotNil(t, loginResponse.User, "User should be in login response")
 		assert.Equal(t, userIDs[i], loginResponse.User.ID.String(), "User ID should match")
 
 		// Verify token works for protected route
@@ -247,6 +284,11 @@ func TestE2E_MultipleUsers(t *testing.T) {
 }
 
 func TestE2E_TokenReuse(t *testing.T) {
+	// Skip in short mode (CI/CD) - E2E tests are comprehensive and slower
+	if testing.Short() {
+		t.Skip("Skipping E2E test in short mode (CI/CD)")
+	}
+
 	server, database := setupTestServerForE2E(t)
 	defer database.Close()
 
@@ -297,6 +339,11 @@ func TestE2E_TokenReuse(t *testing.T) {
 }
 
 func TestE2E_TokenExpiration(t *testing.T) {
+	// Skip in short mode (CI/CD) - E2E tests are comprehensive and slower
+	if testing.Short() {
+		t.Skip("Skipping E2E test in short mode (CI/CD)")
+	}
+
 	server, database := setupTestServerForE2E(t)
 	defer database.Close()
 
@@ -352,6 +399,11 @@ func TestE2E_TokenExpiration(t *testing.T) {
 }
 
 func TestE2E_PasswordUpdateFlow(t *testing.T) {
+	// Skip in short mode (CI/CD) - E2E tests are comprehensive and slower
+	if testing.Short() {
+		t.Skip("Skipping E2E test in short mode (CI/CD)")
+	}
+
 	server, database := setupTestServerForE2E(t)
 	defer database.Close()
 

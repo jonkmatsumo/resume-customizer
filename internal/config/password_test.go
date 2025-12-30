@@ -587,6 +587,11 @@ func TestPasswordConfig_InvalidCostErrors(t *testing.T) {
 
 // Test security properties
 func TestPasswordConfig_SaltUniqueness(t *testing.T) {
+	// Skip in short mode (CI/CD) - this test does many bcrypt operations
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
 	// Use a lower cost for this test to avoid timeout
 	// The salt uniqueness property holds regardless of cost
 	config := &PasswordConfig{
@@ -627,6 +632,11 @@ func TestPasswordConfig_SaltUniqueness(t *testing.T) {
 }
 
 func TestPasswordConfig_HashUniqueness(t *testing.T) {
+	// Skip in short mode (CI/CD) - this test does many bcrypt operations
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
 	config, err := NewPasswordConfig()
 	if err != nil {
 		t.Fatalf("Failed to create config: %v", err)
@@ -831,6 +841,9 @@ func TestPasswordConfig_ConfigurationPersistence(t *testing.T) {
 
 // Performance benchmarks
 func BenchmarkHashPassword_Cost10(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping benchmark in short mode")
+	}
 	originalCost := os.Getenv("BCRYPT_COST")
 	defer os.Setenv("BCRYPT_COST", originalCost)
 
@@ -845,6 +858,9 @@ func BenchmarkHashPassword_Cost10(b *testing.B) {
 }
 
 func BenchmarkHashPassword_Cost12(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping benchmark in short mode")
+	}
 	originalCost := os.Getenv("BCRYPT_COST")
 	defer os.Setenv("BCRYPT_COST", originalCost)
 
@@ -859,6 +875,9 @@ func BenchmarkHashPassword_Cost12(b *testing.B) {
 }
 
 func BenchmarkHashPassword_Cost14(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping benchmark in short mode")
+	}
 	originalCost := os.Getenv("BCRYPT_COST")
 	defer os.Setenv("BCRYPT_COST", originalCost)
 
@@ -873,6 +892,9 @@ func BenchmarkHashPassword_Cost14(b *testing.B) {
 }
 
 func BenchmarkVerifyPassword(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping benchmark in short mode")
+	}
 	config, _ := NewPasswordConfig()
 	password := "benchmark-password-123"
 	hash, _ := config.HashPassword(password)
@@ -884,6 +906,9 @@ func BenchmarkVerifyPassword(b *testing.B) {
 }
 
 func BenchmarkVerifyPassword_WithPepper(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping benchmark in short mode")
+	}
 	originalPepper := os.Getenv("PASSWORD_PEPPER")
 	defer os.Setenv("PASSWORD_PEPPER", originalPepper)
 

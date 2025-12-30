@@ -1,34 +1,16 @@
 package server
 
 import (
-	"context"
-	"os"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/config"
-	"github.com/jonathan/resume-customizer/internal/db"
 )
 
-// setupTestDBForPerformance creates a test database connection for performance tests
-func setupTestDBForPerformance(t *testing.T) *db.DB {
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		dbURL = "postgres://resume:resume_dev@localhost:5432/resume_customizer?sslmode=disable"
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	database, err := db.Connect(ctx, dbURL)
-	if err != nil {
-		t.Skipf("Skipping performance test: failed to connect to DB: %v", err)
-	}
-	return database
-}
-
 func BenchmarkPasswordHashing_Cost10(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping benchmark in short mode")
+	}
 	passwordConfig := &config.PasswordConfig{
 		BcryptCost: 10,
 		Pepper:     "",
@@ -46,6 +28,9 @@ func BenchmarkPasswordHashing_Cost10(b *testing.B) {
 }
 
 func BenchmarkPasswordHashing_Cost12(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping benchmark in short mode")
+	}
 	passwordConfig := &config.PasswordConfig{
 		BcryptCost: 12,
 		Pepper:     "",
@@ -63,6 +48,9 @@ func BenchmarkPasswordHashing_Cost12(b *testing.B) {
 }
 
 func BenchmarkPasswordHashing_WithPepper(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping benchmark in short mode")
+	}
 	passwordConfig := &config.PasswordConfig{
 		BcryptCost: 10,
 		Pepper:     "test-pepper-32-bytes-long-enough",
@@ -80,6 +68,9 @@ func BenchmarkPasswordHashing_WithPepper(b *testing.B) {
 }
 
 func BenchmarkPasswordVerification(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping benchmark in short mode")
+	}
 	passwordConfig := &config.PasswordConfig{
 		BcryptCost: 10,
 		Pepper:     "",
@@ -99,6 +90,9 @@ func BenchmarkPasswordVerification(b *testing.B) {
 }
 
 func BenchmarkTokenGeneration(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping benchmark in short mode")
+	}
 	jwtConfig := &config.JWTConfig{
 		Secret:          "test-secret-key-for-jwt-signing-minimum-32-bytes",
 		ExpirationHours: 24,
@@ -118,6 +112,9 @@ func BenchmarkTokenGeneration(b *testing.B) {
 }
 
 func BenchmarkTokenValidation(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping benchmark in short mode")
+	}
 	jwtConfig := &config.JWTConfig{
 		Secret:          "test-secret-key-for-jwt-signing-minimum-32-bytes",
 		ExpirationHours: 24,
@@ -142,6 +139,9 @@ func BenchmarkTokenValidation(b *testing.B) {
 }
 
 func BenchmarkConcurrentPasswordHashing(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping benchmark in short mode")
+	}
 	passwordConfig := &config.PasswordConfig{
 		BcryptCost: 10,
 		Pepper:     "",
@@ -161,6 +161,9 @@ func BenchmarkConcurrentPasswordHashing(b *testing.B) {
 }
 
 func BenchmarkConcurrentTokenGeneration(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping benchmark in short mode")
+	}
 	jwtConfig := &config.JWTConfig{
 		Secret:          "test-secret-key-for-jwt-signing-minimum-32-bytes",
 		ExpirationHours: 24,
@@ -181,6 +184,9 @@ func BenchmarkConcurrentTokenGeneration(b *testing.B) {
 }
 
 func BenchmarkConcurrentTokenValidation(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping benchmark in short mode")
+	}
 	jwtConfig := &config.JWTConfig{
 		Secret:          "test-secret-key-for-jwt-signing-minimum-32-bytes",
 		ExpirationHours: 24,

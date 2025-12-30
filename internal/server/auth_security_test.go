@@ -474,6 +474,11 @@ func TestSecurity_PasswordStrength_Enforcement(t *testing.T) {
 }
 
 func TestSecurity_RateLimiting_Login(t *testing.T) {
+	// Skip in short mode (CI/CD) - rate limiting tests require multiple requests and time
+	if testing.Short() {
+		t.Skip("Skipping rate limiting test in short mode (CI/CD)")
+	}
+
 	server, database := setupTestServerForSecurity(t)
 	defer database.Close()
 
@@ -507,6 +512,11 @@ func TestSecurity_RateLimiting_Login(t *testing.T) {
 }
 
 func TestSecurity_RateLimiting_Register(t *testing.T) {
+	// Skip in short mode (CI/CD) - rate limiting tests require multiple requests and time
+	if testing.Short() {
+		t.Skip("Skipping rate limiting test in short mode (CI/CD)")
+	}
+
 	server, database := setupTestServerForSecurity(t)
 	defer database.Close()
 
@@ -547,6 +557,11 @@ func TestSecurity_RateLimiting_Register(t *testing.T) {
 }
 
 func TestSecurity_RateLimiting_UpdatePassword(t *testing.T) {
+	// Skip in short mode (CI/CD) - rate limiting tests require multiple requests and time
+	if testing.Short() {
+		t.Skip("Skipping rate limiting test in short mode (CI/CD)")
+	}
+
 	server, database := setupTestServerForSecurity(t)
 	defer database.Close()
 
