@@ -17,6 +17,8 @@ servers:
 tags:
   - name: health
     description: Health checks
+  - name: authentication
+    description: User authentication and password management
   - name: pipeline
     description: Start pipeline runs (background or streaming)
   - name: runs
@@ -412,6 +414,32 @@ paths:
                 $ref: "#/components/schemas/User"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/users/me:
+    get:
+      tags: [users]
+      summary: Get current user
+      description: Returns the authenticated user's profile.
+      operationId: getMe
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -930,10 +958,15 @@ paths:
     get:
       tags: [companies]
       summary: Get company by normalized name
-      description: Returns a company by its normalized name
+      description: Returns a company by its normalized name (uses query parameter)
       operationId: getCompanyByName
       parameters:
-        - $ref: "#/components/parameters/CompanyNamePath"
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Company name (will be normalized)
       responses:
         "200":
           description: OK
@@ -1494,14 +1527,6 @@ components:
         type: string
         format: uuid
       description: Company ID
-
-    CompanyNamePath:
-      in: path
-      name: name
-      required: true
-      schema:
-        type: string
-      description: Company name (will be normalized)
 
     JobPostingIdPath:
       in: path

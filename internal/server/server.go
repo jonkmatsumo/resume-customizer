@@ -110,6 +110,7 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /v1/users/{id}", s.handleGetUser)
 	mux.HandleFunc("PUT /v1/users/{id}", s.handleUpdateUser)
 	mux.HandleFunc("DELETE /v1/users/{id}", s.handleDeleteUser)
+	mux.Handle("GET /v1/users/me", s.withAuth(http.HandlerFunc(s.handleGetMe)))
 	mux.Handle("PUT /v1/users/me/password", s.withAuth(http.HandlerFunc(s.handleUpdatePassword)))
 
 	// Job endpoints
