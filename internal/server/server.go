@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jonathan/resume-customizer/internal/db"
+	"github.com/jonathan/resume-customizer/internal/server/middleware"
 	"github.com/jonathan/resume-customizer/internal/server/ratelimit"
 )
 
@@ -24,6 +25,7 @@ type Server struct {
 	apiKey      string
 	databaseURL string
 	rateLimiter *ratelimit.Limiter
+	jwtService  *JWTService
 }
 
 // Config holds server configuration
@@ -203,6 +205,16 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// withAuth adds authentication middleware
+func (s *Server) withAuth(next http.Handler) http.Handler {
+	if s.jwtService == nil {
+		// If JWT service is not initialized, return handler without auth
+		// This allows server to work without auth until JWT service is configured
+		return next
+	}
+	return middleware.AuthMiddleware(s.jwtService.AsTokenValidator())(next)
 }
 
 // withRateLimit adds rate limiting middleware

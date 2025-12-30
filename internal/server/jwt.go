@@ -8,12 +8,38 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/config"
+	"github.com/jonathan/resume-customizer/internal/server/middleware"
 )
 
 // Claims represents JWT claims with user ID.
 type Claims struct {
 	UserID uuid.UUID `json:"user_id"`
 	jwt.RegisteredClaims
+}
+
+// GetUserID returns the user ID from the claims.
+// This implements the middleware.UserIDGetter interface.
+func (c *Claims) GetUserID() uuid.UUID {
+	return c.UserID
+}
+
+// AsTokenValidator returns a TokenValidator adapter for this JWTService.
+// This allows the JWTService to be used with middleware without creating import cycles.
+func (s *JWTService) AsTokenValidator() middleware.TokenValidator {
+	return &jwtServiceValidator{service: s}
+}
+
+// jwtServiceValidator adapts JWTService to middleware.TokenValidator interface.
+type jwtServiceValidator struct {
+	service *JWTService
+}
+
+func (v *jwtServiceValidator) ValidateToken(tokenString string) (middleware.UserIDGetter, error) {
+	claims, err := v.service.ValidateToken(tokenString)
+	if err != nil {
+		return nil, err
+	}
+	return claims, nil
 }
 
 // JWTService provides JWT token generation and validation functionality.
