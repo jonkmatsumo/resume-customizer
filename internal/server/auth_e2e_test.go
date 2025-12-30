@@ -205,16 +205,16 @@ func TestE2E_MultipleUsers(t *testing.T) {
 				require.NotNil(t, registerResponse.User, "User should be in response")
 				registered = true
 				break
-			} else if registerW.Code == http.StatusTooManyRequests && attempt < maxRetries-1 {
+			}
+			if registerW.Code == http.StatusTooManyRequests && attempt < maxRetries-1 {
 				// Rate limited - wait with exponential backoff
 				delay := baseDelay * time.Duration(1<<uint(attempt)) // Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms
 				t.Logf("Rate limited on attempt %d, waiting %v before retry", attempt+1, delay)
 				time.Sleep(delay)
 				continue
-			} else {
-				// Other error - fail the test
-				require.Equal(t, http.StatusCreated, registerW.Code, "User registration should succeed after retries")
 			}
+			// Other error - fail the test
+			require.Equal(t, http.StatusCreated, registerW.Code, "User registration should succeed after retries")
 		}
 
 		require.True(t, registered, "User should be registered after retries")
