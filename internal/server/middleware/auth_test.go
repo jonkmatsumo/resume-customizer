@@ -314,4 +314,3 @@ func TestGetUserID_InvalidType(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, uuid.Nil, userID)
 }
-

@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jonathan/resume-customizer/internal/config"
 	"github.com/jonathan/resume-customizer/internal/db"
-	"github.com/jonathan/resume-customizer/internal/server/middleware"
 	"github.com/jonathan/resume-customizer/internal/server/ratelimit"
 )
 
@@ -25,7 +25,9 @@ type Server struct {
 	apiKey      string
 	databaseURL string
 	rateLimiter *ratelimit.Limiter
-	jwtService  *JWTService
+	jwtService  *JWTService //nolint:unused // Reserved for Phase 8 (routes with authentication)
+	userService *UserService
+	authHandler *AuthHandler
 }
 
 // Config holds server configuration
@@ -51,6 +53,22 @@ func New(cfg Config) (*Server, error) {
 
 	// Initialize rate limiter
 	s.rateLimiter = ratelimit.NewLimiter(ratelimit.LoadConfig())
+
+	// Initialize authentication services
+	passwordConfig, err := config.NewPasswordConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create password config: %w", err)
+	}
+	s.userService = NewUserService(database, passwordConfig)
+
+	jwtConfig, err := config.NewJWTConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create JWT config: %w", err)
+	}
+	jwtService := NewJWTService(jwtConfig)
+	s.jwtService = jwtService // Store for future use in Phase 8 (routes)
+
+	s.authHandler = NewAuthHandler(s.userService, jwtService)
 
 	// Setup router
 	mux := http.NewServeMux()
@@ -207,16 +225,6 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 	})
 }
 
-// withAuth adds authentication middleware
-func (s *Server) withAuth(next http.Handler) http.Handler {
-	if s.jwtService == nil {
-		// If JWT service is not initialized, return handler without auth
-		// This allows server to work without auth until JWT service is configured
-		return next
-	}
-	return middleware.AuthMiddleware(s.jwtService.AsTokenValidator())(next)
-}
-
 // withRateLimit adds rate limiting middleware
 func (s *Server) withRateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -267,6 +275,21 @@ func (s *Server) jsonResponse(w http.ResponseWriter, status int, data any) {
 // errorResponse writes an error JSON response
 func (s *Server) errorResponse(w http.ResponseWriter, status int, message string) {
 	s.jsonResponse(w, status, map[string]string{"error": message})
+}
+
+// handleRegister handles user registration requests.
+func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
+	s.authHandler.Register(w, r)
+}
+
+// handleLogin handles user login requests.
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	s.authHandler.Login(w, r)
+}
+
+// handleUpdatePassword handles password update requests.
+func (s *Server) handleUpdatePassword(w http.ResponseWriter, r *http.Request) {
+	s.authHandler.UpdatePassword(w, r)
 }
 
 // extractClientID extracts the client identifier from the request.

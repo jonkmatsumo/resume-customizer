@@ -78,3 +78,7 @@ func GetUserID(r *http.Request) (uuid.UUID, error) {
 	return userID, nil
 }
 
+// UserIDKey returns the context key for user ID (for testing purposes).
+func UserIDKey() contextKey {
+	return userIDKey
+}
