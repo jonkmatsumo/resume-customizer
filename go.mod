@@ -6,6 +6,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.11.0
 	github.com/chromedp/chromedp v0.14.2
 	github.com/go-playground/validator/v10 v10.20.0
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/generative-ai-go v0.20.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.8.0

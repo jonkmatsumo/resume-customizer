@@ -238,6 +238,8 @@ curl http://localhost:8080/health
 | `GOOGLE_SEARCH_CX` | No | Custom Search Engine ID |
 | `BCRYPT_COST` | No | Bcrypt work factor for password hashing (default: 12, range: 10-14) |
 | `PASSWORD_PEPPER` | No | Optional global secret for additional password security. Generate with: `openssl rand -base64 32` (32 bytes recommended to stay within bcrypt's 72-byte limit) |
+| `JWT_SECRET` | Yes | Secret key for JWT token signing. Generate with: `openssl rand -base64 32` (32 bytes minimum recommended for HS256) |
+| `JWT_EXPIRATION_HOURS` | No | JWT token expiration in hours (default: 24) |
 
 ---
 

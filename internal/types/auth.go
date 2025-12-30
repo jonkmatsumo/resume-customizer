@@ -2,9 +2,10 @@
 package types
 
 import (
+	"time"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
-	"time"
 )
 
 // CreateUserRequest represents the request to create a new user with password authentication.
