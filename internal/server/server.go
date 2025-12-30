@@ -15,6 +15,7 @@ import (
 
 	"github.com/jonathan/resume-customizer/internal/config"
 	"github.com/jonathan/resume-customizer/internal/db"
+	"github.com/jonathan/resume-customizer/internal/server/middleware"
 	"github.com/jonathan/resume-customizer/internal/server/ratelimit"
 )
 
@@ -78,6 +79,10 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /artifact/{id}", s.handleArtifact)
 	mux.HandleFunc("GET /health", s.handleHealth)
 
+	// Authentication endpoints (public)
+	mux.HandleFunc("POST /auth/register", s.handleRegister)
+	mux.HandleFunc("POST /auth/login", s.handleLogin)
+
 	// Step-by-step pipeline API endpoints
 	mux.HandleFunc("POST /runs", s.handleCreateRun)
 	mux.HandleFunc("POST /runs/{run_id}/steps/{step_name}", s.handleExecuteStep)
@@ -102,6 +107,7 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /users/{id}", s.handleGetUser)
 	mux.HandleFunc("PUT /users/{id}", s.handleUpdateUser)
 	mux.HandleFunc("DELETE /users/{id}", s.handleDeleteUser)
+	mux.Handle("PUT /users/me/password", s.withAuth(http.HandlerFunc(s.handleUpdatePassword)))
 
 	// Job endpoints
 	mux.HandleFunc("GET /users/{id}/jobs", s.handleListJobs)
@@ -214,7 +220,7 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
@@ -258,6 +264,11 @@ func (s *Server) withLogging(next http.Handler) http.Handler {
 	})
 }
 
+// withAuth adds authentication middleware
+func (s *Server) withAuth(next http.Handler) http.Handler {
+	return middleware.AuthMiddleware(s.jwtService.AsTokenValidator())(next)
+}
+
 // handleHealth returns server health status
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -278,16 +289,25 @@ func (s *Server) errorResponse(w http.ResponseWriter, status int, message string
 }
 
 // handleRegister handles user registration requests.
+// It is used by the router in Server.New() via mux.HandleFunc.
+//
+//nolint:unused // Used via function reference in router setup
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	s.authHandler.Register(w, r)
 }
 
 // handleLogin handles user login requests.
+// It is used by the router in Server.New() via mux.HandleFunc.
+//
+//nolint:unused // Used via function reference in router setup
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	s.authHandler.Login(w, r)
 }
 
 // handleUpdatePassword handles password update requests.
+// It is used by the router in Server.New() via mux.Handle.
+//
+//nolint:unused // Used via function reference in router setup
 func (s *Server) handleUpdatePassword(w http.ResponseWriter, r *http.Request) {
 	s.authHandler.UpdatePassword(w, r)
 }

@@ -15,7 +15,7 @@ import (
 )
 
 // setupTestAuthHandler creates an AuthHandler with test services.
-func setupTestAuthHandler(t *testing.T) *AuthHandler {
+func setupTestAuthHandler(_ *testing.T) *AuthHandler {
 	passwordConfig := &config.PasswordConfig{
 		BcryptCost: 10, // Lower cost for faster tests
 		Pepper:     "",

@@ -10,11 +10,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// contextKey is a typed key for context values to avoid collisions.
-type contextKey string
+// ContextKey is a typed key for context values to avoid collisions.
+type ContextKey string
 
 // userIDKey is the context key for storing the authenticated user ID.
-const userIDKey contextKey = "userID"
+const userIDKey ContextKey = "userID"
 
 // TokenValidator is an interface for validating JWT tokens.
 // This allows the middleware to work with any JWT service implementation.
@@ -79,6 +79,6 @@ func GetUserID(r *http.Request) (uuid.UUID, error) {
 }
 
 // UserIDKey returns the context key for user ID (for testing purposes).
-func UserIDKey() contextKey {
+func UserIDKey() ContextKey {
 	return userIDKey
 }
