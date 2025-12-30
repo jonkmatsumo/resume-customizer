@@ -9,8 +9,10 @@ info:
   version: "0.1.0"
 
 servers:
+  - url: http://localhost:8080/v1
+    description: Local development (v1 API)
   - url: http://localhost:8080
-    description: Local development
+    description: Legacy endpoints (deprecated)
 
 tags:
   - name: health
@@ -58,6 +60,102 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+
+  /v1/auth/register:
+    post:
+      tags: [authentication]
+      summary: Register a new user
+      description: Creates a new user account with email and password
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/auth/login:
+    post:
+      tags: [authentication]
+      summary: Login user
+      description: Authenticates a user and returns a JWT token
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/users/me/password:
+    put:
+      tags: [authentication]
+      summary: Update password
+      description: Updates the password for the authenticated user
+      operationId: updatePassword
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePasswordRequest"
+      responses:
+        "200":
+          description: Password updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password updated successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Unauthorized (invalid token or incorrect current password)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /run:
     post:
@@ -127,7 +225,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /runs:
+  /v1/runs:
     get:
       tags: [runs]
       summary: List all runs
@@ -164,7 +262,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /status/{id}:
+  /v1/status/{id}:
     get:
       tags: [runs]
       summary: Get run status
@@ -184,7 +282,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /runs/{id}:
+  /v1/runs/{id}:
     delete:
       tags: [runs]
       summary: Delete run
@@ -200,7 +298,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /artifacts:
+  /v1/artifacts:
     get:
       tags: [artifacts]
       summary: List artifacts
@@ -231,7 +329,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /artifact/{id}:
+  /v1/artifact/{id}:
     get:
       tags: [artifacts]
       summary: Get artifact by ID
@@ -251,7 +349,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /runs/{id}/artifacts:
+  /v1/runs/{id}/artifacts:
     get:
       tags: [artifacts]
       summary: List artifacts for a run
@@ -273,7 +371,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /runs/{id}/resume.tex:
+  /v1/runs/{id}/resume.tex:
     get:
       tags: [artifacts]
       summary: Download LaTeX resume
@@ -293,7 +391,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /users:
+  /v1/users:
     post:
       tags: [users]
       summary: Create user
@@ -317,7 +415,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /users/{id}:
+  /v1/users/{id}:
     get:
       tags: [users]
       summary: Get user
@@ -364,7 +462,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /users/{id}/jobs:
+  /v1/users/{id}/jobs:
     get:
       tags: [jobs]
       summary: List jobs
@@ -412,7 +510,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /jobs/{id}:
+  /v1/jobs/{id}:
     put:
       tags: [jobs]
       summary: Update job
@@ -455,7 +553,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /jobs/{id}/experiences:
+  /v1/jobs/{id}/experiences:
     get:
       tags: [experiences]
       summary: List experiences
@@ -503,7 +601,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /experiences/{id}:
+  /v1/experiences/{id}:
     put:
       tags: [experiences]
       summary: Update experience
@@ -546,7 +644,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /users/{id}/education:
+  /v1/users/{id}/education:
     get:
       tags: [education]
       summary: List education
@@ -594,7 +692,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /education/{id}:
+  /v1/education/{id}:
     put:
       tags: [education]
       summary: Update education
@@ -637,7 +735,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /users/{id}/experience-bank:
+  /v1/users/{id}/experience-bank:
     get:
       tags: [users]
       summary: Export experience bank
@@ -657,7 +755,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /users/{id}/experience-bank/stories:
+  /v1/users/{id}/experience-bank/stories:
     get:
       tags: [experience-bank]
       summary: List stories for user
@@ -677,7 +775,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /users/{id}/experience-bank/stories/{story_id}:
+  /v1/users/{id}/experience-bank/stories/{story_id}:
     get:
       tags: [experience-bank]
       summary: Get story by ID
@@ -704,7 +802,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /users/{id}/experience-bank/stories/{story_id}/bullets:
+  /v1/users/{id}/experience-bank/stories/{story_id}/bullets:
     get:
       tags: [experience-bank]
       summary: Get bullets for a story
@@ -731,7 +829,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /users/{id}/experience-bank/skills:
+  /v1/users/{id}/experience-bank/skills:
     get:
       tags: [experience-bank]
       summary: List skills for user
@@ -751,7 +849,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /users/{id}/experience-bank/skills/{skill_id}/bullets:
+  /v1/users/{id}/experience-bank/skills/{skill_id}/bullets:
     get:
       tags: [experience-bank]
       summary: Get bullets with a specific skill
@@ -778,7 +876,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /companies:
+  /v1/companies:
     get:
       tags: [companies]
       summary: List all companies with research profiles
@@ -808,7 +906,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /companies/{id}:
+  /v1/companies/{id}:
     get:
       tags: [companies]
       summary: Get company by ID
@@ -828,7 +926,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /companies/by-name/{name}:
+  /v1/companies/by-name:
     get:
       tags: [companies]
       summary: Get company by normalized name
@@ -848,7 +946,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /companies/{id}/domains:
+  /v1/companies/{id}/domains:
     get:
       tags: [companies]
       summary: List domains for a company
@@ -875,7 +973,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /companies/{company_id}/profile:
+  /v1/companies/{company_id}/profile:
     get:
       tags: [company-profiles]
       summary: Get company profile
@@ -901,7 +999,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /companies/{company_id}/profile/style-rules:
+  /v1/companies/{company_id}/profile/style-rules:
     get:
       tags: [company-profiles]
       summary: Get style rules for company
@@ -934,7 +1032,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /companies/{company_id}/profile/taboo-phrases:
+  /v1/companies/{company_id}/profile/taboo-phrases:
     get:
       tags: [company-profiles]
       summary: Get taboo phrases for company
@@ -967,7 +1065,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /companies/{company_id}/profile/values:
+  /v1/companies/{company_id}/profile/values:
     get:
       tags: [company-profiles]
       summary: Get company values
@@ -1000,7 +1098,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /companies/{company_id}/profile/sources:
+  /v1/companies/{company_id}/profile/sources:
     get:
       tags: [company-profiles]
       summary: Get evidence URLs for company profile
@@ -1033,7 +1131,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /job-postings:
+  /v1/job-postings:
     get:
       tags: [job-postings]
       summary: List job postings
@@ -1056,7 +1154,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /job-postings/{id}:
+  /v1/job-postings/{id}:
     get:
       tags: [job-postings]
       summary: Get job posting by ID
@@ -1076,7 +1174,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /job-postings/by-url:
+  /v1/job-postings/by-url:
     get:
       tags: [job-postings]
       summary: Get job posting by URL
@@ -1104,7 +1202,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /companies/{company_id}/job-postings:
+  /v1/companies/{company_id}/job-postings:
     get:
       tags: [job-postings]
       summary: List job postings for a company
@@ -1137,7 +1235,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /job-profiles/{id}:
+  /v1/job-profiles/{id}:
     get:
       tags: [job-profiles]
       summary: Get job profile by ID
@@ -1157,7 +1255,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /job-postings/{posting_id}/profile:
+  /v1/job-postings/{posting_id}/profile:
     get:
       tags: [job-profiles]
       summary: Get job profile for a posting
@@ -1177,7 +1275,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /job-profiles/{id}/requirements:
+  /v1/job-profiles/{id}/requirements:
     get:
       tags: [job-profiles]
       summary: Get requirements for a job profile
@@ -1197,7 +1295,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /job-profiles/{id}/responsibilities:
+  /v1/job-profiles/{id}/responsibilities:
     get:
       tags: [job-profiles]
       summary: Get responsibilities for a job profile
@@ -1217,7 +1315,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /job-profiles/{id}/keywords:
+  /v1/job-profiles/{id}/keywords:
     get:
       tags: [job-profiles]
       summary: Get keywords for a job profile
@@ -1237,7 +1335,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /crawled-pages/{id}:
+  /v1/crawled-pages/{id}:
     get:
       tags: [crawled-pages]
       summary: Get crawled page by ID
@@ -1264,7 +1362,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /crawled-pages/by-url:
+  /v1/crawled-pages/by-url:
     get:
       tags: [crawled-pages]
       summary: Get crawled page by URL
@@ -1299,7 +1397,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /companies/{company_id}/crawled-pages:
+  /v1/companies/{company_id}/crawled-pages:
     get:
       tags: [crawled-pages]
       summary: List crawled pages for a company
@@ -1326,6 +1424,13 @@ paths:
           $ref: "#/components/responses/InternalError"
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /v1/auth/login or /v1/auth/register
+
   parameters:
     RunIdPath:
       in: path
@@ -1654,6 +1759,9 @@ components:
         phone:
           type: string
           nullable: true
+        password_set:
+          type: boolean
+          description: Indicates if user has set a password
         created_at:
           type: string
           format: date-time
@@ -2649,3 +2757,71 @@ components:
       required:
         - skills
         - count
+
+    RegisterRequest:
+      type: object
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+          description: User's full name
+        email:
+          type: string
+          format: email
+          description: User's email address
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: User's password (minimum 8 characters)
+        phone:
+          type: string
+          nullable: true
+          description: User's phone number (optional)
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+        password:
+          type: string
+          format: password
+          description: User's password
+
+    UpdatePasswordRequest:
+      type: object
+      required:
+        - current_password
+        - new_password
+      properties:
+        current_password:
+          type: string
+          format: password
+          description: Current password
+        new_password:
+          type: string
+          format: password
+          minLength: 8
+          description: New password (minimum 8 characters)
+
+    LoginResponse:
+      type: object
+      required:
+        - user
+        - token
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+          description: JWT token for authenticated requests
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."

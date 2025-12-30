@@ -73,102 +73,105 @@ func New(cfg Config) (*Server, error) {
 
 	// Setup router
 	mux := http.NewServeMux()
+	// Health check endpoint (no version prefix)
+	mux.HandleFunc("GET /health", s.handleHealth)
+
+	// Legacy endpoints (deprecated, use /v1 versions)
 	mux.HandleFunc("POST /run", s.handleRun)
 	mux.HandleFunc("POST /run/stream", s.handleRunStream)
 	mux.HandleFunc("GET /status/{id}", s.handleStatus)
 	mux.HandleFunc("GET /artifact/{id}", s.handleArtifact)
-	mux.HandleFunc("GET /health", s.handleHealth)
 
 	// Authentication endpoints (public)
-	mux.HandleFunc("POST /auth/register", s.handleRegister)
-	mux.HandleFunc("POST /auth/login", s.handleLogin)
+	mux.HandleFunc("POST /v1/auth/register", s.handleRegister)
+	mux.HandleFunc("POST /v1/auth/login", s.handleLogin)
 
 	// Step-by-step pipeline API endpoints
-	mux.HandleFunc("POST /runs", s.handleCreateRun)
-	mux.HandleFunc("POST /runs/{run_id}/steps/{step_name}", s.handleExecuteStep)
-	mux.HandleFunc("GET /runs/{run_id}/steps", s.handleListRunSteps)
-	mux.HandleFunc("GET /runs/{run_id}/steps/{step_name}", s.handleGetStepStatus)
-	mux.HandleFunc("GET /runs/{run_id}/checkpoint", s.handleGetCheckpoint)
-	mux.HandleFunc("POST /runs/{run_id}/resume", s.handleResumeFromCheckpoint)
-	mux.HandleFunc("POST /runs/{run_id}/steps/{step_name}/skip", s.handleSkipStep)
-	mux.HandleFunc("POST /runs/{run_id}/steps/{step_name}/retry", s.handleRetryStep)
+	mux.HandleFunc("POST /v1/runs", s.handleCreateRun)
+	mux.HandleFunc("POST /v1/runs/{run_id}/steps/{step_name}", s.handleExecuteStep)
+	mux.HandleFunc("GET /v1/runs/{run_id}/steps", s.handleListRunSteps)
+	mux.HandleFunc("GET /v1/runs/{run_id}/steps/{step_name}", s.handleGetStepStatus)
+	mux.HandleFunc("GET /v1/runs/{run_id}/checkpoint", s.handleGetCheckpoint)
+	mux.HandleFunc("POST /v1/runs/{run_id}/resume", s.handleResumeFromCheckpoint)
+	mux.HandleFunc("POST /v1/runs/{run_id}/steps/{step_name}/skip", s.handleSkipStep)
+	mux.HandleFunc("POST /v1/runs/{run_id}/steps/{step_name}/retry", s.handleRetryStep)
 
 	// CRUD endpoints for runs
-	mux.HandleFunc("GET /runs", s.handleListRuns)
-	mux.HandleFunc("DELETE /runs/{id}", s.handleDeleteRun)
-	mux.HandleFunc("GET /runs/{id}/artifacts", s.handleRunArtifacts)
-	mux.HandleFunc("GET /runs/{id}/resume.tex", s.handleRunResumeTex)
+	mux.HandleFunc("GET /v1/runs", s.handleListRuns)
+	mux.HandleFunc("DELETE /v1/runs/{id}", s.handleDeleteRun)
+	mux.HandleFunc("GET /v1/runs/{id}/artifacts", s.handleRunArtifacts)
+	mux.HandleFunc("GET /v1/runs/{id}/resume.tex", s.handleRunResumeTex)
 
 	// CRUD endpoints for artifacts
-	mux.HandleFunc("GET /artifacts", s.handleListArtifacts)
+	mux.HandleFunc("GET /v1/artifacts", s.handleListArtifacts)
 
 	// User Profile endpoints
-	mux.HandleFunc("POST /users", s.handleCreateUser)
-	mux.HandleFunc("GET /users/{id}", s.handleGetUser)
-	mux.HandleFunc("PUT /users/{id}", s.handleUpdateUser)
-	mux.HandleFunc("DELETE /users/{id}", s.handleDeleteUser)
-	mux.Handle("PUT /users/me/password", s.withAuth(http.HandlerFunc(s.handleUpdatePassword)))
+	mux.HandleFunc("POST /v1/users", s.handleCreateUser)
+	mux.HandleFunc("GET /v1/users/{id}", s.handleGetUser)
+	mux.HandleFunc("PUT /v1/users/{id}", s.handleUpdateUser)
+	mux.HandleFunc("DELETE /v1/users/{id}", s.handleDeleteUser)
+	mux.Handle("PUT /v1/users/me/password", s.withAuth(http.HandlerFunc(s.handleUpdatePassword)))
 
 	// Job endpoints
-	mux.HandleFunc("GET /users/{id}/jobs", s.handleListJobs)
-	mux.HandleFunc("POST /users/{id}/jobs", s.handleCreateJob)
-	mux.HandleFunc("PUT /jobs/{id}", s.handleUpdateJob)
-	mux.HandleFunc("DELETE /jobs/{id}", s.handleDeleteJob)
+	mux.HandleFunc("GET /v1/users/{id}/jobs", s.handleListJobs)
+	mux.HandleFunc("POST /v1/users/{id}/jobs", s.handleCreateJob)
+	mux.HandleFunc("PUT /v1/jobs/{id}", s.handleUpdateJob)
+	mux.HandleFunc("DELETE /v1/jobs/{id}", s.handleDeleteJob)
 
 	// Experience endpoints
-	mux.HandleFunc("GET /jobs/{id}/experiences", s.handleListExperiences)
-	mux.HandleFunc("POST /jobs/{id}/experiences", s.handleCreateExperience)
-	mux.HandleFunc("PUT /experiences/{id}", s.handleUpdateExperience)
-	mux.HandleFunc("DELETE /experiences/{id}", s.handleDeleteExperience)
+	mux.HandleFunc("GET /v1/jobs/{id}/experiences", s.handleListExperiences)
+	mux.HandleFunc("POST /v1/jobs/{id}/experiences", s.handleCreateExperience)
+	mux.HandleFunc("PUT /v1/experiences/{id}", s.handleUpdateExperience)
+	mux.HandleFunc("DELETE /v1/experiences/{id}", s.handleDeleteExperience)
 
 	// Education endpoints
-	mux.HandleFunc("GET /users/{id}/education", s.handleListEducation)
-	mux.HandleFunc("POST /users/{id}/education", s.handleCreateEducation)
-	mux.HandleFunc("PUT /education/{id}", s.handleUpdateEducation)
-	mux.HandleFunc("DELETE /education/{id}", s.handleDeleteEducation)
+	mux.HandleFunc("GET /v1/users/{id}/education", s.handleListEducation)
+	mux.HandleFunc("POST /v1/users/{id}/education", s.handleCreateEducation)
+	mux.HandleFunc("PUT /v1/education/{id}", s.handleUpdateEducation)
+	mux.HandleFunc("DELETE /v1/education/{id}", s.handleDeleteEducation)
 
 	// Export endpoint
-	mux.HandleFunc("GET /users/{id}/experience-bank", s.handleGetExperienceBank)
-	mux.HandleFunc("GET /users/{id}/experience-bank/stories", s.handleListStories)
-	mux.HandleFunc("GET /users/{id}/experience-bank/stories/{story_id}", s.handleGetStory)
-	mux.HandleFunc("GET /users/{id}/experience-bank/stories/{story_id}/bullets", s.handleGetStoryBullets)
-	mux.HandleFunc("GET /users/{id}/experience-bank/skills", s.handleListSkills)
-	mux.HandleFunc("GET /users/{id}/experience-bank/skills/{skill_id}/bullets", s.handleGetSkillBullets)
+	mux.HandleFunc("GET /v1/users/{id}/experience-bank", s.handleGetExperienceBank)
+	mux.HandleFunc("GET /v1/users/{id}/experience-bank/stories", s.handleListStories)
+	mux.HandleFunc("GET /v1/users/{id}/experience-bank/stories/{story_id}", s.handleGetStory)
+	mux.HandleFunc("GET /v1/users/{id}/experience-bank/stories/{story_id}/bullets", s.handleGetStoryBullets)
+	mux.HandleFunc("GET /v1/users/{id}/experience-bank/skills", s.handleListSkills)
+	mux.HandleFunc("GET /v1/users/{id}/experience-bank/skills/{skill_id}/bullets", s.handleGetSkillBullets)
 
 	// Companies endpoints
 	// Note: In Go 1.22+ ServeMux, the route /companies/by-name/{name} conflicts
 	// with /companies/{id}/domains because both could match /companies/by-name/domains.
 	// Solution: Change /companies/by-name/{name} to use query parameter /companies/by-name?name={name}
 	// This avoids the route conflict while maintaining functionality.
-	mux.HandleFunc("GET /companies", s.handleListCompanies)
-	mux.HandleFunc("GET /companies/by-name", s.handleGetCompanyByName) // Changed to use query parameter
-	mux.HandleFunc("GET /companies/{id}", s.handleGetCompany)
-	mux.HandleFunc("GET /companies/{id}/domains", s.handleListCompanyDomains)
+	mux.HandleFunc("GET /v1/companies", s.handleListCompanies)
+	mux.HandleFunc("GET /v1/companies/by-name", s.handleGetCompanyByName) // Changed to use query parameter
+	mux.HandleFunc("GET /v1/companies/{id}", s.handleGetCompany)
+	mux.HandleFunc("GET /v1/companies/{id}/domains", s.handleListCompanyDomains)
 
 	// Company profiles endpoints
-	mux.HandleFunc("GET /companies/{company_id}/profile", s.handleGetCompanyProfile)
-	mux.HandleFunc("GET /companies/{company_id}/profile/style-rules", s.handleGetStyleRules)
-	mux.HandleFunc("GET /companies/{company_id}/profile/taboo-phrases", s.handleGetTabooPhrases)
-	mux.HandleFunc("GET /companies/{company_id}/profile/values", s.handleGetValues)
-	mux.HandleFunc("GET /companies/{company_id}/profile/sources", s.handleGetSources)
+	mux.HandleFunc("GET /v1/companies/{company_id}/profile", s.handleGetCompanyProfile)
+	mux.HandleFunc("GET /v1/companies/{company_id}/profile/style-rules", s.handleGetStyleRules)
+	mux.HandleFunc("GET /v1/companies/{company_id}/profile/taboo-phrases", s.handleGetTabooPhrases)
+	mux.HandleFunc("GET /v1/companies/{company_id}/profile/values", s.handleGetValues)
+	mux.HandleFunc("GET /v1/companies/{company_id}/profile/sources", s.handleGetSources)
 
 	// Job Postings endpoints
-	mux.HandleFunc("GET /job-postings", s.handleListJobPostings)
-	mux.HandleFunc("GET /job-postings/{id}", s.handleGetJobPosting)
-	mux.HandleFunc("GET /job-postings/by-url", s.handleGetJobPostingByURL)
-	mux.HandleFunc("GET /companies/{company_id}/job-postings", s.handleListJobPostingsByCompany)
+	mux.HandleFunc("GET /v1/job-postings", s.handleListJobPostings)
+	mux.HandleFunc("GET /v1/job-postings/{id}", s.handleGetJobPosting)
+	mux.HandleFunc("GET /v1/job-postings/by-url", s.handleGetJobPostingByURL)
+	mux.HandleFunc("GET /v1/companies/{company_id}/job-postings", s.handleListJobPostingsByCompany)
 
 	// Job Profiles endpoints
-	mux.HandleFunc("GET /job-profiles/{id}", s.handleGetJobProfile)
-	mux.HandleFunc("GET /job-postings/{posting_id}/profile", s.handleGetJobProfileByPostingID)
-	mux.HandleFunc("GET /job-profiles/{id}/requirements", s.handleGetRequirements)
-	mux.HandleFunc("GET /job-profiles/{id}/responsibilities", s.handleGetResponsibilities)
-	mux.HandleFunc("GET /job-profiles/{id}/keywords", s.handleGetKeywords)
+	mux.HandleFunc("GET /v1/job-profiles/{id}", s.handleGetJobProfile)
+	mux.HandleFunc("GET /v1/job-postings/{posting_id}/profile", s.handleGetJobProfileByPostingID)
+	mux.HandleFunc("GET /v1/job-profiles/{id}/requirements", s.handleGetRequirements)
+	mux.HandleFunc("GET /v1/job-profiles/{id}/responsibilities", s.handleGetResponsibilities)
+	mux.HandleFunc("GET /v1/job-profiles/{id}/keywords", s.handleGetKeywords)
 
 	// Crawled Pages endpoints
-	mux.HandleFunc("GET /crawled-pages/{id}", s.handleGetCrawledPage)
-	mux.HandleFunc("GET /crawled-pages/by-url", s.handleGetCrawledPageByURL)
-	mux.HandleFunc("GET /companies/{company_id}/crawled-pages", s.handleListCrawledPagesByCompany)
+	mux.HandleFunc("GET /v1/crawled-pages/{id}", s.handleGetCrawledPage)
+	mux.HandleFunc("GET /v1/crawled-pages/by-url", s.handleGetCrawledPageByURL)
+	mux.HandleFunc("GET /v1/companies/{company_id}/crawled-pages", s.handleListCrawledPagesByCompany)
 
 	// Create HTTP server
 	s.httpServer = &http.Server{
