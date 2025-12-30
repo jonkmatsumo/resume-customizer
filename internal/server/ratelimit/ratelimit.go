@@ -10,11 +10,11 @@ import (
 // It allows a certain number of requests (tokens) per time window,
 // with tokens refilling at a steady rate.
 type TokenBucket struct {
-	capacity   int           // Maximum tokens (burst capacity)
-	refillRate float64       // Tokens per second
-	tokens     float64       // Current tokens available
-	lastRefill time.Time     // Last time tokens were refilled
-	mu         sync.Mutex    // Mutex for thread safety
+	capacity   int        // Maximum tokens (burst capacity)
+	refillRate float64    // Tokens per second
+	tokens     float64    // Current tokens available
+	lastRefill time.Time  // Last time tokens were refilled
+	mu         sync.Mutex // Mutex for thread safety
 }
 
 // newTokenBucket creates a new token bucket with the specified capacity and refill rate.
@@ -93,13 +93,13 @@ type Info struct {
 
 // Limiter manages rate limiting for multiple clients using token buckets.
 type Limiter struct {
-	buckets        map[string]*TokenBucket // Client ID -> bucket
-	mu             sync.RWMutex
-	config         *Config
-	cleanupTicker  *time.Ticker
-	cleanupStop    chan struct{}
-	lastAccess     map[string]time.Time // Track last access for cleanup
-	accessMu       sync.RWMutex
+	buckets       map[string]*TokenBucket // Client ID -> bucket
+	mu            sync.RWMutex
+	config        *Config
+	cleanupTicker *time.Ticker
+	cleanupStop   chan struct{}
+	lastAccess    map[string]time.Time // Track last access for cleanup
+	accessMu      sync.RWMutex
 }
 
 // Config holds rate limiting configuration.
@@ -302,5 +302,3 @@ func (l *Limiter) Stop() {
 		close(l.cleanupStop)
 	}
 }
-
-

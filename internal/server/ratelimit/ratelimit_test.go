@@ -337,4 +337,3 @@ func TestNewLimiter_NilConfig(t *testing.T) {
 		t.Errorf("Expected default limit 1000, got %d", rateInfo.Limit)
 	}
 }
-

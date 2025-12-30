@@ -38,4 +38,3 @@ func MatchEndpoint(path string, method string, configs []EndpointConfig) *Endpoi
 	// No match found
 	return nil
 }
-

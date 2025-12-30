@@ -125,4 +125,3 @@ func parseIPList(list string) map[string]bool {
 
 	return result
 }
-
