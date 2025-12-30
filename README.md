@@ -2,9 +2,9 @@
 
 ## 1. Introduction
 
-Resume Customizer is a local tool (with a planned hosted version) that tailors your LaTeX resume to a specific job posting. It uses an LLM (Gemini 1.5 Pro) to analyze the job description and your experience bank, rewriting bullet points to match the required skills and "vibe."
+Resume Customizer is a local tool (with a planned hosted version) that tailors your LaTeX resume to a specific job posting. It uses LLMs to analyze the job description and your experience bank, rewriting bullet points to match the required skills and "vibe." This backend service can be accessed via the [Angular frontend application](https://github.com/jonkmatsumo/resume-customizer-frontend) which provides a user-friendly interface for managing your experience bank and generating tailored resumes.
 
-[**API Docs**](https://jonkmatsumo.github.io/resume-customizer/) | [**OpenAPI Spec**](openapi/openapi.yaml)
+[**API Docs**](https://jonkmatsumo.github.io/resume-customizer/) | [**OpenAPI Spec**](openapi/openapi.yaml) | [**Frontend Application**](https://github.com/jonkmatsumo/resume-customizer-frontend)
 
 | Agent | Function |
 |-------|----------|
@@ -22,16 +22,16 @@ At a high level, the system runs as a containerized Go application with PostgreS
 
 ```mermaid
 flowchart LR
+    USER[Frontend User] <--> APP[Angular App]
+    APP <--> API[REST API]
+    
     subgraph Docker
         DB[(PostgreSQL)]
         subgraph Application
-            API[REST API]
-            AGENT[Pipeline Agent]
+            API <--> AGENT[Pipeline Agent]
         end
     end
     
-    USER[API Client] <--> API
-    API <--> AGENT
     API <--> DB
     AGENT <--> LLM[LLM API]
     AGENT <--> SEARCH[Search API]
@@ -133,7 +133,25 @@ flowchart TD
 
 ---
 
-## 3. REST API
+## 3. Frontend Application
+
+This backend service is designed to work with the **[Resume Customizer Frontend](https://github.com/jonkmatsumo/resume-customizer-frontend)**, a modern Angular 21 interface that provides a user-friendly way to interact with the agentic pipeline.
+
+The frontend application offers:
+
+- **Authentication & Profile Management**: Manage user identity and profile data
+- **Employment History Editor**: Curate your "Experience Bank"—the source of truth for the agents
+- **Resume Generation Workflow**:
+  - Start pipeline runs with a job URL
+  - Real-time progress tracking via Server-Sent Events (SSE)
+  - Artifact inspection (extracted keywords, company cultural notes)
+  - Download final tailored LaTeX/PDF resumes
+
+For setup instructions and more details, see the [frontend repository](https://github.com/jonkmatsumo/resume-customizer-frontend).
+
+---
+
+## 4. REST API
 
 The service exposes a comprehensive REST API. For full documentation including all endpoints, parameters, and schemas, please view the interactive API docs.
 
@@ -188,7 +206,7 @@ curl -O http://localhost:8080/runs/{run_id}/resume.tex
 
 ---
 
-## 4. Quick Start with Docker
+## 5. Quick Start with Docker
 
 To run this application locally first install [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
@@ -208,7 +226,7 @@ curl http://localhost:8080/health
 
 ---
 
-## 5. Configuration
+## 6. Configuration
 
 ### Environment Variables
 
@@ -221,7 +239,7 @@ curl http://localhost:8080/health
 
 ---
 
-## 6. Development
+## 7. Development
 
 ### Testing & Linting
 
