@@ -73,4 +73,3 @@ func (c *PasswordConfig) VerifyPassword(pw, storedHash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password))
 	return err == nil
 }
-
