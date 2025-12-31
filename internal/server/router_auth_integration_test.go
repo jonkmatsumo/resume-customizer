@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/config"
 	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/types"
@@ -192,7 +194,7 @@ func TestIntegration_UpdatePassword_EndToEnd(t *testing.T) {
 		NewPassword:     "newpassword456",
 	}
 	updateBody, _ := json.Marshal(updateReq)
-	updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+	updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", userID), bytes.NewReader(updateBody))
 	updateHTTPReq.Header.Set("Content-Type", "application/json")
 	updateHTTPReq.Header.Set("Authorization", "Bearer "+token)
 	// Use unique IP address to avoid rate limiting interference between tests
@@ -244,6 +246,9 @@ func TestIntegration_UpdatePassword_Unauthorized(t *testing.T) {
 	server, database := setupTestServerForRouterIntegration(t)
 	defer database.Close()
 
+	// Use a dummy UUID for unauthorized tests (request will fail at auth middleware)
+	dummyUserID := uuid.New()
+
 	updateReq := types.UpdatePasswordRequest{
 		CurrentPassword: "oldpassword",
 		NewPassword:     "newpassword123",
@@ -251,7 +256,7 @@ func TestIntegration_UpdatePassword_Unauthorized(t *testing.T) {
 	updateBody, _ := json.Marshal(updateReq)
 
 	// Test without token
-	updateHTTPReq1 := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+	updateHTTPReq1 := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", dummyUserID), bytes.NewReader(updateBody))
 	updateHTTPReq1.Header.Set("Content-Type", "application/json")
 	// Use unique IP address to avoid rate limiting interference between tests
 	updateHTTPReq1.RemoteAddr = "192.0.2.30:1234"
@@ -260,7 +265,7 @@ func TestIntegration_UpdatePassword_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, updateW1.Code)
 
 	// Test with invalid token
-	updateHTTPReq2 := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+	updateHTTPReq2 := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", dummyUserID), bytes.NewReader(updateBody))
 	updateHTTPReq2.Header.Set("Content-Type", "application/json")
 	updateHTTPReq2.Header.Set("Authorization", "Bearer invalid-token")
 	// Use unique IP address to avoid rate limiting interference between tests

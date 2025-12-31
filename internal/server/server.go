@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/config"
 	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/server/middleware"
@@ -110,8 +111,7 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /v1/users/{id}", s.handleGetUser)
 	mux.HandleFunc("PUT /v1/users/{id}", s.handleUpdateUser)
 	mux.HandleFunc("DELETE /v1/users/{id}", s.handleDeleteUser)
-	mux.Handle("GET /v1/users/me", s.withAuth(http.HandlerFunc(s.handleGetMe)))
-	mux.Handle("PUT /v1/users/me/password", s.withAuth(http.HandlerFunc(s.handleUpdatePassword)))
+	mux.Handle("PUT /v1/users/{id}/password", s.withAuth(http.HandlerFunc(s.handleUpdateUserPassword)))
 
 	// Job endpoints
 	mux.HandleFunc("GET /v1/users/{id}/jobs", s.handleListJobs)
@@ -309,12 +309,33 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	s.authHandler.Login(w, r)
 }
 
-// handleUpdatePassword handles password update requests.
-// It is used by the router in Server.New() via mux.Handle.
+// handleUpdateUserPassword handles password update requests for a specific user ID.
+// It verifies the authenticated user matches the user ID in the path parameter.
 //
 //nolint:unused // Used via function reference in router setup
-func (s *Server) handleUpdatePassword(w http.ResponseWriter, r *http.Request) {
-	s.authHandler.UpdatePassword(w, r)
+func (s *Server) handleUpdateUserPassword(w http.ResponseWriter, r *http.Request) {
+	// Get user ID from path parameter
+	idStr := r.PathValue("id")
+	userID, err := uuid.Parse(idStr)
+	if err != nil {
+		s.errorResponse(w, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	// Verify the authenticated user matches the user ID in the path
+	authenticatedUserID, err := middleware.GetUserID(r)
+	if err != nil {
+		s.errorResponse(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	if authenticatedUserID != userID {
+		s.errorResponse(w, http.StatusForbidden, "You can only update your own password")
+		return
+	}
+
+	// Delegate to AuthHandler for password update logic
+	s.authHandler.UpdatePasswordWithUserID(w, r, userID)
 }
 
 // extractClientID extracts the client identifier from the request.

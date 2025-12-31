@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/jonathan/resume-customizer/internal/server/middleware"
+	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/types"
 )
 
@@ -107,14 +107,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// UpdatePassword handles password update requests.
-func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
-	userID, err := middleware.GetUserID(r)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
+// UpdatePasswordWithUserID handles password update requests with an explicit user ID.
+func (h *AuthHandler) UpdatePasswordWithUserID(w http.ResponseWriter, r *http.Request, userID uuid.UUID) {
 	var req types.UpdatePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)

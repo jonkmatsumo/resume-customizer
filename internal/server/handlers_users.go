@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/db"
-	"github.com/jonathan/resume-customizer/internal/server/middleware"
 	"github.com/jonathan/resume-customizer/internal/types"
 )
 
@@ -49,27 +48,6 @@ func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 	userID, err := uuid.Parse(idStr)
 	if err != nil {
 		s.errorResponse(w, http.StatusBadRequest, "Invalid user ID")
-		return
-	}
-
-	user, err := s.db.GetUser(r.Context(), userID)
-	if err != nil {
-		s.errorResponse(w, http.StatusInternalServerError, "Database error: "+err.Error())
-		return
-	}
-	if user == nil {
-		s.errorResponse(w, http.StatusNotFound, "User not found")
-		return
-	}
-
-	s.jsonResponse(w, http.StatusOK, user)
-}
-
-func (s *Server) handleGetMe(w http.ResponseWriter, r *http.Request) {
-	// Get user ID from authentication middleware context
-	userID, err := middleware.GetUserID(r)
-	if err != nil {
-		s.errorResponse(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 

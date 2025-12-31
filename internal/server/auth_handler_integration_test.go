@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/config"
 	"github.com/jonathan/resume-customizer/internal/db"
-	"github.com/jonathan/resume-customizer/internal/server/middleware"
 	"github.com/jonathan/resume-customizer/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -298,12 +298,9 @@ func TestIntegration_AuthHandler_UpdatePassword_EndToEnd(t *testing.T) {
 	updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
 	updateHTTPReq.Header.Set("Content-Type", "application/json")
 	updateHTTPReq.Header.Set("Authorization", "Bearer "+token)
-	// Set user ID in context (simulating middleware)
-	ctx := context.WithValue(updateHTTPReq.Context(), middleware.UserIDKey(), userID)
-	updateHTTPReq = updateHTTPReq.WithContext(ctx)
 	updateW := httptest.NewRecorder()
 
-	handler.UpdatePassword(updateW, updateHTTPReq)
+	handler.UpdatePasswordWithUserID(updateW, updateHTTPReq, userID)
 
 	assert.Equal(t, http.StatusOK, updateW.Code)
 
@@ -366,13 +363,11 @@ func TestIntegration_AuthHandler_UpdatePassword_WrongCurrentPassword(t *testing.
 		NewPassword:     "newpassword123",
 	}
 	updateBody, _ := json.Marshal(updateReq)
-	updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+	updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", userID), bytes.NewReader(updateBody))
 	updateHTTPReq.Header.Set("Content-Type", "application/json")
-	ctx := context.WithValue(updateHTTPReq.Context(), middleware.UserIDKey(), userID)
-	updateHTTPReq = updateHTTPReq.WithContext(ctx)
 	updateW := httptest.NewRecorder()
 
-	handler.UpdatePassword(updateW, updateHTTPReq)
+	handler.UpdatePasswordWithUserID(updateW, updateHTTPReq, userID)
 
 	assert.Equal(t, http.StatusUnauthorized, updateW.Code)
 	assert.Contains(t, updateW.Body.String(), "current password is incorrect")

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -111,7 +112,7 @@ func TestSecurity_PasswordHashNeverReturned(t *testing.T) {
 		NewPassword:     "newpassword456",
 	}
 	updateBody, _ := json.Marshal(updateReq)
-	updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+	updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", userID), bytes.NewReader(updateBody))
 	updateHTTPReq.Header.Set("Content-Type", "application/json")
 	updateHTTPReq.Header.Set("Authorization", "Bearer "+loginResponse.Token)
 	updateW := httptest.NewRecorder()
@@ -247,7 +248,7 @@ func TestSecurity_TokenValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+			updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", userID), bytes.NewReader(updateBody))
 			updateHTTPReq.Header.Set("Content-Type", "application/json")
 			updateHTTPReq.Header.Set("Authorization", "Bearer "+tt.token)
 			updateW := httptest.NewRecorder()
@@ -270,7 +271,7 @@ func TestSecurity_TokenValidation(t *testing.T) {
 	// Wait a bit to ensure expiration
 	time.Sleep(100 * time.Millisecond)
 
-	updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+	updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", userID), bytes.NewReader(updateBody))
 	updateHTTPReq.Header.Set("Content-Type", "application/json")
 	updateHTTPReq.Header.Set("Authorization", "Bearer "+expiredToken)
 	updateW := httptest.NewRecorder()
@@ -590,7 +591,7 @@ func TestSecurity_RateLimiting_UpdatePassword(t *testing.T) {
 			NewPassword:     "newpassword456",
 		}
 		updateBody, _ := json.Marshal(updateReq)
-		updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+		updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", userID), bytes.NewReader(updateBody))
 		updateHTTPReq.Header.Set("Content-Type", "application/json")
 		updateHTTPReq.Header.Set("Authorization", "Bearer "+token)
 		updateHTTPReq.RemoteAddr = "192.0.2.3:1234" // Same IP for rate limiting
@@ -688,7 +689,7 @@ func TestSecurity_ContextKey_Collision(t *testing.T) {
 		NewPassword:     "newpassword456",
 	}
 	updateBody, _ := json.Marshal(updateReq)
-	updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+	updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", userID), bytes.NewReader(updateBody))
 	updateHTTPReq.Header.Set("Content-Type", "application/json")
 	updateHTTPReq.Header.Set("Authorization", "Bearer "+token)
 	updateW := httptest.NewRecorder()

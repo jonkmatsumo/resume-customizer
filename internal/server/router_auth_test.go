@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/types"
 	"github.com/stretchr/testify/assert"
@@ -157,7 +159,7 @@ func TestProtectedRoute_UpdatePassword_WithValidToken(t *testing.T) {
 		NewPassword:     "newpassword456",
 	}
 	updateBody, _ := json.Marshal(updateReq)
-	updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+	updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", userID), bytes.NewReader(updateBody))
 	updateHTTPReq.Header.Set("Content-Type", "application/json")
 	updateHTTPReq.Header.Set("Authorization", "Bearer "+token)
 	updateW := httptest.NewRecorder()
@@ -179,12 +181,15 @@ func TestProtectedRoute_UpdatePassword_WithoutToken(t *testing.T) {
 	server, database := setupTestServerForRouter(t)
 	defer database.Close()
 
+	// Use a dummy UUID for unauthorized tests (request will fail at auth middleware)
+	dummyUserID := uuid.New()
+
 	updateReq := types.UpdatePasswordRequest{
 		CurrentPassword: "oldpassword",
 		NewPassword:     "newpassword123",
 	}
 	updateBody, _ := json.Marshal(updateReq)
-	updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+	updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", dummyUserID), bytes.NewReader(updateBody))
 	updateHTTPReq.Header.Set("Content-Type", "application/json")
 	// No Authorization header
 	updateW := httptest.NewRecorder()
@@ -199,6 +204,9 @@ func TestProtectedRoute_UpdatePassword_WithoutToken(t *testing.T) {
 func TestProtectedRoute_UpdatePassword_WithInvalidToken(t *testing.T) {
 	server, database := setupTestServerForRouter(t)
 	defer database.Close()
+
+	// Use a dummy UUID for unauthorized tests (request will fail at auth middleware)
+	dummyUserID := uuid.New()
 
 	updateReq := types.UpdatePasswordRequest{
 		CurrentPassword: "oldpassword",
@@ -230,7 +238,7 @@ func TestProtectedRoute_UpdatePassword_WithInvalidToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+			updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", dummyUserID), bytes.NewReader(updateBody))
 			updateHTTPReq.Header.Set("Content-Type", "application/json")
 			updateHTTPReq.Header.Set("Authorization", "Bearer "+tt.token)
 			updateW := httptest.NewRecorder()

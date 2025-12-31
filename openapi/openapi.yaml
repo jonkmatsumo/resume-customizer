@@ -123,41 +123,6 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /v1/users/me/password:
-    put:
-      tags: [authentication]
-      summary: Update password
-      description: Updates the password for the authenticated user
-      operationId: updatePassword
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdatePasswordRequest"
-      responses:
-        "200":
-          description: Password updated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Password updated successfully
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          description: Unauthorized (invalid token or incorrect current password)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
-          $ref: "#/components/responses/InternalError"
 
   /run:
     post:
@@ -417,32 +382,6 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /v1/users/me:
-    get:
-      tags: [users]
-      summary: Get current user
-      description: Returns the authenticated user's profile.
-      operationId: getMe
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: User profile
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/User"
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
   /v1/users/{id}:
     get:
       tags: [users]
@@ -487,6 +426,50 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/users/{id}/password:
+    put:
+      tags: [authentication]
+      summary: Update user password
+      description: Updates the password for a specific user. The authenticated user must match the user ID in the path.
+      operationId: updateUserPassword
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePasswordRequest"
+      responses:
+        "200":
+          description: Password updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password updated successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Unauthorized (invalid token)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden (cannot update another user's password)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500":
           $ref: "#/components/responses/InternalError"
 

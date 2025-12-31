@@ -75,7 +75,7 @@ func TestE2E_CompleteAuthenticationFlow(t *testing.T) {
 		Password: "initialpassword123",
 	}
 	registerBody, _ := json.Marshal(registerReq)
-	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBody))
+	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/register", bytes.NewReader(registerBody))
 	registerHTTPReq.Header.Set("Content-Type", "application/json")
 	registerW := httptest.NewRecorder()
 	handler.ServeHTTP(registerW, registerHTTPReq)
@@ -93,7 +93,7 @@ func TestE2E_CompleteAuthenticationFlow(t *testing.T) {
 		Password: "initialpassword123",
 	}
 	loginBody, _ := json.Marshal(loginReq)
-	loginHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBody))
+	loginHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/login", bytes.NewReader(loginBody))
 	loginHTTPReq.Header.Set("Content-Type", "application/json")
 	loginW := httptest.NewRecorder()
 	handler.ServeHTTP(loginW, loginHTTPReq)
@@ -111,7 +111,7 @@ func TestE2E_CompleteAuthenticationFlow(t *testing.T) {
 		NewPassword:     "updatedpassword456",
 	}
 	updateBody, _ := json.Marshal(updateReq)
-	updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+	updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", userID), bytes.NewReader(updateBody))
 	updateHTTPReq.Header.Set("Content-Type", "application/json")
 	updateHTTPReq.Header.Set("Authorization", "Bearer "+loginToken)
 	updateW := httptest.NewRecorder()
@@ -125,7 +125,7 @@ func TestE2E_CompleteAuthenticationFlow(t *testing.T) {
 		Password: "updatedpassword456",
 	}
 	loginBody2, _ := json.Marshal(loginReq2)
-	loginHTTPReq2 := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBody2))
+	loginHTTPReq2 := httptest.NewRequest(http.MethodPost, "/v1/auth/login", bytes.NewReader(loginBody2))
 	loginHTTPReq2.Header.Set("Content-Type", "application/json")
 	loginW2 := httptest.NewRecorder()
 	handler.ServeHTTP(loginW2, loginHTTPReq2)
@@ -142,7 +142,7 @@ func TestE2E_CompleteAuthenticationFlow(t *testing.T) {
 		Password: "initialpassword123",
 	}
 	loginBody3, _ := json.Marshal(loginReq3)
-	loginHTTPReq3 := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBody3))
+	loginHTTPReq3 := httptest.NewRequest(http.MethodPost, "/v1/auth/login", bytes.NewReader(loginBody3))
 	loginHTTPReq3.Header.Set("Content-Type", "application/json")
 	loginW3 := httptest.NewRecorder()
 	handler.ServeHTTP(loginW3, loginHTTPReq3)
@@ -192,7 +192,7 @@ func TestE2E_MultipleUsers(t *testing.T) {
 		registered := false
 
 		for attempt := 0; attempt < maxRetries; attempt++ {
-			registerHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBody))
+			registerHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/register", bytes.NewReader(registerBody))
 			registerHTTPReq.Header.Set("Content-Type", "application/json")
 			// Use different IP addresses to avoid rate limiting
 			registerHTTPReq.RemoteAddr = fmt.Sprintf("192.0.2.%d:1234", i+1)
@@ -235,7 +235,7 @@ func TestE2E_MultipleUsers(t *testing.T) {
 			Password: "testpassword123",
 		}
 		loginBody, _ := json.Marshal(loginReq)
-		loginHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBody))
+		loginHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/login", bytes.NewReader(loginBody))
 		loginHTTPReq.Header.Set("Content-Type", "application/json")
 		loginW := httptest.NewRecorder()
 		handler.ServeHTTP(loginW, loginHTTPReq)
@@ -253,7 +253,7 @@ func TestE2E_MultipleUsers(t *testing.T) {
 			NewPassword:     "newpassword456",
 		}
 		updateBody, _ := json.Marshal(updateReq)
-		updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+		updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", loginResponse.User.ID), bytes.NewReader(updateBody))
 		updateHTTPReq.Header.Set("Content-Type", "application/json")
 		updateHTTPReq.Header.Set("Authorization", "Bearer "+token)
 		updateW := httptest.NewRecorder()
@@ -301,7 +301,7 @@ func TestE2E_TokenReuse(t *testing.T) {
 		Password: "testpassword123",
 	}
 	registerBody, _ := json.Marshal(registerReq)
-	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBody))
+	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/register", bytes.NewReader(registerBody))
 	registerHTTPReq.Header.Set("Content-Type", "application/json")
 	registerW := httptest.NewRecorder()
 	handler.ServeHTTP(registerW, registerHTTPReq)
@@ -318,7 +318,7 @@ func TestE2E_TokenReuse(t *testing.T) {
 			NewPassword:     "newpassword456",
 		}
 		updateBody, _ := json.Marshal(updateReq)
-		updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+		updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", userID), bytes.NewReader(updateBody))
 		updateHTTPReq.Header.Set("Content-Type", "application/json")
 		updateHTTPReq.Header.Set("Authorization", "Bearer "+token)
 		updateW := httptest.NewRecorder()
@@ -356,7 +356,7 @@ func TestE2E_TokenExpiration(t *testing.T) {
 		Password: "testpassword123",
 	}
 	registerBody, _ := json.Marshal(registerReq)
-	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBody))
+	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/register", bytes.NewReader(registerBody))
 	registerHTTPReq.Header.Set("Content-Type", "application/json")
 	registerW := httptest.NewRecorder()
 	handler.ServeHTTP(registerW, registerHTTPReq)
@@ -382,7 +382,7 @@ func TestE2E_TokenExpiration(t *testing.T) {
 		NewPassword:     "newpassword456",
 	}
 	updateBody, _ := json.Marshal(updateReq)
-	updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+	updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", userID), bytes.NewReader(updateBody))
 	updateHTTPReq.Header.Set("Content-Type", "application/json")
 	updateHTTPReq.Header.Set("Authorization", "Bearer "+token)
 	updateW := httptest.NewRecorder()
@@ -416,13 +416,16 @@ func TestE2E_PasswordUpdateFlow(t *testing.T) {
 		Password: "password1",
 	}
 	registerBody, _ := json.Marshal(registerReq)
-	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBody))
+	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/register", bytes.NewReader(registerBody))
 	registerHTTPReq.Header.Set("Content-Type", "application/json")
 	registerW := httptest.NewRecorder()
 	handler.ServeHTTP(registerW, registerHTTPReq)
 
+	assert.Equal(t, http.StatusCreated, registerW.Code, "Registration should succeed")
 	var registerResponse types.LoginResponse
-	json.Unmarshal(registerW.Body.Bytes(), &registerResponse)
+	err := json.Unmarshal(registerW.Body.Bytes(), &registerResponse)
+	require.NoError(t, err)
+	require.NotNil(t, registerResponse.User, "User should be in registration response")
 	userID := registerResponse.User.ID
 
 	// Update password multiple times
@@ -438,7 +441,7 @@ func TestE2E_PasswordUpdateFlow(t *testing.T) {
 			Password: currentPassword,
 		}
 		loginBody, _ := json.Marshal(loginReq)
-		loginHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBody))
+		loginHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/login", bytes.NewReader(loginBody))
 		loginHTTPReq.Header.Set("Content-Type", "application/json")
 		loginW := httptest.NewRecorder()
 		handler.ServeHTTP(loginW, loginHTTPReq)
@@ -454,7 +457,7 @@ func TestE2E_PasswordUpdateFlow(t *testing.T) {
 			NewPassword:     newPassword,
 		}
 		updateBody, _ := json.Marshal(updateReq)
-		updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+		updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", userID), bytes.NewReader(updateBody))
 		updateHTTPReq.Header.Set("Content-Type", "application/json")
 		updateHTTPReq.Header.Set("Authorization", "Bearer "+token)
 		updateW := httptest.NewRecorder()
@@ -468,7 +471,7 @@ func TestE2E_PasswordUpdateFlow(t *testing.T) {
 			Password: currentPassword,
 		}
 		loginBodyOld, _ := json.Marshal(loginReqOld)
-		loginHTTPReqOld := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBodyOld))
+		loginHTTPReqOld := httptest.NewRequest(http.MethodPost, "/v1/auth/login", bytes.NewReader(loginBodyOld))
 		loginHTTPReqOld.Header.Set("Content-Type", "application/json")
 		loginWOld := httptest.NewRecorder()
 		handler.ServeHTTP(loginWOld, loginHTTPReqOld)
@@ -481,7 +484,7 @@ func TestE2E_PasswordUpdateFlow(t *testing.T) {
 			Password: newPassword,
 		}
 		loginBodyNew, _ := json.Marshal(loginReqNew)
-		loginHTTPReqNew := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBodyNew))
+		loginHTTPReqNew := httptest.NewRequest(http.MethodPost, "/v1/auth/login", bytes.NewReader(loginBodyNew))
 		loginHTTPReqNew.Header.Set("Content-Type", "application/json")
 		loginWNew := httptest.NewRecorder()
 		handler.ServeHTTP(loginWNew, loginHTTPReqNew)
