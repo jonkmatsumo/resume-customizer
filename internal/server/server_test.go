@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -45,6 +46,15 @@ func (m *mockDB) GetArtifactByID(_ context.Context, artifactID uuid.UUID) (*db.A
 }
 
 func (m *mockDB) Close() {}
+
+// errorMockDB returns errors for testing error paths
+type errorMockDB struct {
+	mockDB
+}
+
+func (m *errorMockDB) GetRun(_ context.Context, _ uuid.UUID) (*db.Run, error) {
+	return nil, fmt.Errorf("database connection failed")
+}
 
 // testServer creates a server with mock DB for testing
 type testServer struct {

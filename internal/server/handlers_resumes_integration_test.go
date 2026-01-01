@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/db"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -67,4 +68,34 @@ func TestResumeRun_MissingUserID(t *testing.T) {
 	var resp map[string]string
 	json.Unmarshal(w.Body.Bytes(), &resp)
 	require.Contains(t, resp["error"], "user_id is required")
+}
+
+func TestHandleV1Status_Integration(t *testing.T) {
+	s := setupIntegrationTestServer(t)
+	defer s.db.Close()
+	ctx := context.Background()
+
+	// Create a run
+	runID, err := s.db.CreateRun(ctx, "Test Corp", "Engineer", "https://example.com/job")
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/status/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
+	w := httptest.NewRecorder()
+
+	s.handleV1Status(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var resp RunStatusResponse
+	err = json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Equal(t, runID.String(), resp.ID)
+	assert.NotNil(t, resp.Company)
+	assert.Equal(t, "Test Corp", *resp.Company)
+	assert.NotNil(t, resp.Role)
+	assert.Equal(t, "Engineer", *resp.Role)
+	assert.Equal(t, "running", resp.Status)
+	assert.NotEmpty(t, resp.CreatedAt)
+	assert.NotEmpty(t, resp.UpdatedAt)
 }

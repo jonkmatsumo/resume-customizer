@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/db"
@@ -39,6 +40,18 @@ type StatusResponse struct {
 	RoleTitle string `json:"role_title"`
 	Status    string `json:"status"`
 	CreatedAt string `json:"created_at"`
+}
+
+// RunStatusResponse represents the response for /v1/status/{id}
+// Matches OpenAPI RunStatus schema
+type RunStatusResponse struct {
+	ID        string  `json:"id"`
+	Company   *string `json:"company,omitempty"`
+	Role      *string `json:"role,omitempty"` // mapped from role_title
+	Status    string  `json:"status"`
+	CreatedAt string  `json:"created_at"`
+	UpdatedAt string  `json:"updated_at"`        // completed_at or created_at
+	Message   *string `json:"message,omitempty"` // optional error message
 }
 
 // ArtifactResponse represents the response for /artifact
@@ -181,6 +194,63 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		Status:    run.Status,
 		CreatedAt: run.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	})
+}
+
+// handleV1Status returns the status of a pipeline run (v1 API)
+// Matches OpenAPI RunStatus schema
+func (s *Server) handleV1Status(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	if idStr == "" {
+		s.errorResponse(w, http.StatusBadRequest, "Run ID is required")
+		return
+	}
+
+	runID, err := uuid.Parse(idStr)
+	if err != nil {
+		s.errorResponse(w, http.StatusBadRequest, "Invalid run ID format")
+		return
+	}
+
+	run, err := s.db.GetRun(r.Context(), runID)
+	if err != nil {
+		s.errorResponse(w, http.StatusInternalServerError, "Database error: "+err.Error())
+		return
+	}
+	if run == nil {
+		s.errorResponse(w, http.StatusNotFound, "Run not found")
+		return
+	}
+
+	// Map role_title to role
+	var role *string
+	if run.RoleTitle != "" {
+		role = &run.RoleTitle
+	}
+
+	// Map company (nullable)
+	var company *string
+	if run.Company != "" {
+		company = &run.Company
+	}
+
+	// Determine updated_at: use completed_at if available, otherwise created_at
+	updatedAt := run.CreatedAt
+	if run.CompletedAt != nil {
+		updatedAt = *run.CompletedAt
+	}
+
+	// Build response
+	response := RunStatusResponse{
+		ID:        run.ID.String(),
+		Company:   company,
+		Role:      role,
+		Status:    run.Status,
+		CreatedAt: run.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: updatedAt.Format(time.RFC3339),
+		Message:   nil, // Run-level error messages not yet tracked
+	}
+
+	s.jsonResponse(w, http.StatusOK, response)
 }
 
 // handleArtifact returns an artifact by ID
