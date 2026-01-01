@@ -68,15 +68,17 @@ func TestE2E_CompleteAuthenticationFlow(t *testing.T) {
 
 	handler := server.httpServer.Handler
 
-	// Step 1: Register user
+	// Step 1: Register user (use unique email with timestamp to avoid conflicts)
+	timestamp := time.Now().UnixNano()
 	registerReq := types.CreateUserRequest{
 		Name:     "E2E Test User",
-		Email:    "e2e-complete-flow@example.com",
+		Email:    fmt.Sprintf("e2e-complete-flow-%d@example.com", timestamp),
 		Password: "initialpassword123",
 	}
 	registerBody, _ := json.Marshal(registerReq)
 	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/register", bytes.NewReader(registerBody))
 	registerHTTPReq.Header.Set("Content-Type", "application/json")
+	registerHTTPReq.RemoteAddr = "192.0.2.1:1234" // Use unique IP to avoid rate limiting
 	registerW := httptest.NewRecorder()
 	handler.ServeHTTP(registerW, registerHTTPReq)
 
@@ -86,15 +88,17 @@ func TestE2E_CompleteAuthenticationFlow(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, registerResponse.User)
 	userID := registerResponse.User.ID
+	testEmail := registerReq.Email // Store email for reuse
 
-	// Step 2: Login with credentials
+	// Step 2: Login with credentials (use same email as registration)
 	loginReq := types.LoginRequest{
-		Email:    "e2e-complete-flow@example.com",
+		Email:    testEmail,
 		Password: "initialpassword123",
 	}
 	loginBody, _ := json.Marshal(loginReq)
 	loginHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/login", bytes.NewReader(loginBody))
 	loginHTTPReq.Header.Set("Content-Type", "application/json")
+	loginHTTPReq.RemoteAddr = "192.0.2.1:1234" // Use same IP
 	loginW := httptest.NewRecorder()
 	handler.ServeHTTP(loginW, loginHTTPReq)
 
@@ -102,6 +106,7 @@ func TestE2E_CompleteAuthenticationFlow(t *testing.T) {
 	var loginResponse types.LoginResponse
 	err = json.Unmarshal(loginW.Body.Bytes(), &loginResponse)
 	require.NoError(t, err)
+	require.NotNil(t, loginResponse.User)
 	assert.Equal(t, userID, loginResponse.User.ID)
 	loginToken := loginResponse.Token
 
@@ -114,31 +119,47 @@ func TestE2E_CompleteAuthenticationFlow(t *testing.T) {
 	updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", userID), bytes.NewReader(updateBody))
 	updateHTTPReq.Header.Set("Content-Type", "application/json")
 	updateHTTPReq.Header.Set("Authorization", "Bearer "+loginToken)
+	updateHTTPReq.RemoteAddr = "192.0.2.1:1234" // Use same IP
 	updateW := httptest.NewRecorder()
 	handler.ServeHTTP(updateW, updateHTTPReq)
 
 	assert.Equal(t, http.StatusOK, updateW.Code)
 
-	// Step 4: Login with new password
+	// Step 4: Login with new password (with retry logic for rate limiting)
 	loginReq2 := types.LoginRequest{
-		Email:    "e2e-complete-flow@example.com",
+		Email:    testEmail,
 		Password: "updatedpassword456",
 	}
 	loginBody2, _ := json.Marshal(loginReq2)
-	loginHTTPReq2 := httptest.NewRequest(http.MethodPost, "/v1/auth/login", bytes.NewReader(loginBody2))
-	loginHTTPReq2.Header.Set("Content-Type", "application/json")
-	loginW2 := httptest.NewRecorder()
-	handler.ServeHTTP(loginW2, loginHTTPReq2)
 
-	assert.Equal(t, http.StatusOK, loginW2.Code)
+	var loginW2 *httptest.ResponseRecorder
+	maxRetries := 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		loginHTTPReq2 := httptest.NewRequest(http.MethodPost, "/v1/auth/login", bytes.NewReader(loginBody2))
+		loginHTTPReq2.Header.Set("Content-Type", "application/json")
+		loginHTTPReq2.RemoteAddr = "192.0.2.1:1234" // Use same IP
+		loginW2 = httptest.NewRecorder()
+		handler.ServeHTTP(loginW2, loginHTTPReq2)
+
+		if loginW2.Code != http.StatusTooManyRequests {
+			break
+		}
+		if attempt < maxRetries-1 {
+			delay := time.Duration(attempt+1) * time.Second
+			time.Sleep(delay)
+		}
+	}
+
+	assert.Equal(t, http.StatusOK, loginW2.Code, "Login with new password should succeed after retries")
 	var loginResponse2 types.LoginResponse
 	err = json.Unmarshal(loginW2.Body.Bytes(), &loginResponse2)
 	require.NoError(t, err)
+	require.NotNil(t, loginResponse2.User)
 	assert.Equal(t, userID, loginResponse2.User.ID)
 
 	// Verify old password no longer works
 	loginReq3 := types.LoginRequest{
-		Email:    "e2e-complete-flow@example.com",
+		Email:    testEmail,
 		Password: "initialpassword123",
 	}
 	loginBody3, _ := json.Marshal(loginReq3)

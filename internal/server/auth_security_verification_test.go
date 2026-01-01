@@ -151,7 +151,7 @@ func TestVerifyErrorSecurity(t *testing.T) {
 		Password: "anypassword",
 	}
 	loginBody, _ := json.Marshal(loginReq)
-	loginHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBody))
+	loginHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/login", bytes.NewReader(loginBody))
 	loginHTTPReq.Header.Set("Content-Type", "application/json")
 	loginW := httptest.NewRecorder()
 	handler.ServeHTTP(loginW, loginHTTPReq)
@@ -190,7 +190,7 @@ func TestVerifyInputValidation(t *testing.T) {
 		Password: "testpassword123",
 	}
 	registerBody, _ := json.Marshal(registerReq)
-	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBody))
+	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/register", bytes.NewReader(registerBody))
 	registerHTTPReq.Header.Set("Content-Type", "application/json")
 	registerW := httptest.NewRecorder()
 	handler.ServeHTTP(registerW, registerHTTPReq)
@@ -221,7 +221,7 @@ func TestVerifyInputValidation(t *testing.T) {
 		Password: "testpassword123",
 	}
 	registerBody2, _ := json.Marshal(registerReq2)
-	registerHTTPReq2 := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBody2))
+	registerHTTPReq2 := httptest.NewRequest(http.MethodPost, "/v1/auth/register", bytes.NewReader(registerBody2))
 	registerHTTPReq2.Header.Set("Content-Type", "application/json")
 	registerW2 := httptest.NewRecorder()
 	handler.ServeHTTP(registerW2, registerHTTPReq2)
@@ -259,7 +259,7 @@ func TestVerifyRateLimiting(t *testing.T) {
 	// Make requests until rate limit is hit
 	rateLimited := false
 	for i := 0; i < 10; i++ {
-		loginHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBody))
+		loginHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/login", bytes.NewReader(loginBody))
 		loginHTTPReq.Header.Set("Content-Type", "application/json")
 		loginHTTPReq.RemoteAddr = "192.0.2.100:1234" // Same IP
 		loginW := httptest.NewRecorder()

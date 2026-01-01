@@ -245,6 +245,7 @@ func (db *DB) GetArtifactByID(ctx context.Context, artifactID uuid.UUID) (*Artif
 type RunFilters struct {
 	Company string
 	Status  string
+	UserID  *uuid.UUID // Optional user ID filter
 	Limit   int
 }
 
@@ -254,7 +255,7 @@ func (db *DB) ListRunsFiltered(ctx context.Context, filters RunFilters) ([]Run, 
 		filters.Limit = 50
 	}
 
-	query := `SELECT id, company, role_title, job_url, status, created_at, completed_at
+	query := `SELECT id, company, role_title, job_url, status, user_id, created_at, completed_at
 		FROM pipeline_runs WHERE 1=1`
 	args := []any{}
 	argNum := 1
@@ -267,6 +268,11 @@ func (db *DB) ListRunsFiltered(ctx context.Context, filters RunFilters) ([]Run, 
 	if filters.Status != "" {
 		query += fmt.Sprintf(" AND status = $%d", argNum)
 		args = append(args, filters.Status)
+		argNum++
+	}
+	if filters.UserID != nil {
+		query += fmt.Sprintf(" AND user_id = $%d", argNum)
+		args = append(args, *filters.UserID)
 		argNum++
 	}
 
@@ -282,7 +288,7 @@ func (db *DB) ListRunsFiltered(ctx context.Context, filters RunFilters) ([]Run, 
 	var runs []Run
 	for rows.Next() {
 		var run Run
-		if err := rows.Scan(&run.ID, &run.Company, &run.RoleTitle, &run.JobURL, &run.Status, &run.CreatedAt, &run.CompletedAt); err != nil {
+		if err := rows.Scan(&run.ID, &run.Company, &run.RoleTitle, &run.JobURL, &run.Status, &run.UserID, &run.CreatedAt, &run.CompletedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan run: %w", err)
 		}
 		runs = append(runs, run)

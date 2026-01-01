@@ -13,6 +13,7 @@ type Run struct {
 	RoleTitle   string     `json:"role_title"`
 	JobURL      string     `json:"job_url"`
 	Status      string     `json:"status"`
+	UserID      *uuid.UUID `json:"user_id,omitempty"` // Nullable for backward compatibility
 	CreatedAt   time.Time  `json:"created_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 }

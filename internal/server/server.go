@@ -108,14 +108,15 @@ func New(cfg Config) (*Server, error) {
 
 	// User Profile endpoints
 	mux.HandleFunc("POST /v1/users", s.handleCreateUser)
+	// More specific routes must be registered before general {id} routes
+	mux.Handle("PUT /v1/users/{id}/password", s.withAuth(http.HandlerFunc(s.handleUpdateUserPassword)))
+	mux.HandleFunc("GET /v1/users/{id}/jobs", s.handleListJobs)
+	mux.HandleFunc("POST /v1/users/{id}/jobs", s.handleCreateJob)
+	mux.Handle("GET /v1/users/{id}/runs", s.withAuth(http.HandlerFunc(s.handleListUserRuns)))
+	// General {id} routes registered after specific routes
 	mux.HandleFunc("GET /v1/users/{id}", s.handleGetUser)
 	mux.HandleFunc("PUT /v1/users/{id}", s.handleUpdateUser)
 	mux.HandleFunc("DELETE /v1/users/{id}", s.handleDeleteUser)
-	mux.Handle("PUT /v1/users/{id}/password", s.withAuth(http.HandlerFunc(s.handleUpdateUserPassword)))
-
-	// Job endpoints
-	mux.HandleFunc("GET /v1/users/{id}/jobs", s.handleListJobs)
-	mux.HandleFunc("POST /v1/users/{id}/jobs", s.handleCreateJob)
 	mux.HandleFunc("PUT /v1/jobs/{id}", s.handleUpdateJob)
 	mux.HandleFunc("DELETE /v1/jobs/{id}", s.handleDeleteJob)
 

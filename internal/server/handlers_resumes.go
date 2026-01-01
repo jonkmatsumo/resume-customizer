@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/pipeline"
+	"github.com/jonathan/resume-customizer/internal/server/middleware"
 )
 
 // RunRequest represents the request body for /run
@@ -375,6 +376,72 @@ func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to response format
+	type RunItem struct {
+		ID        string `json:"id"`
+		Company   string `json:"company"`
+		RoleTitle string `json:"role_title"`
+		Status    string `json:"status"`
+		CreatedAt string `json:"created_at"`
+	}
+	response := make([]RunItem, 0, len(runs))
+	for _, run := range runs {
+		response = append(response, RunItem{
+			ID:        run.ID.String(),
+			Company:   run.Company,
+			RoleTitle: run.RoleTitle,
+			Status:    run.Status,
+			CreatedAt: run.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		})
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]any{
+		"runs":  response,
+		"count": len(response),
+	})
+}
+
+// handleListUserRuns returns a list of pipeline runs for a specific user
+func (s *Server) handleListUserRuns(w http.ResponseWriter, r *http.Request) {
+	// Get user ID from path parameter
+	idStr := r.PathValue("id")
+	userID, err := uuid.Parse(idStr)
+	if err != nil {
+		s.errorResponse(w, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	// Verify the authenticated user matches the user ID in the path
+	authenticatedUserID, err := middleware.GetUserID(r)
+	if err != nil {
+		s.errorResponse(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	if authenticatedUserID != userID {
+		s.errorResponse(w, http.StatusForbidden, "You can only view your own runs")
+		return
+	}
+
+	// Parse query parameters for filtering
+	filters := db.RunFilters{
+		Company: r.URL.Query().Get("company"),
+		Status:  r.URL.Query().Get("status"),
+		UserID:  &userID, // Filter by user ID
+	}
+
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if limit, err := strconv.Atoi(limitStr); err == nil {
+			filters.Limit = limit
+		}
+	}
+
+	runs, err := s.db.ListRunsFiltered(r.Context(), filters)
+	if err != nil {
+		s.errorResponse(w, http.StatusInternalServerError, "Database error: "+err.Error())
+		return
+	}
+
+	// Convert to response format (same as handleListRuns)
 	type RunItem struct {
 		ID        string `json:"id"`
 		Company   string `json:"company"`

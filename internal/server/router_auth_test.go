@@ -67,7 +67,7 @@ func TestPublicRoutes_Register(t *testing.T) {
 		Password: "testpassword123",
 	}
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -99,13 +99,15 @@ func TestPublicRoutes_Login(t *testing.T) {
 		Password: "testpassword123",
 	}
 	registerBody, _ := json.Marshal(registerReq)
-	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBody))
+	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/register", bytes.NewReader(registerBody))
 	registerHTTPReq.Header.Set("Content-Type", "application/json")
 	registerW := httptest.NewRecorder()
 	server.httpServer.Handler.ServeHTTP(registerW, registerHTTPReq)
 
 	var registerResponse types.LoginResponse
-	json.Unmarshal(registerW.Body.Bytes(), &registerResponse)
+	err := json.Unmarshal(registerW.Body.Bytes(), &registerResponse)
+	require.NoError(t, err)
+	require.NotNil(t, registerResponse.User)
 	userID := registerResponse.User.ID
 
 	// Now test login
@@ -114,7 +116,7 @@ func TestPublicRoutes_Login(t *testing.T) {
 		Password: "testpassword123",
 	}
 	loginBody, _ := json.Marshal(loginReq)
-	loginHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBody))
+	loginHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/login", bytes.NewReader(loginBody))
 	loginHTTPReq.Header.Set("Content-Type", "application/json")
 	loginW := httptest.NewRecorder()
 
@@ -123,8 +125,9 @@ func TestPublicRoutes_Login(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, loginW.Code)
 	var loginResponse types.LoginResponse
-	err := json.Unmarshal(loginW.Body.Bytes(), &loginResponse)
+	err = json.Unmarshal(loginW.Body.Bytes(), &loginResponse)
 	require.NoError(t, err)
+	require.NotNil(t, loginResponse.User)
 	assert.Equal(t, userID, loginResponse.User.ID)
 	assert.NotEmpty(t, loginResponse.Token)
 
@@ -143,7 +146,7 @@ func TestProtectedRoute_UpdatePassword_WithValidToken(t *testing.T) {
 		Password: "oldpassword123",
 	}
 	registerBody, _ := json.Marshal(registerReq)
-	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBody))
+	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/register", bytes.NewReader(registerBody))
 	registerHTTPReq.Header.Set("Content-Type", "application/json")
 	registerW := httptest.NewRecorder()
 	server.httpServer.Handler.ServeHTTP(registerW, registerHTTPReq)
@@ -256,6 +259,24 @@ func TestProtectedRoute_UpdatePassword_WithWrongBearerFormat(t *testing.T) {
 	server, database := setupTestServerForRouter(t)
 	defer database.Close()
 
+	// Register a user first to get a user ID
+	registerReq := types.CreateUserRequest{
+		Name:     "Bearer Format Test",
+		Email:    fmt.Sprintf("bearer-format-test-%d@example.com", time.Now().UnixNano()),
+		Password: "testpassword123",
+	}
+	registerBody, _ := json.Marshal(registerReq)
+	registerHTTPReq := httptest.NewRequest(http.MethodPost, "/v1/auth/register", bytes.NewReader(registerBody))
+	registerHTTPReq.Header.Set("Content-Type", "application/json")
+	registerW := httptest.NewRecorder()
+	server.httpServer.Handler.ServeHTTP(registerW, registerHTTPReq)
+
+	var registerResponse types.LoginResponse
+	err := json.Unmarshal(registerW.Body.Bytes(), &registerResponse)
+	require.NoError(t, err)
+	require.NotNil(t, registerResponse.User)
+	userID := registerResponse.User.ID
+
 	updateReq := types.UpdatePasswordRequest{
 		CurrentPassword: "oldpassword",
 		NewPassword:     "newpassword123",
@@ -296,7 +317,7 @@ func TestProtectedRoute_UpdatePassword_WithWrongBearerFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			updateHTTPReq := httptest.NewRequest(http.MethodPut, "/users/me/password", bytes.NewReader(updateBody))
+			updateHTTPReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/v1/users/%s/password", userID), bytes.NewReader(updateBody))
 			updateHTTPReq.Header.Set("Content-Type", "application/json")
 			if tt.authHeader != "" {
 				updateHTTPReq.Header.Set("Authorization", tt.authHeader)
@@ -316,6 +337,9 @@ func TestProtectedRoute_UpdatePassword_WithWrongBearerFormat(t *testing.T) {
 			}
 		})
 	}
+
+	// Cleanup
+	database.DeleteUser(context.Background(), userID)
 }
 
 func TestCORS_AuthorizationHeader(t *testing.T) {
@@ -323,7 +347,7 @@ func TestCORS_AuthorizationHeader(t *testing.T) {
 	defer database.Close()
 
 	// Test preflight OPTIONS request
-	req := httptest.NewRequest(http.MethodOptions, "/auth/register", nil)
+	req := httptest.NewRequest(http.MethodOptions, "/v1/auth/register", nil)
 	req.Header.Set("Origin", "http://localhost:3000")
 	req.Header.Set("Access-Control-Request-Method", "POST")
 	req.Header.Set("Access-Control-Request-Headers", "Content-Type, Authorization")
