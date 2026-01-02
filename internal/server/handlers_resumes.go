@@ -33,6 +33,18 @@ type RunResponse struct {
 	Status string `json:"status"`
 }
 
+// RunGetResponse represents the response for GET /v1/runs/{id}
+type RunGetResponse struct {
+	ID          string  `json:"id"`
+	UserID      *string `json:"user_id,omitempty"`
+	Company     string  `json:"company"`
+	RoleTitle   string  `json:"role_title"`
+	JobURL      string  `json:"job_url"`
+	Status      string  `json:"status"`
+	CreatedAt   string  `json:"created_at"`
+	CompletedAt *string `json:"completed_at,omitempty"`
+}
+
 // StatusResponse represents the response for /status
 type StatusResponse struct {
 	RunID     string `json:"run_id"`
@@ -248,6 +260,59 @@ func (s *Server) handleV1Status(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: run.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: updatedAt.Format(time.RFC3339),
 		Message:   nil, // Run-level error messages not yet tracked
+	}
+
+	s.jsonResponse(w, http.StatusOK, response)
+}
+
+// handleGetRun returns a single run by ID
+func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	if idStr == "" {
+		s.errorResponse(w, http.StatusBadRequest, "Run ID is required")
+		return
+	}
+
+	runID, err := uuid.Parse(idStr)
+	if err != nil {
+		s.errorResponse(w, http.StatusBadRequest, "Invalid run ID format")
+		return
+	}
+
+	run, err := s.db.GetRun(r.Context(), runID)
+	if err != nil {
+		s.errorResponse(w, http.StatusInternalServerError, "Database error: "+err.Error())
+		return
+	}
+	if run == nil {
+		s.errorResponse(w, http.StatusNotFound, "Run not found")
+		return
+	}
+
+	// Map user_id (nullable)
+	var userID *string
+	if run.UserID != nil {
+		userIDStr := run.UserID.String()
+		userID = &userIDStr
+	}
+
+	// Map completed_at (nullable)
+	var completedAt *string
+	if run.CompletedAt != nil {
+		completedAtStr := run.CompletedAt.Format(time.RFC3339)
+		completedAt = &completedAtStr
+	}
+
+	// Build response
+	response := RunGetResponse{
+		ID:          run.ID.String(),
+		UserID:      userID,
+		Company:     run.Company,
+		RoleTitle:   run.RoleTitle,
+		JobURL:      run.JobURL,
+		Status:      run.Status,
+		CreatedAt:   run.CreatedAt.Format(time.RFC3339),
+		CompletedAt: completedAt,
 	}
 
 	s.jsonResponse(w, http.StatusOK, response)

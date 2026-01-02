@@ -99,6 +99,7 @@ func New(cfg Config) (*Server, error) {
 
 	// CRUD endpoints for runs
 	mux.HandleFunc("GET /v1/runs", s.handleListRuns)
+	mux.HandleFunc("GET /v1/runs/{id}", s.handleGetRun)
 	mux.HandleFunc("GET /v1/status/{id}", s.handleV1Status)
 	mux.HandleFunc("DELETE /v1/runs/{id}", s.handleDeleteRun)
 	mux.HandleFunc("GET /v1/runs/{id}/artifacts", s.handleRunArtifacts)

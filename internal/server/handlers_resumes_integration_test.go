@@ -99,3 +99,32 @@ func TestHandleV1Status_Integration(t *testing.T) {
 	assert.NotEmpty(t, resp.CreatedAt)
 	assert.NotEmpty(t, resp.UpdatedAt)
 }
+
+func TestHandleGetRun_Integration(t *testing.T) {
+	s := setupIntegrationTestServer(t)
+	defer s.db.Close()
+	ctx := context.Background()
+
+	// Create a run
+	runID, err := s.db.CreateRun(ctx, "Test Corp", "Engineer", "https://example.com/job")
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
+	w := httptest.NewRecorder()
+
+	s.handleGetRun(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var resp RunGetResponse
+	err = json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Equal(t, runID.String(), resp.ID)
+	assert.Equal(t, "Test Corp", resp.Company)
+	assert.Equal(t, "Engineer", resp.RoleTitle)
+	assert.Equal(t, "https://example.com/job", resp.JobURL)
+	assert.Equal(t, "running", resp.Status)
+	assert.NotEmpty(t, resp.CreatedAt)
+	// completed_at may be nil for newly created runs
+}

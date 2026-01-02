@@ -230,3 +230,230 @@ func TestRunStatusResponse_JSON_NullFields(t *testing.T) {
 	assert.False(t, hasCompany)
 	assert.False(t, hasRole)
 }
+
+// TestHandleGetRun_Success tests successful response
+func TestHandleGetRun_Success(t *testing.T) {
+	s := newTestServer()
+	runID := uuid.New()
+	userID := uuid.New()
+	now := time.Now()
+	completedAt := now.Add(5 * time.Minute)
+
+	s.db.(*mockDB).runs[runID] = &db.Run{
+		ID:          runID,
+		UserID:      &userID,
+		Company:     "Test Corp",
+		RoleTitle:   "Software Engineer",
+		JobURL:      "https://example.com/job",
+		Status:      "completed",
+		CreatedAt:   now,
+		CompletedAt: &completedAt,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
+	w := httptest.NewRecorder()
+
+	s.handleGetRun(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+	var resp RunGetResponse
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Equal(t, runID.String(), resp.ID)
+	assert.NotNil(t, resp.UserID)
+	assert.Equal(t, userID.String(), *resp.UserID)
+	assert.Equal(t, "Test Corp", resp.Company)
+	assert.Equal(t, "Software Engineer", resp.RoleTitle)
+	assert.Equal(t, "https://example.com/job", resp.JobURL)
+	assert.Equal(t, "completed", resp.Status)
+	assert.Equal(t, now.Format(time.RFC3339), resp.CreatedAt)
+	assert.NotNil(t, resp.CompletedAt)
+	assert.Equal(t, completedAt.Format(time.RFC3339), *resp.CompletedAt)
+}
+
+// TestHandleGetRun_NoCompletedAt tests response when completed_at is null
+func TestHandleGetRun_NoCompletedAt(t *testing.T) {
+	s := newTestServer()
+	runID := uuid.New()
+	now := time.Now()
+
+	s.db.(*mockDB).runs[runID] = &db.Run{
+		ID:          runID,
+		UserID:      nil,
+		Company:     "Test Corp",
+		RoleTitle:   "Engineer",
+		JobURL:      "https://example.com/job",
+		Status:      "running",
+		CreatedAt:   now,
+		CompletedAt: nil,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
+	w := httptest.NewRecorder()
+
+	s.handleGetRun(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp RunGetResponse
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Nil(t, resp.UserID)
+	assert.Nil(t, resp.CompletedAt)
+}
+
+// TestHandleGetRun_NullableFields tests null user_id and completed_at handling
+func TestHandleGetRun_NullableFields(t *testing.T) {
+	s := newTestServer()
+	runID := uuid.New()
+
+	s.db.(*mockDB).runs[runID] = &db.Run{
+		ID:          runID,
+		UserID:      nil,
+		Company:     "Test Corp",
+		RoleTitle:   "Engineer",
+		JobURL:      "https://example.com/job",
+		Status:      "queued",
+		CreatedAt:   time.Now(),
+		CompletedAt: nil,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
+	w := httptest.NewRecorder()
+
+	s.handleGetRun(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp RunGetResponse
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Nil(t, resp.UserID)
+	assert.Nil(t, resp.CompletedAt)
+}
+
+// TestHandleGetRun_MissingID tests missing ID parameter
+func TestHandleGetRun_MissingID(t *testing.T) {
+	s := newTestServer()
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/", nil)
+	req.SetPathValue("id", "")
+	w := httptest.NewRecorder()
+
+	s.handleGetRun(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+// TestHandleGetRun_InvalidUUID tests invalid UUID format
+func TestHandleGetRun_InvalidUUID(t *testing.T) {
+	s := newTestServer()
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/not-a-uuid", nil)
+	req.SetPathValue("id", "not-a-uuid")
+	w := httptest.NewRecorder()
+
+	s.handleGetRun(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var errorResp map[string]string
+	err := json.Unmarshal(w.Body.Bytes(), &errorResp)
+	require.NoError(t, err)
+	assert.Contains(t, errorResp["error"], "Invalid run ID format")
+}
+
+// TestHandleGetRun_NotFound tests run not found
+func TestHandleGetRun_NotFound(t *testing.T) {
+	s := newTestServer()
+	runID := uuid.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
+	w := httptest.NewRecorder()
+
+	s.handleGetRun(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	var errorResp map[string]string
+	err := json.Unmarshal(w.Body.Bytes(), &errorResp)
+	require.NoError(t, err)
+	assert.Contains(t, errorResp["error"], "Run not found")
+}
+
+// TestHandleGetRun_DatabaseError tests database error handling
+func TestHandleGetRun_DatabaseError(t *testing.T) {
+	s := newTestServer()
+	runID := uuid.New()
+
+	// Create a mock DB that returns an error
+	errorDB := &errorMockDB{}
+	s.db = errorDB
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
+	w := httptest.NewRecorder()
+
+	s.handleGetRun(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+// TestRunGetResponse_JSON tests JSON serialization
+func TestRunGetResponse_JSON(t *testing.T) {
+	userID := uuid.New().String()
+	completedAt := time.Now().Format(time.RFC3339)
+
+	resp := RunGetResponse{
+		ID:          uuid.New().String(),
+		UserID:      &userID,
+		Company:     "Test Corp",
+		RoleTitle:   "Engineer",
+		JobURL:      "https://example.com/job",
+		Status:      "completed",
+		CreatedAt:   time.Now().Format(time.RFC3339),
+		CompletedAt: &completedAt,
+	}
+
+	data, err := json.Marshal(resp)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "Test Corp")
+	assert.Contains(t, string(data), "Engineer")
+	assert.Contains(t, string(data), "completed")
+	assert.Contains(t, string(data), userID)
+}
+
+// TestRunGetResponse_JSON_NullFields tests JSON with null fields
+func TestRunGetResponse_JSON_NullFields(t *testing.T) {
+	resp := RunGetResponse{
+		ID:          uuid.New().String(),
+		UserID:      nil,
+		Company:     "Test Corp",
+		RoleTitle:   "Engineer",
+		JobURL:      "https://example.com/job",
+		Status:      "queued",
+		CreatedAt:   time.Now().Format(time.RFC3339),
+		CompletedAt: nil,
+	}
+
+	data, err := json.Marshal(resp)
+	require.NoError(t, err)
+
+	// Verify null fields are omitted
+	var result map[string]interface{}
+	err = json.Unmarshal(data, &result)
+	require.NoError(t, err)
+
+	// user_id and completed_at should be omitted (not present in JSON)
+	_, hasUserID := result["user_id"]
+	_, hasCompletedAt := result["completed_at"]
+	// With omitempty, they should be omitted when nil
+	assert.False(t, hasUserID)
+	assert.False(t, hasCompletedAt)
+}
