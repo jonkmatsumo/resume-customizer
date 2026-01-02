@@ -128,3 +128,38 @@ func TestHandleGetRun_Integration(t *testing.T) {
 	assert.NotEmpty(t, resp.CreatedAt)
 	// completed_at may be nil for newly created runs
 }
+
+func TestHandleRunResumeTex_ViewMode_Integration(t *testing.T) {
+	s := setupIntegrationTestServer(t)
+	defer s.db.Close()
+	ctx := context.Background()
+
+	// Create a run and save resume.tex artifact
+	runID, err := s.db.CreateRun(ctx, "Test Corp", "Engineer", "https://example.com/job")
+	require.NoError(t, err)
+
+	texContent := "\\documentclass{article}\n\\begin{document}\nHello World\n\\end{document}"
+	err = s.db.SaveTextArtifact(ctx, runID, "resume_tex", "validation", texContent)
+	require.NoError(t, err)
+
+	// Test view=true
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/resume.tex?view=true", nil)
+	req.SetPathValue("id", runID.String())
+	w := httptest.NewRecorder()
+
+	s.handleRunResumeTex(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.Empty(t, w.Header().Get("Content-Disposition"), "Should not have Content-Disposition header when view=true")
+	assert.Equal(t, texContent, w.Body.String())
+
+	// Test default (no view parameter)
+	req2 := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/resume.tex", nil)
+	req2.SetPathValue("id", runID.String())
+	w2 := httptest.NewRecorder()
+
+	s.handleRunResumeTex(w2, req2)
+
+	require.Equal(t, http.StatusOK, w2.Code)
+	assert.Equal(t, "attachment; filename=resume.tex", w2.Header().Get("Content-Disposition"))
+}

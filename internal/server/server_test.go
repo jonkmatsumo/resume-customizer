@@ -18,14 +18,16 @@ import (
 
 // mockDB implements a minimal mock for testing
 type mockDB struct {
-	runs      map[uuid.UUID]*db.Run
-	artifacts map[uuid.UUID]*db.Artifact
+	runs          map[uuid.UUID]*db.Run
+	artifacts     map[uuid.UUID]*db.Artifact
+	textArtifacts map[string]string // key: "runID:step", value: text content
 }
 
 func newMockDB() *mockDB {
 	return &mockDB{
-		runs:      make(map[uuid.UUID]*db.Run),
-		artifacts: make(map[uuid.UUID]*db.Artifact),
+		runs:          make(map[uuid.UUID]*db.Run),
+		artifacts:     make(map[uuid.UUID]*db.Artifact),
+		textArtifacts: make(map[string]string),
 	}
 }
 
@@ -43,6 +45,15 @@ func (m *mockDB) GetArtifactByID(_ context.Context, artifactID uuid.UUID) (*db.A
 		return nil, nil
 	}
 	return artifact, nil
+}
+
+func (m *mockDB) GetTextArtifact(_ context.Context, runID uuid.UUID, step string) (string, error) {
+	key := runID.String() + ":" + step
+	content, ok := m.textArtifacts[key]
+	if !ok {
+		return "", nil // Return empty string when not found (matches real behavior)
+	}
+	return content, nil
 }
 
 func (m *mockDB) Close() {}

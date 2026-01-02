@@ -706,8 +706,13 @@ func (s *Server) handleRunResumeTex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check for view query parameter
+	viewMode := r.URL.Query().Get("view") == "true"
+
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Content-Disposition", "attachment; filename=resume.tex")
+	if !viewMode {
+		w.Header().Set("Content-Disposition", "attachment; filename=resume.tex")
+	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(tex))
 }
