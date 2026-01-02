@@ -76,10 +76,13 @@ type StepStatusResponse struct {
 
 // RunStepsListResponse represents the list of all steps for a run
 type RunStepsListResponse struct {
-	RunID   string               `json:"run_id"`
-	Status  string               `json:"status"`
-	Steps   []StepStatusResponse `json:"steps"`
-	Summary RunStepsSummary      `json:"summary"`
+	RunID     string               `json:"run_id"`
+	Status    string               `json:"status"`
+	Company   *string              `json:"company,omitempty"`
+	RoleTitle *string              `json:"role_title,omitempty"`
+	CreatedAt string               `json:"created_at,omitempty"`
+	Steps     []StepStatusResponse `json:"steps"`
+	Summary   RunStepsSummary      `json:"summary"`
 }
 
 // RunStepsSummary represents a summary of step statuses
@@ -524,11 +527,24 @@ func (s *Server) handleListRunSteps(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Extract metadata fields
+	var company *string
+	if run.Company != "" {
+		company = &run.Company
+	}
+	var roleTitle *string
+	if run.RoleTitle != "" {
+		roleTitle = &run.RoleTitle
+	}
+
 	s.jsonResponse(w, http.StatusOK, RunStepsListResponse{
-		RunID:   runID.String(),
-		Status:  run.Status,
-		Steps:   stepsResp,
-		Summary: summary,
+		RunID:     runID.String(),
+		Status:    run.Status,
+		Company:   company,
+		RoleTitle: roleTitle,
+		CreatedAt: run.CreatedAt.Format(time.RFC3339),
+		Steps:     stepsResp,
+		Summary:   summary,
 	})
 }
 
