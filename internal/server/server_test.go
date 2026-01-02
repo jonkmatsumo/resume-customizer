@@ -87,7 +87,7 @@ func (m *mockDB) ListRunSteps(_ context.Context, _ uuid.UUID, _, _ *string) ([]d
 	return []db.RunStep{}, nil
 }
 
-func (m *mockDB) CreateRunStep(_ context.Context, _ uuid.UUID, _ db.RunStepInput) (*db.RunStep, error) {
+func (m *mockDB) CreateRunStep(_ context.Context, _ uuid.UUID, _ *db.RunStepInput) (*db.RunStep, error) {
 	return nil, nil
 }
 
@@ -179,8 +179,8 @@ func (m *mockDB) DeleteEducation(_ context.Context, _ uuid.UUID) error {
 	return nil
 }
 
-func (m *mockDB) ListCompaniesWithProfiles(_ context.Context, _, _ int) ([]db.CompanyWithProfile, int, error) {
-	return []db.CompanyWithProfile{}, 0, nil
+func (m *mockDB) ListCompaniesWithProfiles(_ context.Context, _, _ int) ([]db.Company, int, error) {
+	return []db.Company{}, 0, nil
 }
 
 func (m *mockDB) GetCompanyByID(_ context.Context, _ uuid.UUID) (*db.Company, error) {
@@ -199,7 +199,7 @@ func (m *mockDB) FindOrCreateCompany(_ context.Context, _ string) (*db.Company, 
 	return nil, nil
 }
 
-func (m *mockDB) AddCompanyDomain(_ context.Context, _ uuid.UUID, _ string, _ db.DomainType) error {
+func (m *mockDB) AddCompanyDomain(_ context.Context, _ uuid.UUID, _ string, _ string) error {
 	return nil
 }
 
@@ -207,15 +207,27 @@ func (m *mockDB) GetCompanyProfileByCompanyID(_ context.Context, _ uuid.UUID) (*
 	return nil, nil
 }
 
-func (m *mockDB) CreateCompanyProfile(_ context.Context, _ db.CompanyProfileInput) (*db.CompanyProfile, error) {
+func (m *mockDB) CreateCompanyProfile(_ context.Context, _ *db.ProfileCreateInput) (*db.CompanyProfile, error) {
 	return nil, nil
 }
 
-func (m *mockDB) GetStyleRulesByProfileID(_ context.Context, _ uuid.UUID) ([]db.StyleRule, error) {
-	return []db.StyleRule{}, nil
+func (m *mockDB) GetStyleRulesByProfileID(_ context.Context, _ uuid.UUID) ([]db.CompanyStyleRule, error) {
+	return []db.CompanyStyleRule{}, nil
 }
 
-func (m *mockDB) ListJobPostings(_ context.Context, _ db.JobPostingListOptions) ([]db.JobPosting, int, error) {
+func (m *mockDB) GetTabooPhrasesByProfileID(_ context.Context, _ uuid.UUID) ([]db.CompanyTabooPhrase, error) {
+	return []db.CompanyTabooPhrase{}, nil
+}
+
+func (m *mockDB) GetValuesByProfileID(_ context.Context, _ uuid.UUID) ([]db.CompanyValue, error) {
+	return []db.CompanyValue{}, nil
+}
+
+func (m *mockDB) GetSourcesByProfileID(_ context.Context, _ uuid.UUID) ([]db.CompanyProfileSource, error) {
+	return []db.CompanyProfileSource{}, nil
+}
+
+func (m *mockDB) ListJobPostings(_ context.Context, _ db.ListJobPostingsOptions) ([]db.JobPosting, int, error) {
 	return []db.JobPosting{}, 0, nil
 }
 
@@ -231,7 +243,7 @@ func (m *mockDB) ListJobPostingsByCompany(_ context.Context, _ uuid.UUID) ([]db.
 	return []db.JobPosting{}, nil
 }
 
-func (m *mockDB) UpsertJobPosting(_ context.Context, _ db.JobPostingInput) (*db.JobPosting, error) {
+func (m *mockDB) UpsertJobPosting(_ context.Context, _ *db.JobPostingCreateInput) (*db.JobPosting, error) {
 	return nil, nil
 }
 
@@ -243,19 +255,19 @@ func (m *mockDB) GetJobProfileByPostingID(_ context.Context, _ uuid.UUID) (*db.J
 	return nil, nil
 }
 
-func (m *mockDB) GetRequirementsByProfileID(_ context.Context, _ uuid.UUID) ([]db.Requirement, error) {
-	return []db.Requirement{}, nil
+func (m *mockDB) GetRequirementsByProfileID(_ context.Context, _ uuid.UUID) ([]db.JobRequirement, error) {
+	return []db.JobRequirement{}, nil
 }
 
-func (m *mockDB) GetResponsibilitiesByProfileID(_ context.Context, _ uuid.UUID) ([]db.Responsibility, error) {
-	return []db.Responsibility{}, nil
+func (m *mockDB) GetResponsibilitiesByProfileID(_ context.Context, _ uuid.UUID) ([]db.JobResponsibility, error) {
+	return []db.JobResponsibility{}, nil
 }
 
-func (m *mockDB) GetKeywordsByProfileID(_ context.Context, _ uuid.UUID) ([]db.Keyword, error) {
-	return []db.Keyword{}, nil
+func (m *mockDB) GetKeywordsByProfileID(_ context.Context, _ uuid.UUID) ([]db.JobKeyword, error) {
+	return []db.JobKeyword{}, nil
 }
 
-func (m *mockDB) CreateJobProfile(_ context.Context, _ db.JobProfileInput) (*db.JobProfile, error) {
+func (m *mockDB) CreateJobProfile(_ context.Context, _ *db.JobProfileCreateInput) (*db.JobProfile, error) {
 	return nil, nil
 }
 
@@ -299,7 +311,7 @@ func (m *mockDB) ListCrawledPagesByCompany(_ context.Context, _ uuid.UUID) ([]db
 	return []db.CrawledPage{}, nil
 }
 
-func (m *mockDB) UpsertCrawledPage(_ context.Context, _ db.CrawledPageInput) error {
+func (m *mockDB) UpsertCrawledPage(_ context.Context, _ *db.CrawledPage) error {
 	return nil
 }
 

@@ -6,6 +6,22 @@ info:
     and retrieving artifacts (including the generated LaTeX resume).
 
     The endpoints and their descriptions are based on the repository README's REST API section.
+
+    ## Response Headers
+
+    ### Rate Limiting Headers
+    All responses include rate limiting headers (when rate limiting is enabled):
+    - `X-RateLimit-Limit` (integer): Maximum requests allowed in the window
+    - `X-RateLimit-Remaining` (integer): Remaining requests in the current window
+    - `X-RateLimit-Reset` (integer, Unix timestamp): Time when the rate limit window resets
+    - `Retry-After` (integer, seconds): Present when rate limit is exceeded (429 Too Many Requests response)
+
+    ### CORS Headers
+    All responses include CORS headers to support cross-origin requests:
+    - `Access-Control-Allow-Origin`: Set to `*` for all origins
+    - `Access-Control-Allow-Methods`: Allowed HTTP methods (GET, POST, PUT, DELETE, OPTIONS)
+    - `Access-Control-Allow-Headers`: Allowed request headers (Content-Type, Authorization)
+    - `Access-Control-Allow-Credentials`: Set to `true`
   version: "0.1.0"
 
 servers:
@@ -126,9 +142,13 @@ paths:
 
   /run:
     post:
+      deprecated: true
       tags: [pipeline]
       summary: Start pipeline (background)
-      description: Starts the pipeline asynchronously and returns a run ID immediately.
+      description: |
+        **DEPRECATED**: This endpoint is deprecated. Use `POST /v1/runs` instead.
+        
+        Starts the pipeline asynchronously and returns a run ID immediately.
       operationId: startRun
       requestBody:
         required: true
@@ -156,9 +176,13 @@ paths:
 
   /run/stream:
     post:
+      deprecated: true
       tags: [pipeline]
       summary: Start pipeline (SSE)
-      description: Starts the pipeline and streams progress events using Server-Sent Events (SSE).
+      description: |
+        **DEPRECATED**: This endpoint is deprecated. Use the step-by-step pipeline API (`POST /v1/runs` with step execution) instead.
+        
+        Starts the pipeline and streams progress events using Server-Sent Events (SSE).
       operationId: startRunStream
       requestBody:
         required: true
@@ -189,6 +213,54 @@ paths:
                     data: {"step":"job_profile","category":"ingestion","message":"Parsed job profile: Software Engineer at Acme Corp"}
         "400":
           $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /status/{id}:
+    get:
+      deprecated: true
+      tags: [runs]
+      summary: Get run status (legacy)
+      description: |
+        **DEPRECATED**: This endpoint is deprecated. Use `GET /v1/status/{id}` or `GET /v1/runs/{id}` instead.
+        
+        Returns status, company, role (and other metadata) for a run.
+      operationId: getRunStatusLegacy
+      parameters:
+        - $ref: "#/components/parameters/RunIdPath"
+      responses:
+        "200":
+          description: Run status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunStatus"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /artifact/{id}:
+    get:
+      deprecated: true
+      tags: [artifacts]
+      summary: Get artifact by ID (legacy)
+      description: |
+        **DEPRECATED**: This endpoint is deprecated. Use `GET /v1/artifact/{id}` instead.
+        
+        Returns full artifact JSON content.
+      operationId: getArtifactLegacy
+      parameters:
+        - $ref: "#/components/parameters/ArtifactIdPath"
+      responses:
+        "200":
+          description: Full artifact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -1947,9 +2019,68 @@ components:
         format: uuid
       description: Crawled page ID
 
+  headers:
+    RateLimitLimit:
+      description: Maximum requests allowed in the rate limit window
+      schema:
+        type: integer
+        example: 1000
+    RateLimitRemaining:
+      description: Remaining requests in the current rate limit window
+      schema:
+        type: integer
+        example: 999
+    RateLimitReset:
+      description: Unix timestamp indicating when the rate limit window resets
+      schema:
+        type: integer
+        format: int64
+        example: 1609459200
+    RetryAfter:
+      description: Number of seconds to wait before retrying the request (present in 429 responses)
+      schema:
+        type: integer
+        example: 60
+    AccessControlAllowOrigin:
+      description: Indicates which origins are allowed to access the resource
+      schema:
+        type: string
+        example: "*"
+    AccessControlAllowMethods:
+      description: Comma-separated list of allowed HTTP methods
+      schema:
+        type: string
+        example: "GET, POST, PUT, DELETE, OPTIONS"
+    AccessControlAllowHeaders:
+      description: Comma-separated list of allowed request headers
+      schema:
+        type: string
+        example: "Content-Type, Authorization"
+    AccessControlAllowCredentials:
+      description: Indicates whether credentials can be included in the request
+      schema:
+        type: string
+        enum: ["true"]
+        example: "true"
+
   responses:
     BadRequest:
       description: Bad request
+      headers:
+        X-RateLimit-Limit:
+          $ref: "#/components/headers/RateLimitLimit"
+        X-RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimitRemaining"
+        X-RateLimit-Reset:
+          $ref: "#/components/headers/RateLimitReset"
+        Access-Control-Allow-Origin:
+          $ref: "#/components/headers/AccessControlAllowOrigin"
+        Access-Control-Allow-Methods:
+          $ref: "#/components/headers/AccessControlAllowMethods"
+        Access-Control-Allow-Headers:
+          $ref: "#/components/headers/AccessControlAllowHeaders"
+        Access-Control-Allow-Credentials:
+          $ref: "#/components/headers/AccessControlAllowCredentials"
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -1961,6 +2092,21 @@ components:
 
     NotFound:
       description: Not found
+      headers:
+        X-RateLimit-Limit:
+          $ref: "#/components/headers/RateLimitLimit"
+        X-RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimitRemaining"
+        X-RateLimit-Reset:
+          $ref: "#/components/headers/RateLimitReset"
+        Access-Control-Allow-Origin:
+          $ref: "#/components/headers/AccessControlAllowOrigin"
+        Access-Control-Allow-Methods:
+          $ref: "#/components/headers/AccessControlAllowMethods"
+        Access-Control-Allow-Headers:
+          $ref: "#/components/headers/AccessControlAllowHeaders"
+        Access-Control-Allow-Credentials:
+          $ref: "#/components/headers/AccessControlAllowCredentials"
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -1972,6 +2118,21 @@ components:
 
     InternalError:
       description: Internal server error
+      headers:
+        X-RateLimit-Limit:
+          $ref: "#/components/headers/RateLimitLimit"
+        X-RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimitRemaining"
+        X-RateLimit-Reset:
+          $ref: "#/components/headers/RateLimitReset"
+        Access-Control-Allow-Origin:
+          $ref: "#/components/headers/AccessControlAllowOrigin"
+        Access-Control-Allow-Methods:
+          $ref: "#/components/headers/AccessControlAllowMethods"
+        Access-Control-Allow-Headers:
+          $ref: "#/components/headers/AccessControlAllowHeaders"
+        Access-Control-Allow-Credentials:
+          $ref: "#/components/headers/AccessControlAllowCredentials"
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -1980,6 +2141,34 @@ components:
               value:
                 error: internal_error
                 message: Unexpected error
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          $ref: "#/components/headers/RateLimitLimit"
+        X-RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimitRemaining"
+        X-RateLimit-Reset:
+          $ref: "#/components/headers/RateLimitReset"
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
+        Access-Control-Allow-Origin:
+          $ref: "#/components/headers/AccessControlAllowOrigin"
+        Access-Control-Allow-Methods:
+          $ref: "#/components/headers/AccessControlAllowMethods"
+        Access-Control-Allow-Headers:
+          $ref: "#/components/headers/AccessControlAllowHeaders"
+        Access-Control-Allow-Credentials:
+          $ref: "#/components/headers/AccessControlAllowCredentials"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          examples:
+            too_many_requests:
+              value:
+                error: too_many_requests
+                message: Rate limit exceeded. Please retry after the time specified in Retry-After header.
 
   schemas:
     HealthResponse:
@@ -3389,7 +3578,8 @@ components:
             type: string
           description: List of next available steps
         checkpoint:
-          $ref: "#/components/schemas/CheckpointResponse"
+          allOf:
+            - $ref: "#/components/schemas/CheckpointResponse"
           nullable: true
       required: [step, status, run_id]
 

@@ -38,7 +38,7 @@ type DBClient interface {
 	// Run step operations
 	GetRunStep(ctx context.Context, runID uuid.UUID, stepName string) (*db.RunStep, error)
 	ListRunSteps(ctx context.Context, runID uuid.UUID, status *string, category *string) ([]db.RunStep, error)
-	CreateRunStep(ctx context.Context, runID uuid.UUID, input db.RunStepInput) (*db.RunStep, error)
+	CreateRunStep(ctx context.Context, runID uuid.UUID, input *db.RunStepInput) (*db.RunStep, error)
 	UpdateRunStepStatus(ctx context.Context, runID uuid.UUID, stepName string, status string, errorMsg *string, artifactID *uuid.UUID) error
 
 	// Checkpoint operations
@@ -73,32 +73,35 @@ type DBClient interface {
 	DeleteEducation(ctx context.Context, id uuid.UUID) error
 
 	// Company operations
-	ListCompaniesWithProfiles(ctx context.Context, limit, offset int) ([]db.CompanyWithProfile, int, error)
+	ListCompaniesWithProfiles(ctx context.Context, limit, offset int) ([]db.Company, int, error)
 	GetCompanyByID(ctx context.Context, companyID uuid.UUID) (*db.Company, error)
 	GetCompanyByNormalizedName(ctx context.Context, normalized string) (*db.Company, error)
 	ListCompanyDomains(ctx context.Context, companyID uuid.UUID) ([]db.CompanyDomain, error)
 	FindOrCreateCompany(ctx context.Context, name string) (*db.Company, error)
-	AddCompanyDomain(ctx context.Context, companyID uuid.UUID, domain string, domainType db.DomainType) error
+	AddCompanyDomain(ctx context.Context, companyID uuid.UUID, domain string, domainType string) error
 
 	// Company profile operations
 	GetCompanyProfileByCompanyID(ctx context.Context, companyID uuid.UUID) (*db.CompanyProfile, error)
-	CreateCompanyProfile(ctx context.Context, input db.CompanyProfileInput) (*db.CompanyProfile, error)
-	GetStyleRulesByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.StyleRule, error)
+	CreateCompanyProfile(ctx context.Context, input *db.ProfileCreateInput) (*db.CompanyProfile, error)
+	GetStyleRulesByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.CompanyStyleRule, error)
+	GetTabooPhrasesByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.CompanyTabooPhrase, error)
+	GetValuesByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.CompanyValue, error)
+	GetSourcesByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.CompanyProfileSource, error)
 
 	// Job posting operations
-	ListJobPostings(ctx context.Context, opts db.JobPostingListOptions) ([]db.JobPosting, int, error)
+	ListJobPostings(ctx context.Context, opts db.ListJobPostingsOptions) ([]db.JobPosting, int, error)
 	GetJobPostingByID(ctx context.Context, postingID uuid.UUID) (*db.JobPosting, error)
 	GetJobPostingByURL(ctx context.Context, url string) (*db.JobPosting, error)
 	ListJobPostingsByCompany(ctx context.Context, companyID uuid.UUID) ([]db.JobPosting, error)
-	UpsertJobPosting(ctx context.Context, input db.JobPostingInput) (*db.JobPosting, error)
+	UpsertJobPosting(ctx context.Context, input *db.JobPostingCreateInput) (*db.JobPosting, error)
 
 	// Job profile operations
 	GetJobProfileByID(ctx context.Context, profileID uuid.UUID) (*db.JobProfile, error)
 	GetJobProfileByPostingID(ctx context.Context, postingID uuid.UUID) (*db.JobProfile, error)
-	GetRequirementsByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.Requirement, error)
-	GetResponsibilitiesByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.Responsibility, error)
-	GetKeywordsByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.Keyword, error)
-	CreateJobProfile(ctx context.Context, input db.JobProfileInput) (*db.JobProfile, error)
+	GetRequirementsByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.JobRequirement, error)
+	GetResponsibilitiesByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.JobResponsibility, error)
+	GetKeywordsByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.JobKeyword, error)
+	CreateJobProfile(ctx context.Context, input *db.JobProfileCreateInput) (*db.JobProfile, error)
 
 	// Experience bank operations
 	ListStoriesByUser(ctx context.Context, userID uuid.UUID) ([]db.Story, error)
@@ -113,7 +116,7 @@ type DBClient interface {
 	GetCrawledPageByID(ctx context.Context, pageID uuid.UUID) (*db.CrawledPage, error)
 	GetCrawledPageByURL(ctx context.Context, url string) (*db.CrawledPage, error)
 	ListCrawledPagesByCompany(ctx context.Context, companyID uuid.UUID) ([]db.CrawledPage, error)
-	UpsertCrawledPage(ctx context.Context, page db.CrawledPageInput) error
+	UpsertCrawledPage(ctx context.Context, page *db.CrawledPage) error
 
 	// Experience bank (types)
 	GetExperienceBank(ctx context.Context, userID uuid.UUID) (*types.ExperienceBank, error)
