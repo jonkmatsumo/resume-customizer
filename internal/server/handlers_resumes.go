@@ -318,8 +318,13 @@ func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
 	s.jsonResponse(w, http.StatusOK, response)
 }
 
-// handleArtifact returns an artifact by ID
+// handleArtifact returns an artifact by ID (legacy endpoint)
 func (s *Server) handleArtifact(w http.ResponseWriter, r *http.Request) {
+	s.handleGetArtifact(w, r)
+}
+
+// handleGetArtifact returns an artifact by ID (v1 API)
+func (s *Server) handleGetArtifact(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	if idStr == "" {
 		s.errorResponse(w, http.StatusBadRequest, "Artifact ID is required")

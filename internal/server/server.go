@@ -14,16 +14,121 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jonathan/resume-customizer/internal/config"
 	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/server/middleware"
 	"github.com/jonathan/resume-customizer/internal/server/ratelimit"
+	"github.com/jonathan/resume-customizer/internal/types"
 )
+
+// DBClient defines the database methods needed by the server
+type DBClient interface {
+	// Run operations
+	GetRun(ctx context.Context, runID uuid.UUID) (*db.Run, error)
+	CreateRun(ctx context.Context, company, roleTitle, jobURL string) (uuid.UUID, error)
+	ListRunsFiltered(ctx context.Context, filters db.RunFilters) ([]db.Run, error)
+	DeleteRun(ctx context.Context, runID uuid.UUID) error
+
+	// Artifact operations
+	GetArtifactByID(ctx context.Context, artifactID uuid.UUID) (*db.Artifact, error)
+	GetTextArtifact(ctx context.Context, runID uuid.UUID, step string) (string, error)
+	ListArtifacts(ctx context.Context, filters db.ArtifactFilters) ([]db.ArtifactSummary, error)
+
+	// Run step operations
+	GetRunStep(ctx context.Context, runID uuid.UUID, stepName string) (*db.RunStep, error)
+	ListRunSteps(ctx context.Context, runID uuid.UUID, status *string, category *string) ([]db.RunStep, error)
+	CreateRunStep(ctx context.Context, runID uuid.UUID, input db.RunStepInput) (*db.RunStep, error)
+	UpdateRunStepStatus(ctx context.Context, runID uuid.UUID, stepName string, status string, errorMsg *string, artifactID *uuid.UUID) error
+
+	// Checkpoint operations
+	GetRunCheckpoint(ctx context.Context, runID uuid.UUID) (*db.RunCheckpoint, error)
+	CreateRunCheckpoint(ctx context.Context, runID uuid.UUID, input *db.RunCheckpointInput) (*db.RunCheckpoint, error)
+
+	// User operations
+	GetUser(ctx context.Context, id uuid.UUID) (*db.User, error)
+	GetUserByEmail(ctx context.Context, email string) (*db.User, error)
+	CreateUser(ctx context.Context, name, email, phone string) (uuid.UUID, error)
+	UpdateUser(ctx context.Context, u *db.User) error
+	DeleteUser(ctx context.Context, id uuid.UUID) error
+	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
+	CheckEmailExists(ctx context.Context, email string) (bool, error)
+
+	// Job operations
+	CreateJob(ctx context.Context, job *db.Job) (uuid.UUID, error)
+	ListJobs(ctx context.Context, userID uuid.UUID) ([]db.Job, error)
+	UpdateJob(ctx context.Context, job *db.Job) error
+	DeleteJob(ctx context.Context, id uuid.UUID) error
+
+	// Experience operations
+	CreateExperience(ctx context.Context, exp *db.Experience) (uuid.UUID, error)
+	ListExperiences(ctx context.Context, jobID uuid.UUID) ([]db.Experience, error)
+	UpdateExperience(ctx context.Context, exp *db.Experience) error
+	DeleteExperience(ctx context.Context, id uuid.UUID) error
+
+	// Education operations
+	CreateEducation(ctx context.Context, edu *db.Education) (uuid.UUID, error)
+	ListEducation(ctx context.Context, userID uuid.UUID) ([]db.Education, error)
+	UpdateEducation(ctx context.Context, edu *db.Education) error
+	DeleteEducation(ctx context.Context, id uuid.UUID) error
+
+	// Company operations
+	ListCompaniesWithProfiles(ctx context.Context, limit, offset int) ([]db.CompanyWithProfile, int, error)
+	GetCompanyByID(ctx context.Context, companyID uuid.UUID) (*db.Company, error)
+	GetCompanyByNormalizedName(ctx context.Context, normalized string) (*db.Company, error)
+	ListCompanyDomains(ctx context.Context, companyID uuid.UUID) ([]db.CompanyDomain, error)
+	FindOrCreateCompany(ctx context.Context, name string) (*db.Company, error)
+	AddCompanyDomain(ctx context.Context, companyID uuid.UUID, domain string, domainType db.DomainType) error
+
+	// Company profile operations
+	GetCompanyProfileByCompanyID(ctx context.Context, companyID uuid.UUID) (*db.CompanyProfile, error)
+	CreateCompanyProfile(ctx context.Context, input db.CompanyProfileInput) (*db.CompanyProfile, error)
+	GetStyleRulesByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.StyleRule, error)
+
+	// Job posting operations
+	ListJobPostings(ctx context.Context, opts db.JobPostingListOptions) ([]db.JobPosting, int, error)
+	GetJobPostingByID(ctx context.Context, postingID uuid.UUID) (*db.JobPosting, error)
+	GetJobPostingByURL(ctx context.Context, url string) (*db.JobPosting, error)
+	ListJobPostingsByCompany(ctx context.Context, companyID uuid.UUID) ([]db.JobPosting, error)
+	UpsertJobPosting(ctx context.Context, input db.JobPostingInput) (*db.JobPosting, error)
+
+	// Job profile operations
+	GetJobProfileByID(ctx context.Context, profileID uuid.UUID) (*db.JobProfile, error)
+	GetJobProfileByPostingID(ctx context.Context, postingID uuid.UUID) (*db.JobProfile, error)
+	GetRequirementsByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.Requirement, error)
+	GetResponsibilitiesByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.Responsibility, error)
+	GetKeywordsByProfileID(ctx context.Context, profileID uuid.UUID) ([]db.Keyword, error)
+	CreateJobProfile(ctx context.Context, input db.JobProfileInput) (*db.JobProfile, error)
+
+	// Experience bank operations
+	ListStoriesByUser(ctx context.Context, userID uuid.UUID) ([]db.Story, error)
+	GetStoryByID(ctx context.Context, storyID uuid.UUID) (*db.Story, error)
+	CreateStory(ctx context.Context, input *db.StoryCreateInput) (*db.Story, error)
+	GetBulletsByStoryID(ctx context.Context, storyID uuid.UUID) ([]db.Bullet, error)
+	ListSkillsByUserID(ctx context.Context, userID uuid.UUID) ([]db.Skill, error)
+	GetSkillByName(ctx context.Context, name string) (*db.Skill, error)
+	GetBulletsBySkillIDAndUserID(ctx context.Context, skillID uuid.UUID, userID uuid.UUID) ([]db.Bullet, error)
+
+	// Crawled pages operations
+	GetCrawledPageByID(ctx context.Context, pageID uuid.UUID) (*db.CrawledPage, error)
+	GetCrawledPageByURL(ctx context.Context, url string) (*db.CrawledPage, error)
+	ListCrawledPagesByCompany(ctx context.Context, companyID uuid.UUID) ([]db.CrawledPage, error)
+	UpsertCrawledPage(ctx context.Context, page db.CrawledPageInput) error
+
+	// Experience bank (types)
+	GetExperienceBank(ctx context.Context, userID uuid.UUID) (*types.ExperienceBank, error)
+
+	// Pool access (used in one place in handlers_steps.go)
+	Pool() *pgxpool.Pool
+
+	// Cleanup
+	Close()
+}
 
 // Server represents the HTTP server
 type Server struct {
 	httpServer  *http.Server
-	db          *db.DB
+	db          DBClient
 	apiKey      string
 	databaseURL string
 	rateLimiter *ratelimit.Limiter
@@ -107,6 +212,7 @@ func New(cfg Config) (*Server, error) {
 
 	// CRUD endpoints for artifacts
 	mux.HandleFunc("GET /v1/artifacts", s.handleListArtifacts)
+	mux.HandleFunc("GET /v1/artifact/{id}", s.handleGetArtifact)
 
 	// User Profile endpoints
 	mux.HandleFunc("POST /v1/users", s.handleCreateUser)

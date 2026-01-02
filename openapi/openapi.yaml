@@ -223,9 +223,31 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Run"
+                type: object
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        company:
+                          type: string
+                        role_title:
+                          type: string
+                        status:
+                          type: string
+                          enum: [queued, running, completed, failed, canceled]
+                        created_at:
+                          type: string
+                          format: date-time
+                      required: [id, company, role_title, status, created_at]
+                  count:
+                    type: integer
+                    description: Total number of runs returned
+                required: [runs, count]
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -250,6 +272,26 @@ paths:
           $ref: "#/components/responses/InternalError"
 
   /v1/runs/{id}:
+    get:
+      tags: [runs]
+      summary: Get run by ID
+      description: Returns complete run metadata including user_id, company, role_title, job_url, status, and timestamps.
+      operationId: getRun
+      parameters:
+        - $ref: "#/components/parameters/RunIdPath"
+      responses:
+        "200":
+          description: Run details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunGetResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
     delete:
       tags: [runs]
       summary: Delete run
@@ -341,14 +383,31 @@ paths:
   /v1/runs/{id}/resume.tex:
     get:
       tags: [artifacts]
-      summary: Download LaTeX resume
-      description: Downloads the generated LaTeX resume for a run as plain text.
-      operationId: downloadResumeTex
+      summary: Get LaTeX resume
+      description: |
+        Returns the generated LaTeX resume for a run as plain text.
+        
+        By default, triggers a download with `Content-Disposition: attachment; filename=resume.tex`.
+        Use `view=true` query parameter to display the content in-browser without triggering a download.
+      operationId: getResumeTex
       parameters:
         - $ref: "#/components/parameters/RunIdPath"
+        - name: view
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: When true, displays content in browser without download header
       responses:
         "200":
           description: LaTeX document
+          headers:
+            Content-Disposition:
+              description: Present only when view=false (default). Triggers file download.
+              schema:
+                type: string
+                example: attachment; filename=resume.tex
           content:
             text/plain:
               schema:
@@ -1502,6 +1561,245 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /v1/runs/{run_id}/steps:
+    get:
+      tags: [pipeline-steps]
+      summary: List all steps for a run
+      description: Returns all pipeline steps for a run with their status, timing, and artifacts. Includes optional run metadata (company, role_title, created_at) to reduce frontend API calls.
+      operationId: listRunSteps
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Run ID
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [pending, in_progress, completed, failed, skipped, blocked]
+          description: Filter steps by status
+        - in: query
+          name: category
+          required: false
+          schema:
+            type: string
+          description: Filter steps by category
+      responses:
+        "200":
+          description: List of steps with status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunStepsListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/runs/{run_id}/steps/{step_name}:
+    get:
+      tags: [pipeline-steps]
+      summary: Get step status
+      description: Returns the status of a specific pipeline step
+      operationId: getStepStatus
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Run ID
+        - in: path
+          name: step_name
+          required: true
+          schema:
+            type: string
+          description: Step name
+      responses:
+        "200":
+          description: Step status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StepStatusResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: [pipeline-steps]
+      summary: Execute a step
+      description: Executes a specific pipeline step
+      operationId: executeStep
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Run ID
+        - in: path
+          name: step_name
+          required: true
+          schema:
+            type: string
+          description: Step name
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StepExecuteRequest"
+      responses:
+        "200":
+          description: Step execution result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StepExecuteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/runs/{run_id}/steps/{step_name}/skip:
+    post:
+      tags: [pipeline-steps]
+      summary: Skip a step
+      description: Marks a step as skipped
+      operationId: skipStep
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Run ID
+        - in: path
+          name: step_name
+          required: true
+          schema:
+            type: string
+          description: Step name
+      responses:
+        "200":
+          description: Step skipped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StepExecuteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/runs/{run_id}/steps/{step_name}/retry:
+    post:
+      tags: [pipeline-steps]
+      summary: Retry a failed step
+      description: Retries a previously failed step
+      operationId: retryStep
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Run ID
+        - in: path
+          name: step_name
+          required: true
+          schema:
+            type: string
+          description: Step name
+      responses:
+        "200":
+          description: Step retry result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StepExecuteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/runs/{run_id}/checkpoint:
+    get:
+      tags: [pipeline-steps]
+      summary: Get checkpoint
+      description: Returns the current checkpoint state for a run
+      operationId: getCheckpoint
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Run ID
+      responses:
+        "200":
+          description: Checkpoint state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckpointGetResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/runs/{run_id}/resume:
+    post:
+      tags: [pipeline-steps]
+      summary: Resume from checkpoint
+      description: Resumes pipeline execution from the last checkpoint
+      operationId: resumeFromCheckpoint
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Run ID
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResumeRequest"
+      responses:
+        "200":
+          description: Resume result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResumeResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1695,19 +1993,19 @@ components:
 
     RunCreateRequest:
       type: object
-      description: Request body to start a pipeline run.
+      description: Request body to start a pipeline run (step-by-step execution).
       properties:
         user_id:
           type: string
           format: uuid
-          description: UUID of the user profile in DB
+          description: UUID of the user profile in DB (REQUIRED)
         job_url:
           type: string
           format: uri
-          description: URL of the job posting
-        job:
+          description: URL of the job posting (required if job_text not provided)
+        job_text:
           type: string
-          description: Path to local job posting file (alternative to job_url)
+          description: Raw job posting text (required if job_url not provided)
         template:
           type: string
           description: Path to LaTeX template
@@ -1725,7 +2023,7 @@ components:
       required: [user_id]
       oneOf:
         - required: [job_url]
-        - required: [job]
+        - required: [job_text]
 
     RunCreateResponse:
       type: object
@@ -1738,7 +2036,30 @@ components:
           type: string
           enum: [queued, running]
           description: Initial status
-      required: [run_id, status]
+        created_at:
+          type: string
+          format: date-time
+          description: Run creation timestamp
+        steps:
+          type: object
+          properties:
+            completed:
+              type: array
+              items:
+                type: string
+              description: List of completed step names
+            available:
+              type: array
+              items:
+                type: string
+              description: List of available step names
+            blocked:
+              type: array
+              items:
+                type: string
+              description: List of blocked step names
+          required: [completed, available, blocked]
+      required: [run_id, status, created_at, steps]
 
     Run:
       type: object
@@ -2896,3 +3217,266 @@ components:
           type: string
           description: JWT token for authenticated requests
           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    RunGetResponse:
+      type: object
+      description: Complete run metadata response
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: User ID (nullable for backward compatibility)
+        company:
+          type: string
+          description: Company name
+        role_title:
+          type: string
+          description: Job role title
+        job_url:
+          type: string
+          format: uri
+          description: Original job posting URL
+        status:
+          type: string
+          enum: [queued, running, completed, failed, canceled]
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when run completed (null if still running)
+      required: [id, company, role_title, job_url, status, created_at]
+
+    RunStepsListResponse:
+      type: object
+      description: List of all steps for a run with optional run metadata
+      properties:
+        run_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, running, completed, failed, canceled]
+          description: Run-level status
+        company:
+          type: string
+          nullable: true
+          description: Company name (omitted if empty)
+        role_title:
+          type: string
+          nullable: true
+          description: Job role title (omitted if empty)
+        created_at:
+          type: string
+          format: date-time
+          description: Run creation timestamp (omitted if empty)
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepStatusResponse"
+        summary:
+          $ref: "#/components/schemas/RunStepsSummary"
+      required: [run_id, status, steps, summary]
+
+    StepStatusResponse:
+      type: object
+      description: Status of a single pipeline step
+      properties:
+        step:
+          type: string
+          description: Step name
+        status:
+          type: string
+          enum: [pending, in_progress, completed, failed, skipped, blocked]
+        run_id:
+          type: string
+          format: uuid
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Step start time (null if not started)
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Step completion time (null if not completed)
+        duration_ms:
+          type: integer
+          nullable: true
+          description: Step duration in milliseconds (null if not completed)
+        artifact_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Artifact ID produced by this step (null if no artifact)
+        error:
+          type: string
+          nullable: true
+          description: Error message (null unless status is failed)
+      required: [step, status, run_id]
+
+    RunStepsSummary:
+      type: object
+      description: Summary of step statuses for a run
+      properties:
+        total:
+          type: integer
+          description: Total number of steps
+        completed:
+          type: integer
+          description: Number of completed steps
+        in_progress:
+          type: integer
+          description: Number of steps in progress
+        pending:
+          type: integer
+          description: Number of pending steps
+        failed:
+          type: integer
+          description: Number of failed steps
+        skipped:
+          type: integer
+          description: Number of skipped steps
+      required: [total, completed, in_progress, pending, failed, skipped]
+
+    StepExecuteRequest:
+      type: object
+      description: Request to execute a step with optional parameters
+      properties:
+        parameters:
+          type: object
+          additionalProperties: true
+          description: Step-specific parameters
+      additionalProperties: false
+
+    StepExecuteResponse:
+      type: object
+      description: Response from step execution
+      properties:
+        step:
+          type: string
+        status:
+          type: string
+          enum: [pending, in_progress, completed, failed, skipped]
+        run_id:
+          type: string
+          format: uuid
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        duration_ms:
+          type: integer
+          nullable: true
+        artifact_id:
+          type: string
+          format: uuid
+          nullable: true
+        next_steps:
+          type: array
+          items:
+            type: string
+          description: List of next available steps
+        checkpoint:
+          $ref: "#/components/schemas/CheckpointResponse"
+          nullable: true
+      required: [step, status, run_id]
+
+    CheckpointResponse:
+      type: object
+      description: Checkpoint information
+      properties:
+        step:
+          type: string
+        run_id:
+          type: string
+          format: uuid
+        completed_at:
+          type: string
+          format: date-time
+        artifacts:
+          type: object
+          additionalProperties: true
+          description: Artifacts available at this checkpoint
+      required: [step, run_id, completed_at, artifacts]
+
+    CheckpointGetResponse:
+      type: object
+      description: Full checkpoint state
+      properties:
+        run_id:
+          type: string
+          format: uuid
+        checkpoint_step:
+          type: string
+          description: Step that created this checkpoint
+        checkpoint_at:
+          type: string
+          format: date-time
+        completed_steps:
+          type: array
+          items:
+            type: string
+          description: List of completed step names
+        next_available_steps:
+          type: array
+          items:
+            type: string
+          description: List of steps that can be executed next
+        artifacts:
+          type: object
+          additionalProperties: true
+          description: All artifacts available at this checkpoint
+      required: [run_id, checkpoint_step, checkpoint_at, completed_steps, next_available_steps, artifacts]
+
+    ResumeRequest:
+      type: object
+      description: Request to resume from checkpoint
+      properties:
+        auto_continue:
+          type: boolean
+          default: false
+          description: Automatically continue executing steps
+        max_steps:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Maximum number of steps to execute (null for unlimited)
+      additionalProperties: false
+
+    ResumeResponse:
+      type: object
+      description: Response from resume operation
+      properties:
+        run_id:
+          type: string
+          format: uuid
+        resumed_from:
+          type: string
+          description: Step name that was resumed from
+        executed_steps:
+          type: array
+          items:
+            type: string
+          description: List of steps that were executed
+        current_status:
+          type: string
+          enum: [queued, running, completed, failed, canceled]
+          description: Current run status
+        next_available_steps:
+          type: array
+          items:
+            type: string
+          description: List of steps that can be executed next
+      required: [run_id, resumed_from, executed_steps, current_status, next_available_steps]

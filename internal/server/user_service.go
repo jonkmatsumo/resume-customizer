@@ -13,12 +13,12 @@ import (
 
 // UserService provides business logic for user authentication operations
 type UserService struct {
-	db             *db.DB
+	db             DBClient
 	passwordConfig *config.PasswordConfig
 }
 
 // NewUserService creates a new UserService with the given dependencies
-func NewUserService(db *db.DB, passwordConfig *config.PasswordConfig) *UserService {
+func NewUserService(db DBClient, passwordConfig *config.PasswordConfig) *UserService {
 	return &UserService{
 		db:             db,
 		passwordConfig: passwordConfig,

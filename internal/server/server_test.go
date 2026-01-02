@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jonathan/resume-customizer/internal/db"
 	"github.com/jonathan/resume-customizer/internal/server/ratelimit"
+	"github.com/jonathan/resume-customizer/internal/types"
 )
 
 // mockDB implements a minimal mock for testing
@@ -58,6 +60,257 @@ func (m *mockDB) GetTextArtifact(_ context.Context, runID uuid.UUID, step string
 
 func (m *mockDB) Close() {}
 
+// Stub implementations for all other DBClient interface methods
+// These return zero values or errors as appropriate for unit tests
+
+func (m *mockDB) CreateRun(_ context.Context, _, _, _ string) (uuid.UUID, error) {
+	return uuid.New(), nil
+}
+
+func (m *mockDB) ListRunsFiltered(_ context.Context, _ db.RunFilters) ([]db.Run, error) {
+	return []db.Run{}, nil
+}
+
+func (m *mockDB) DeleteRun(_ context.Context, _ uuid.UUID) error {
+	return nil
+}
+
+func (m *mockDB) ListArtifacts(_ context.Context, _ db.ArtifactFilters) ([]db.ArtifactSummary, error) {
+	return []db.ArtifactSummary{}, nil
+}
+
+func (m *mockDB) GetRunStep(_ context.Context, _, _ string) (*db.RunStep, error) {
+	return nil, nil
+}
+
+func (m *mockDB) ListRunSteps(_ context.Context, _ uuid.UUID, _, _ *string) ([]db.RunStep, error) {
+	return []db.RunStep{}, nil
+}
+
+func (m *mockDB) CreateRunStep(_ context.Context, _ uuid.UUID, _ db.RunStepInput) (*db.RunStep, error) {
+	return nil, nil
+}
+
+func (m *mockDB) UpdateRunStepStatus(_ context.Context, _, _ string, _ string, _ *string, _ *uuid.UUID) error {
+	return nil
+}
+
+func (m *mockDB) GetRunCheckpoint(_ context.Context, _ uuid.UUID) (*db.RunCheckpoint, error) {
+	return nil, nil
+}
+
+func (m *mockDB) CreateRunCheckpoint(_ context.Context, _ uuid.UUID, _ *db.RunCheckpointInput) (*db.RunCheckpoint, error) {
+	return nil, nil
+}
+
+func (m *mockDB) GetUser(_ context.Context, _ uuid.UUID) (*db.User, error) {
+	return nil, nil
+}
+
+func (m *mockDB) GetUserByEmail(_ context.Context, _ string) (*db.User, error) {
+	return nil, nil
+}
+
+func (m *mockDB) CreateUser(_ context.Context, _, _, _ string) (uuid.UUID, error) {
+	return uuid.New(), nil
+}
+
+func (m *mockDB) UpdateUser(_ context.Context, _ *db.User) error {
+	return nil
+}
+
+func (m *mockDB) DeleteUser(_ context.Context, _ uuid.UUID) error {
+	return nil
+}
+
+func (m *mockDB) UpdatePassword(_ context.Context, _ uuid.UUID, _ string) error {
+	return nil
+}
+
+func (m *mockDB) CheckEmailExists(_ context.Context, _ string) (bool, error) {
+	return false, nil
+}
+
+func (m *mockDB) CreateJob(_ context.Context, _ *db.Job) (uuid.UUID, error) {
+	return uuid.New(), nil
+}
+
+func (m *mockDB) ListJobs(_ context.Context, _ uuid.UUID) ([]db.Job, error) {
+	return []db.Job{}, nil
+}
+
+func (m *mockDB) UpdateJob(_ context.Context, _ *db.Job) error {
+	return nil
+}
+
+func (m *mockDB) DeleteJob(_ context.Context, _ uuid.UUID) error {
+	return nil
+}
+
+func (m *mockDB) CreateExperience(_ context.Context, _ *db.Experience) (uuid.UUID, error) {
+	return uuid.New(), nil
+}
+
+func (m *mockDB) ListExperiences(_ context.Context, _ uuid.UUID) ([]db.Experience, error) {
+	return []db.Experience{}, nil
+}
+
+func (m *mockDB) UpdateExperience(_ context.Context, _ *db.Experience) error {
+	return nil
+}
+
+func (m *mockDB) DeleteExperience(_ context.Context, _ uuid.UUID) error {
+	return nil
+}
+
+func (m *mockDB) CreateEducation(_ context.Context, _ *db.Education) (uuid.UUID, error) {
+	return uuid.New(), nil
+}
+
+func (m *mockDB) ListEducation(_ context.Context, _ uuid.UUID) ([]db.Education, error) {
+	return []db.Education{}, nil
+}
+
+func (m *mockDB) UpdateEducation(_ context.Context, _ *db.Education) error {
+	return nil
+}
+
+func (m *mockDB) DeleteEducation(_ context.Context, _ uuid.UUID) error {
+	return nil
+}
+
+func (m *mockDB) ListCompaniesWithProfiles(_ context.Context, _, _ int) ([]db.CompanyWithProfile, int, error) {
+	return []db.CompanyWithProfile{}, 0, nil
+}
+
+func (m *mockDB) GetCompanyByID(_ context.Context, _ uuid.UUID) (*db.Company, error) {
+	return nil, nil
+}
+
+func (m *mockDB) GetCompanyByNormalizedName(_ context.Context, _ string) (*db.Company, error) {
+	return nil, nil
+}
+
+func (m *mockDB) ListCompanyDomains(_ context.Context, _ uuid.UUID) ([]db.CompanyDomain, error) {
+	return []db.CompanyDomain{}, nil
+}
+
+func (m *mockDB) FindOrCreateCompany(_ context.Context, _ string) (*db.Company, error) {
+	return nil, nil
+}
+
+func (m *mockDB) AddCompanyDomain(_ context.Context, _ uuid.UUID, _ string, _ db.DomainType) error {
+	return nil
+}
+
+func (m *mockDB) GetCompanyProfileByCompanyID(_ context.Context, _ uuid.UUID) (*db.CompanyProfile, error) {
+	return nil, nil
+}
+
+func (m *mockDB) CreateCompanyProfile(_ context.Context, _ db.CompanyProfileInput) (*db.CompanyProfile, error) {
+	return nil, nil
+}
+
+func (m *mockDB) GetStyleRulesByProfileID(_ context.Context, _ uuid.UUID) ([]db.StyleRule, error) {
+	return []db.StyleRule{}, nil
+}
+
+func (m *mockDB) ListJobPostings(_ context.Context, _ db.JobPostingListOptions) ([]db.JobPosting, int, error) {
+	return []db.JobPosting{}, 0, nil
+}
+
+func (m *mockDB) GetJobPostingByID(_ context.Context, _ uuid.UUID) (*db.JobPosting, error) {
+	return nil, nil
+}
+
+func (m *mockDB) GetJobPostingByURL(_ context.Context, _ string) (*db.JobPosting, error) {
+	return nil, nil
+}
+
+func (m *mockDB) ListJobPostingsByCompany(_ context.Context, _ uuid.UUID) ([]db.JobPosting, error) {
+	return []db.JobPosting{}, nil
+}
+
+func (m *mockDB) UpsertJobPosting(_ context.Context, _ db.JobPostingInput) (*db.JobPosting, error) {
+	return nil, nil
+}
+
+func (m *mockDB) GetJobProfileByID(_ context.Context, _ uuid.UUID) (*db.JobProfile, error) {
+	return nil, nil
+}
+
+func (m *mockDB) GetJobProfileByPostingID(_ context.Context, _ uuid.UUID) (*db.JobProfile, error) {
+	return nil, nil
+}
+
+func (m *mockDB) GetRequirementsByProfileID(_ context.Context, _ uuid.UUID) ([]db.Requirement, error) {
+	return []db.Requirement{}, nil
+}
+
+func (m *mockDB) GetResponsibilitiesByProfileID(_ context.Context, _ uuid.UUID) ([]db.Responsibility, error) {
+	return []db.Responsibility{}, nil
+}
+
+func (m *mockDB) GetKeywordsByProfileID(_ context.Context, _ uuid.UUID) ([]db.Keyword, error) {
+	return []db.Keyword{}, nil
+}
+
+func (m *mockDB) CreateJobProfile(_ context.Context, _ db.JobProfileInput) (*db.JobProfile, error) {
+	return nil, nil
+}
+
+func (m *mockDB) ListStoriesByUser(_ context.Context, _ uuid.UUID) ([]db.Story, error) {
+	return []db.Story{}, nil
+}
+
+func (m *mockDB) GetStoryByID(_ context.Context, _ uuid.UUID) (*db.Story, error) {
+	return nil, nil
+}
+
+func (m *mockDB) CreateStory(_ context.Context, _ *db.StoryCreateInput) (*db.Story, error) {
+	return nil, nil
+}
+
+func (m *mockDB) GetBulletsByStoryID(_ context.Context, _ uuid.UUID) ([]db.Bullet, error) {
+	return []db.Bullet{}, nil
+}
+
+func (m *mockDB) ListSkillsByUserID(_ context.Context, _ uuid.UUID) ([]db.Skill, error) {
+	return []db.Skill{}, nil
+}
+
+func (m *mockDB) GetSkillByName(_ context.Context, _ string) (*db.Skill, error) {
+	return nil, nil
+}
+
+func (m *mockDB) GetBulletsBySkillIDAndUserID(_ context.Context, _, _ uuid.UUID) ([]db.Bullet, error) {
+	return []db.Bullet{}, nil
+}
+
+func (m *mockDB) GetCrawledPageByID(_ context.Context, _ uuid.UUID) (*db.CrawledPage, error) {
+	return nil, nil
+}
+
+func (m *mockDB) GetCrawledPageByURL(_ context.Context, _ string) (*db.CrawledPage, error) {
+	return nil, nil
+}
+
+func (m *mockDB) ListCrawledPagesByCompany(_ context.Context, _ uuid.UUID) ([]db.CrawledPage, error) {
+	return []db.CrawledPage{}, nil
+}
+
+func (m *mockDB) UpsertCrawledPage(_ context.Context, _ db.CrawledPageInput) error {
+	return nil
+}
+
+func (m *mockDB) GetExperienceBank(_ context.Context, _ uuid.UUID) (*types.ExperienceBank, error) {
+	return nil, nil
+}
+
+func (m *mockDB) Pool() *pgxpool.Pool {
+	return nil // Unit tests don't use Pool()
+}
+
 // errorMockDB returns errors for testing error paths
 type errorMockDB struct {
 	mockDB
@@ -82,7 +335,7 @@ func newTestServer() *testServer {
 		DefaultWindow: time.Minute,
 	}
 	s := &Server{
-		db:          nil, // Will use mock methods directly
+		db:          mock,
 		apiKey:      "test-api-key",
 		rateLimiter: ratelimit.NewLimiter(rateLimitConfig),
 	}
@@ -101,7 +354,7 @@ func newTestServerWithRateLimit(enabled bool, limit int, window time.Duration) *
 		},
 	}
 	s := &Server{
-		db:          nil,
+		db:          mock,
 		apiKey:      "test-api-key",
 		rateLimiter: ratelimit.NewLimiter(rateLimitConfig),
 	}
@@ -615,6 +868,7 @@ func TestRateLimitMiddleware_HealthCheckExempt(t *testing.T) {
 
 // TestRateLimitMiddleware_Whitelist tests whitelist functionality
 func TestRateLimitMiddleware_Whitelist(t *testing.T) {
+	mock := newMockDB()
 	config := &ratelimit.Config{
 		Enabled:       true,
 		DefaultLimit:  1,
@@ -622,7 +876,7 @@ func TestRateLimitMiddleware_Whitelist(t *testing.T) {
 		Whitelist:     map[string]bool{"127.0.0.1": true},
 	}
 	s := &Server{
-		db:          nil,
+		db:          mock,
 		apiKey:      "test-api-key",
 		rateLimiter: ratelimit.NewLimiter(config),
 	}
@@ -646,6 +900,7 @@ func TestRateLimitMiddleware_Whitelist(t *testing.T) {
 
 // TestRateLimitMiddleware_Blacklist tests blacklist functionality
 func TestRateLimitMiddleware_Blacklist(t *testing.T) {
+	mock := newMockDB()
 	config := &ratelimit.Config{
 		Enabled:       true,
 		DefaultLimit:  1000,
@@ -653,7 +908,7 @@ func TestRateLimitMiddleware_Blacklist(t *testing.T) {
 		Blacklist:     map[string]bool{"192.168.1.1": true},
 	}
 	s := &Server{
-		db:          nil,
+		db:          mock,
 		apiKey:      "test-api-key",
 		rateLimiter: ratelimit.NewLimiter(config),
 	}
