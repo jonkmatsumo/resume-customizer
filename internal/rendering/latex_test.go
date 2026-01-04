@@ -157,7 +157,7 @@ func TestGroupByCompanyAndRole_ValidInput(t *testing.T) {
 	// Role names are also escaped, but "Engineer" has no special chars
 	assert.Equal(t, "Engineer", companies[0].Roles[0].Role)
 	require.Len(t, companies[0].Roles[0].Bullets, 2, "should have 2 bullets")
-	
+
 	// Bullets now include LaTeX comments for mapping (format: % BULLET_START:id\ntext\n% BULLET_END:id)
 	// Check that each bullet string contains the expected text
 	bullets := companies[0].Roles[0].Bullets

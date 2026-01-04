@@ -8,42 +8,46 @@ import (
 )
 
 // ApplyRepairs applies repair actions deterministically to a plan and rewritten bullets
-func ApplyRepairs(actions *types.RepairActions, plan *types.ResumePlan, rewrittenBullets *types.RewrittenBullets, rankedStories *types.RankedStories, experienceBank *types.ExperienceBank) (updatedPlan *types.ResumePlan, updatedBullets *types.RewrittenBullets, needsRewrite bool, err error) {
+func ApplyRepairs(actions *types.RepairActions, plan *types.ResumePlan, rewrittenBullets *types.RewrittenBullets, rankedStories *types.RankedStories, experienceBank *types.ExperienceBank) (updatedPlan *types.ResumePlan, updatedBullets *types.RewrittenBullets, bulletsToRewrite []string, err error) {
 	// Create deep copies to avoid mutating inputs
 	planCopy := deepCopyPlan(plan)
 	bulletsCopy := deepCopyRewrittenBullets(rewrittenBullets)
-	needsRewriteFlag := false
+	bulletsToRewriteList := make([]string, 0)
 
 	// Process each action in order
 	for i, action := range actions.Actions {
 		switch action.Type {
 		case "shorten_bullet":
 			if err := applyShortenBullet(&action, bulletsCopy); err != nil {
-				return nil, nil, false, &ApplyError{
+				return nil, nil, nil, &ApplyError{
 					Message: fmt.Sprintf("failed to apply shorten_bullet action at index %d", i),
 					Cause:   err,
 				}
 			}
-			needsRewriteFlag = true
+			// Add bullet ID to rewrite list
+			bulletsToRewriteList = append(bulletsToRewriteList, action.BulletID)
 
 		case "drop_bullet":
 			var planChanged bool
 			if err := applyDropBullet(&action, planCopy, bulletsCopy); err != nil {
-				return nil, nil, false, &ApplyError{
+				return nil, nil, nil, &ApplyError{
 					Message: fmt.Sprintf("failed to apply drop_bullet action at index %d", i),
 					Cause:   err,
 				}
 			}
 			_ = planChanged // Plan may have changed but we don't need to track it here
+			// drop_bullet doesn't require rewriting (bullet is removed)
 
 		case "swap_story":
-			if err := applySwapStory(&action, planCopy, bulletsCopy, rankedStories, experienceBank); err != nil {
-				return nil, nil, false, &ApplyError{
+			newBulletIDs, err := applySwapStory(&action, planCopy, bulletsCopy, rankedStories, experienceBank)
+			if err != nil {
+				return nil, nil, nil, &ApplyError{
 					Message: fmt.Sprintf("failed to apply swap_story action at index %d", i),
 					Cause:   err,
 				}
 			}
-			needsRewriteFlag = true
+			// Add all new bullet IDs from replacement story to rewrite list
+			bulletsToRewriteList = append(bulletsToRewriteList, newBulletIDs...)
 
 		case "tighten_section":
 			// Not implemented yet - skip with warning
@@ -54,7 +58,7 @@ func ApplyRepairs(actions *types.RepairActions, plan *types.ResumePlan, rewritte
 			// Could return error in strict mode, but for now we skip
 
 		default:
-			return nil, nil, false, &ApplyError{
+			return nil, nil, nil, &ApplyError{
 				Message: fmt.Sprintf("unknown repair action type: %s", action.Type),
 			}
 		}
@@ -63,7 +67,7 @@ func ApplyRepairs(actions *types.RepairActions, plan *types.ResumePlan, rewritte
 	// Recalculate estimated lines for plan after changes
 	recalculateEstimatedLines(planCopy, bulletsCopy)
 
-	return planCopy, bulletsCopy, needsRewriteFlag, nil
+	return planCopy, bulletsCopy, bulletsToRewriteList, nil
 }
 
 // applyShortenBullet marks a bullet for rewriting with a new target length
@@ -140,9 +144,10 @@ func applyDropBullet(action *types.RepairAction, plan *types.ResumePlan, bullets
 }
 
 // applySwapStory replaces a story in the plan with an alternative from ranked stories
-func applySwapStory(action *types.RepairAction, plan *types.ResumePlan, bullets *types.RewrittenBullets, rankedStories *types.RankedStories, experienceBank *types.ExperienceBank) error {
+// Returns the bullet IDs from the replacement story that need to be rewritten
+func applySwapStory(action *types.RepairAction, plan *types.ResumePlan, bullets *types.RewrittenBullets, rankedStories *types.RankedStories, experienceBank *types.ExperienceBank) ([]string, error) {
 	if action.StoryID == "" {
-		return fmt.Errorf("story_id is required for swap_story action")
+		return nil, fmt.Errorf("story_id is required for swap_story action")
 	}
 
 	// Find story in plan
@@ -155,7 +160,7 @@ func applySwapStory(action *types.RepairAction, plan *types.ResumePlan, bullets 
 	}
 
 	if storyIdx < 0 {
-		return fmt.Errorf("story_id %s not found in plan", action.StoryID)
+		return nil, fmt.Errorf("story_id %s not found in plan", action.StoryID)
 	}
 
 	// Capture old story info before modifying plan
@@ -182,7 +187,7 @@ func applySwapStory(action *types.RepairAction, plan *types.ResumePlan, bullets 
 	}
 
 	if replacementStory == nil {
-		return fmt.Errorf("no suitable replacement story found in ranked stories")
+		return nil, fmt.Errorf("no suitable replacement story found in ranked stories")
 	}
 
 	// Find replacement story in experience bank to get bullet IDs
@@ -195,7 +200,7 @@ func applySwapStory(action *types.RepairAction, plan *types.ResumePlan, bullets 
 	}
 
 	if replacementExperienceStory == nil {
-		return fmt.Errorf("replacement story %s not found in experience bank", replacementStory.StoryID)
+		return nil, fmt.Errorf("replacement story %s not found in experience bank", replacementStory.StoryID)
 	}
 
 	// Determine which bullets to use from replacement story
@@ -226,9 +231,8 @@ func applySwapStory(action *types.RepairAction, plan *types.ResumePlan, bullets 
 
 	bullets.Bullets = newBulletsList
 
-	// The new bullets will need to be materialized and rewritten in the loop
-
-	return nil
+	// Return the bullet IDs from the replacement story that need to be rewritten
+	return replacementBulletIDs, nil
 }
 
 // recalculateEstimatedLines updates estimated lines in the plan based on current bullets

@@ -73,6 +73,214 @@ func RewriteBullets(ctx context.Context, selectedBullets *types.SelectedBullets,
 	}, nil
 }
 
+// RewriteBulletsSelective rewrites only specified bullets, preserving others
+func RewriteBulletsSelective(
+	ctx context.Context,
+	currentBullets *types.RewrittenBullets, // All current bullets
+	bulletsToRewrite []string, // IDs of bullets to rewrite
+	jobProfile *types.JobProfile,
+	companyProfile *types.CompanyProfile,
+	experienceBank *types.ExperienceBank,
+	apiKey string,
+) (*types.RewrittenBullets, error) {
+	// If no bullets to rewrite, return preserved bullets immediately
+	if len(bulletsToRewrite) == 0 {
+		return &types.RewrittenBullets{
+			Bullets: currentBullets.Bullets,
+		}, nil
+	}
+
+	// Build lookup maps
+	currentBulletMap := make(map[string]*types.RewrittenBullet)
+	for i := range currentBullets.Bullets {
+		bullet := &currentBullets.Bullets[i]
+		currentBulletMap[bullet.OriginalBulletID] = bullet
+	}
+
+	bulletsToRewriteSet := make(map[string]bool)
+	for _, bulletID := range bulletsToRewrite {
+		bulletsToRewriteSet[bulletID] = true
+	}
+
+	// Split bullets into preserve and rewrite
+	bulletsToPreserve := make([]types.RewrittenBullet, 0)
+
+	// Collect preserved bullets (not in rewrite set)
+	for _, bullet := range currentBullets.Bullets {
+		if !bulletsToRewriteSet[bullet.OriginalBulletID] {
+			bulletsToPreserve = append(bulletsToPreserve, bullet)
+		}
+	}
+
+	// Extract verbs from preserved bullets for diversity
+	usedVerbs := make([]string, 0)
+	for _, bullet := range bulletsToPreserve {
+		if verb := extractLeadingVerb(bullet.FinalText); verb != "" {
+			usedVerbs = append(usedVerbs, verb)
+		}
+	}
+
+	// Materialize bullets to rewrite from experienceBank
+	// Build bullet ID -> (Bullet, Story) map for efficient lookup
+	bulletToStoryMap := make(map[string]*types.Story) // bulletID -> Story
+	bulletMap := make(map[string]*types.Bullet)       // bulletID -> Bullet
+	for i := range experienceBank.Stories {
+		story := &experienceBank.Stories[i]
+		for j := range story.Bullets {
+			bullet := &story.Bullets[j]
+			bulletMap[bullet.ID] = bullet
+			bulletToStoryMap[bullet.ID] = story
+		}
+	}
+
+	// Build SelectedBullets for bullets to rewrite
+	selectedBulletsList := make([]types.SelectedBullet, 0, len(bulletsToRewrite))
+	for _, bulletID := range bulletsToRewrite {
+		bullet, bulletExists := bulletMap[bulletID]
+		story, storyExists := bulletToStoryMap[bulletID]
+
+		if !bulletExists || !storyExists {
+			// Bullet not found in experienceBank - skip with warning
+			// This can happen if bullet was already dropped or not in experienceBank
+			continue
+		}
+
+		// Copy skills slice to avoid sharing references
+		skills := make([]string, len(bullet.Skills))
+		copy(skills, bullet.Skills)
+
+		selectedBullet := types.SelectedBullet{
+			ID:          bullet.ID,
+			StoryID:     story.ID,
+			Text:        bullet.Text,
+			Skills:      skills,
+			Metrics:     bullet.Metrics,
+			LengthChars: bullet.LengthChars,
+		}
+
+		selectedBulletsList = append(selectedBulletsList, selectedBullet)
+	}
+
+	// If no bullets found in experienceBank to rewrite, return preserved bullets
+	if len(selectedBulletsList) == 0 {
+		return &types.RewrittenBullets{
+			Bullets: bulletsToPreserve,
+		}, nil
+	}
+
+	// Check API key is required for rewriting
+	if apiKey == "" {
+		return nil, &APICallError{Message: "API key is required"}
+	}
+
+	// Rewrite selected bullets using existing function
+	selectedBullets := &types.SelectedBullets{
+		Bullets: selectedBulletsList,
+	}
+
+	// Create a modified version of RewriteBullets that accepts usedVerbs
+	// For now, we'll call the existing function and then merge
+	rewritten, err := rewriteBulletsWithVerbs(ctx, selectedBullets, jobProfile, companyProfile, usedVerbs, apiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Merge preserved and rewritten bullets
+	// Build map of rewritten bullets by OriginalBulletID
+	rewrittenMap := make(map[string]*types.RewrittenBullet)
+	for i := range rewritten.Bullets {
+		bullet := &rewritten.Bullets[i]
+		rewrittenMap[bullet.OriginalBulletID] = bullet
+	}
+
+	// Build final result maintaining order from currentBullets
+	finalBullets := make([]types.RewrittenBullet, 0, len(currentBullets.Bullets)+len(rewritten.Bullets))
+	for _, currentBullet := range currentBullets.Bullets {
+		if bulletsToRewriteSet[currentBullet.OriginalBulletID] {
+			// This bullet was rewritten - use rewritten version
+			if rewrittenBullet, exists := rewrittenMap[currentBullet.OriginalBulletID]; exists {
+				finalBullets = append(finalBullets, *rewrittenBullet)
+			} else {
+				// Rewritten bullet not found - this shouldn't happen, but preserve original as fallback
+				finalBullets = append(finalBullets, currentBullet)
+			}
+		} else {
+			// This bullet was preserved - use original
+			finalBullets = append(finalBullets, currentBullet)
+		}
+	}
+
+	// Add any new bullets that weren't in currentBullets (from swap_story)
+	// These are bullets that were rewritten but didn't exist in currentBullets
+	for _, rewrittenBullet := range rewritten.Bullets {
+		if _, exists := currentBulletMap[rewrittenBullet.OriginalBulletID]; !exists {
+			finalBullets = append(finalBullets, rewrittenBullet)
+		}
+	}
+
+	return &types.RewrittenBullets{
+		Bullets: finalBullets,
+	}, nil
+}
+
+// rewriteBulletsWithVerbs is a helper that rewrites bullets with pre-populated used verbs
+func rewriteBulletsWithVerbs(ctx context.Context, selectedBullets *types.SelectedBullets, jobProfile *types.JobProfile, companyProfile *types.CompanyProfile, initialUsedVerbs []string, apiKey string) (*types.RewrittenBullets, error) {
+	// Initialize LLM client with default config
+	config := llm.DefaultConfig()
+	client, err := llm.NewClient(ctx, config, apiKey)
+	if err != nil {
+		return nil, &APICallError{
+			Message: "failed to create LLM client",
+			Cause:   err,
+		}
+	}
+	defer func() { _ = client.Close() }()
+
+	// Start with initial used verbs
+	usedVerbs := make([]string, len(initialUsedVerbs))
+	copy(usedVerbs, initialUsedVerbs)
+
+	// Rewrite each bullet
+	rewrittenBullets := make([]types.RewrittenBullet, 0, len(selectedBullets.Bullets))
+
+	for _, originalBullet := range selectedBullets.Bullets {
+		// Build rewriting prompt with verbs to avoid
+		prompt := buildRewritingPrompt(originalBullet, jobProfile, companyProfile, usedVerbs)
+
+		// Use TierAdvanced for bullet rewriting (requires nuance and style matching)
+		responseText, err := client.GenerateContent(ctx, prompt, llm.TierAdvanced)
+		if err != nil {
+			return nil, &APICallError{
+				Message: fmt.Sprintf("failed to generate content for bullet %s", originalBullet.ID),
+				Cause:   err,
+			}
+		}
+
+		// Parse response (expects just the rewritten text)
+		rewrittenText, err := parseBulletResponse(responseText)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse response for bullet %s: %w", originalBullet.ID, err)
+		}
+
+		// Extract leading verb and add to used verbs list
+		if verb := extractLeadingVerb(rewrittenText); verb != "" {
+			usedVerbs = append(usedVerbs, verb)
+		}
+
+		// Post-process bullet
+		rewrittenBullet, err := postProcessBullet(rewrittenText, originalBullet, companyProfile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to post-process bullet %s: %w", originalBullet.ID, err)
+		}
+
+		rewrittenBullets = append(rewrittenBullets, *rewrittenBullet)
+	}
+
+	return &types.RewrittenBullets{
+		Bullets: rewrittenBullets,
+	}, nil
+}
+
 // extractLeadingVerb extracts the first word (assumed to be a verb) from a bullet point
 func extractLeadingVerb(text string) string {
 	text = strings.TrimSpace(text)

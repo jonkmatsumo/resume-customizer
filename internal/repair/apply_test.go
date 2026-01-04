@@ -53,12 +53,13 @@ func TestApplyRepairs_ShortenBullet(t *testing.T) {
 	rankedStories := &types.RankedStories{Ranked: []types.RankedStory{}}
 	experienceBank := &types.ExperienceBank{Stories: []types.Story{}}
 
-	updatedPlan, updatedBullets, needsRewrite, err := ApplyRepairs(actions, plan, bullets, rankedStories, experienceBank)
+	updatedPlan, updatedBullets, bulletsToRewrite, err := ApplyRepairs(actions, plan, bullets, rankedStories, experienceBank)
 
 	require.NoError(t, err)
 	assert.NotNil(t, updatedPlan)
 	assert.NotNil(t, updatedBullets)
-	assert.True(t, needsRewrite, "should need rewrite after shorten_bullet action")
+	assert.Equal(t, 1, len(bulletsToRewrite), "should have one bullet to rewrite")
+	assert.Equal(t, "bullet_001", bulletsToRewrite[0], "should mark bullet_001 for rewrite")
 	assert.Equal(t, 2, len(updatedBullets.Bullets))
 }
 
@@ -104,12 +105,12 @@ func TestApplyRepairs_DropBullet(t *testing.T) {
 	rankedStories := &types.RankedStories{Ranked: []types.RankedStory{}}
 	experienceBank := &types.ExperienceBank{Stories: []types.Story{}}
 
-	updatedPlan, updatedBullets, needsRewrite, err := ApplyRepairs(actions, plan, bullets, rankedStories, experienceBank)
+	updatedPlan, updatedBullets, bulletsToRewrite, err := ApplyRepairs(actions, plan, bullets, rankedStories, experienceBank)
 
 	require.NoError(t, err)
 	assert.NotNil(t, updatedPlan)
 	assert.NotNil(t, updatedBullets)
-	assert.False(t, needsRewrite, "should not need rewrite after drop_bullet action")
+	assert.Equal(t, 0, len(bulletsToRewrite), "should not need rewrite after drop_bullet action")
 	assert.Equal(t, 1, len(updatedBullets.Bullets))
 	assert.Equal(t, "bullet_002", updatedBullets.Bullets[0].OriginalBulletID)
 	assert.Equal(t, 1, len(updatedPlan.SelectedStories[0].BulletIDs))
@@ -217,12 +218,13 @@ func TestApplyRepairs_SwapStory(t *testing.T) {
 		},
 	}
 
-	updatedPlan, updatedBullets, needsRewrite, err := ApplyRepairs(actions, plan, bullets, rankedStories, experienceBank)
+	updatedPlan, updatedBullets, bulletsToRewrite, err := ApplyRepairs(actions, plan, bullets, rankedStories, experienceBank)
 
 	require.NoError(t, err)
 	assert.NotNil(t, updatedPlan)
 	assert.NotNil(t, updatedBullets)
-	assert.True(t, needsRewrite, "should need rewrite after swap_story action")
+	assert.Equal(t, 1, len(bulletsToRewrite), "should have one bullet to rewrite after swap_story")
+	assert.Equal(t, "bullet_002", bulletsToRewrite[0], "should mark new bullet_002 for rewrite")
 	assert.Equal(t, "story_002", updatedPlan.SelectedStories[0].StoryID)
 	assert.Equal(t, "bullet_002", updatedPlan.SelectedStories[0].BulletIDs[0])
 	// Old bullets should be removed from rewritten bullets (bullet_001 was from story_001)
@@ -327,7 +329,7 @@ func TestApplyRepairs_MultipleActions(t *testing.T) {
 	rankedStories := &types.RankedStories{Ranked: []types.RankedStory{}}
 	experienceBank := &types.ExperienceBank{Stories: []types.Story{}}
 
-	updatedPlan, updatedBullets, needsRewrite, err := ApplyRepairs(actions, plan, bullets, rankedStories, experienceBank)
+	updatedPlan, updatedBullets, bulletsToRewrite, err := ApplyRepairs(actions, plan, bullets, rankedStories, experienceBank)
 
 	require.NoError(t, err)
 	assert.Equal(t, 2, len(updatedBullets.Bullets))
@@ -335,7 +337,8 @@ func TestApplyRepairs_MultipleActions(t *testing.T) {
 	assert.Contains(t, updatedPlan.SelectedStories[0].BulletIDs, "bullet_001")
 	assert.Contains(t, updatedPlan.SelectedStories[0].BulletIDs, "bullet_003")
 	assert.NotContains(t, updatedPlan.SelectedStories[0].BulletIDs, "bullet_002")
-	assert.True(t, needsRewrite)
+	assert.Equal(t, 1, len(bulletsToRewrite), "should have one bullet to rewrite")
+	assert.Equal(t, "bullet_003", bulletsToRewrite[0], "should mark bullet_003 for rewrite")
 }
 
 func TestApplyRepairs_UnknownActionType(t *testing.T) {

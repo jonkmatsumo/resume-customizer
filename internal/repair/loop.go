@@ -8,7 +8,6 @@ import (
 
 	"github.com/jonathan/resume-customizer/internal/rendering"
 	"github.com/jonathan/resume-customizer/internal/rewriting"
-	"github.com/jonathan/resume-customizer/internal/selection"
 	"github.com/jonathan/resume-customizer/internal/types"
 	"github.com/jonathan/resume-customizer/internal/validation"
 )
@@ -44,29 +43,42 @@ func RunRepairLoop(ctx context.Context, initialPlan *types.ResumePlan, initialBu
 		}
 
 		// 2. Apply repairs
-		updatedPlan, updatedBullets, needsRewrite, err := ApplyRepairs(repairActions, currentPlan, currentBullets, rankedStories, experienceBank)
+		updatedPlan, updatedBullets, bulletsToRewrite, err := ApplyRepairs(repairActions, currentPlan, currentBullets, rankedStories, experienceBank)
 		if err != nil {
 			return nil, nil, "", currentViolations, iterationsUsed, fmt.Errorf("failed to apply repairs at iteration %d: %w", iterationsUsed, err)
 		}
 
 		// 3. Handle bullet rewriting if needed
 		planChanged := plansDiffer(currentPlan, updatedPlan)
-		if needsRewrite || planChanged {
-			// Need to materialize and rewrite bullets
-			// Materialize bullets from updated plan
-			selectedBullets, err := selection.MaterializeBullets(updatedPlan, experienceBank)
-			if err != nil {
-				return nil, nil, "", currentViolations, iterationsUsed, fmt.Errorf("failed to materialize bullets at iteration %d: %w", iterationsUsed, err)
-			}
 
-			// Rewrite bullets
-			rewritten, err := rewriting.RewriteBullets(ctx, selectedBullets, jobProfile, companyProfile, apiKey)
+		// Determine which bullets need rewriting
+		allBulletsToRewrite := make([]string, 0, len(bulletsToRewrite))
+		allBulletsToRewrite = append(allBulletsToRewrite, bulletsToRewrite...)
+
+		// Handle plan changes (swap_story adds new bullets)
+		if planChanged {
+			// Find new bullets not in currentBullets
+			newBulletIDs := findNewBulletIDs(updatedPlan, currentBullets)
+			allBulletsToRewrite = append(allBulletsToRewrite, newBulletIDs...)
+		}
+
+		// Rewrite only if there are bullets to rewrite
+		if len(allBulletsToRewrite) > 0 {
+			rewritten, err := rewriting.RewriteBulletsSelective(
+				ctx,
+				updatedBullets, // Current bullets (may have been modified by ApplyRepairs)
+				allBulletsToRewrite,
+				jobProfile,
+				companyProfile,
+				experienceBank,
+				apiKey,
+			)
 			if err != nil {
 				return nil, nil, "", currentViolations, iterationsUsed, fmt.Errorf("failed to rewrite bullets at iteration %d: %w", iterationsUsed, err)
 			}
 			updatedBullets = rewritten
 		}
-		// If not needsRewrite and plan didn't change, use updatedBullets from ApplyRepairs (which may have dropped bullets)
+		// If no bullets to rewrite and plan didn't change, use updatedBullets from ApplyRepairs (which may have dropped bullets)
 
 		// 5. Render LaTeX
 		latex, lineMap, err := rendering.RenderLaTeX(updatedPlan, updatedBullets, templatePath, candidateInfo.Name, candidateInfo.Email, candidateInfo.Phone, experienceBank, selectedEducation)
@@ -154,4 +166,42 @@ func writeTempLaTeX(latex string) (string, error) {
 // cleanupTempFile removes a temporary file (best effort)
 func cleanupTempFile(path string) error {
 	return os.Remove(path)
+}
+
+// extractBulletIDsFromActions extracts bullet IDs from repair actions that require rewriting
+func extractBulletIDsFromActions(actions *types.RepairActions) []string {
+	bulletIDs := make([]string, 0)
+	for _, action := range actions.Actions {
+		switch action.Type {
+		case "shorten_bullet":
+			if action.BulletID != "" {
+				bulletIDs = append(bulletIDs, action.BulletID)
+			}
+		case "swap_story":
+			// Bullet IDs from swap_story are handled in ApplyRepairs
+			// This function is for extracting from actions directly if needed
+		}
+	}
+	return bulletIDs
+}
+
+// findNewBulletIDs finds bullet IDs in the plan that are not in currentBullets
+func findNewBulletIDs(plan *types.ResumePlan, currentBullets *types.RewrittenBullets) []string {
+	// Build set of existing bullet IDs
+	existingBulletIDs := make(map[string]bool)
+	for _, bullet := range currentBullets.Bullets {
+		existingBulletIDs[bullet.OriginalBulletID] = true
+	}
+
+	// Find bullet IDs in plan that don't exist in currentBullets
+	newBulletIDs := make([]string, 0)
+	for _, story := range plan.SelectedStories {
+		for _, bulletID := range story.BulletIDs {
+			if !existingBulletIDs[bulletID] {
+				newBulletIDs = append(newBulletIDs, bulletID)
+			}
+		}
+	}
+
+	return newBulletIDs
 }
