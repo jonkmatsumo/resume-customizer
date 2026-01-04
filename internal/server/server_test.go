@@ -334,6 +334,7 @@ func (m *mockDB) Pool() *pgxpool.Pool {
 
 // errorMockDB returns errors for testing error paths
 // TODO: Use this in error path tests when needed
+//
 //nolint:unused // Reserved for future error path testing
 type errorMockDB struct {
 	mockDB
