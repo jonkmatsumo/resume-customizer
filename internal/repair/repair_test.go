@@ -206,3 +206,67 @@ func TestBuildRepairPrompt_IncludesViolations(t *testing.T) {
 	assert.Contains(t, prompt, "Resume has 2 pages")
 	assert.Contains(t, prompt, "Engineer")
 }
+
+func TestHasPageOverflowViolation(t *testing.T) {
+	tests := []struct {
+		name       string
+		violations *types.Violations
+		want       bool
+	}{
+		{
+			name:       "nil violations",
+			violations: nil,
+			want:       false,
+		},
+		{
+			name:       "empty violations",
+			violations: &types.Violations{Violations: []types.Violation{}},
+			want:       false,
+		},
+		{
+			name: "page overflow error",
+			violations: &types.Violations{
+				Violations: []types.Violation{
+					{Type: "page_overflow", Severity: "error", Details: "2 pages"},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "page overflow warning (not error)",
+			violations: &types.Violations{
+				Violations: []types.Violation{
+					{Type: "page_overflow", Severity: "warning", Details: "close to limit"},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "other violation types",
+			violations: &types.Violations{
+				Violations: []types.Violation{
+					{Type: "line_too_long", Severity: "error", Details: "line 5"},
+					{Type: "forbidden_phrase", Severity: "warning", Details: "leverage"},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "mixed with page overflow",
+			violations: &types.Violations{
+				Violations: []types.Violation{
+					{Type: "line_too_long", Severity: "error", Details: "line 5"},
+					{Type: "page_overflow", Severity: "error", Details: "2 pages"},
+				},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := hasPageOverflowViolation(tt.violations)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

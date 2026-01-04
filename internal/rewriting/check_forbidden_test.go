@@ -122,7 +122,7 @@ func TestCheckForbiddenPhrasesInBullets(t *testing.T) {
 				TabooPhrases: []string{"ninja", "rockstar"},
 			},
 			expectedMap: map[string][]string{
-				"bullet_001": []string{"ninja"},
+				"bullet_001": {"ninja"},
 			},
 		},
 		{
@@ -147,8 +147,8 @@ func TestCheckForbiddenPhrasesInBullets(t *testing.T) {
 				TabooPhrases: []string{"ninja", "rockstar"},
 			},
 			expectedMap: map[string][]string{
-				"bullet_001": []string{"ninja"},
-				"bullet_002": []string{"rockstar"},
+				"bullet_001": {"ninja"},
+				"bullet_002": {"rockstar"},
 			},
 		},
 		{

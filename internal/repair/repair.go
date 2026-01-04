@@ -10,6 +10,7 @@ import (
 	"github.com/jonathan/resume-customizer/internal/llm"
 	"github.com/jonathan/resume-customizer/internal/prompts"
 	"github.com/jonathan/resume-customizer/internal/types"
+	"github.com/jonathan/resume-customizer/internal/validation"
 )
 
 // ProposeRepairs uses LLM to analyze violations and propose structured repair actions
@@ -59,6 +60,88 @@ func ProposeRepairs(ctx context.Context, violations *types.Violations, plan *typ
 	}
 
 	return repairActions, nil
+}
+
+// ProposeRepairsWithOverflow extends ProposeRepairs to handle page overflow by
+// automatically proposing drop actions for least relevant bullets when needed.
+// It first analyzes the overflow, proposes deterministic drop actions, then
+// calls the LLM for additional repair suggestions.
+func ProposeRepairsWithOverflow(
+	ctx context.Context,
+	violations *types.Violations,
+	plan *types.ResumePlan,
+	rewrittenBullets *types.RewrittenBullets,
+	rankedStories *types.RankedStories,
+	jobProfile *types.JobProfile,
+	companyProfile *types.CompanyProfile,
+	experienceBank *types.ExperienceBank,
+	currentPages int,
+	maxPages int,
+	apiKey string,
+) (*types.RepairActions, error) {
+	// Check for page overflow violation
+	hasPageOverflow := hasPageOverflowViolation(violations)
+
+	var dropActions []types.RepairAction
+	if hasPageOverflow && currentPages > maxPages {
+		// Analyze overflow
+		overflow := validation.AnalyzePageOverflow(currentPages, maxPages, rewrittenBullets, plan)
+
+		// Generate deterministic drop actions for least relevant bullets
+		dropActions = ProposeBulletDrops(overflow, rewrittenBullets, plan, jobProfile, rankedStories, experienceBank)
+	}
+
+	// Call base ProposeRepairs for LLM-generated actions
+	llmActions, err := ProposeRepairs(ctx, violations, plan, rewrittenBullets, rankedStories, jobProfile, companyProfile, apiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// If we have drop actions, prepend them to LLM actions
+	// Drop actions are prioritized because they must happen first
+	if len(dropActions) > 0 {
+		// Filter out any LLM-proposed drop actions for the same bullets
+		// (we already have deterministic drops for those)
+		droppedBulletIDs := make(map[string]bool)
+		for _, action := range dropActions {
+			droppedBulletIDs[action.BulletID] = true
+		}
+
+		filteredLLMActions := make([]types.RepairAction, 0, len(llmActions.Actions))
+		for _, action := range llmActions.Actions {
+			// Skip LLM drop actions for bullets we're already dropping
+			if action.Type == "drop_bullet" && droppedBulletIDs[action.BulletID] {
+				continue
+			}
+			// Skip shorten actions for bullets we're dropping
+			if action.Type == "shorten_bullet" && droppedBulletIDs[action.BulletID] {
+				continue
+			}
+			filteredLLMActions = append(filteredLLMActions, action)
+		}
+
+		// Combine: drop actions first, then filtered LLM actions
+		allActions := make([]types.RepairAction, 0, len(dropActions)+len(filteredLLMActions))
+		allActions = append(allActions, dropActions...)
+		allActions = append(allActions, filteredLLMActions...)
+
+		return &types.RepairActions{Actions: allActions}, nil
+	}
+
+	return llmActions, nil
+}
+
+// hasPageOverflowViolation checks if violations contain a page_overflow error
+func hasPageOverflowViolation(violations *types.Violations) bool {
+	if violations == nil {
+		return false
+	}
+	for _, v := range violations.Violations {
+		if v.Type == "page_overflow" && v.Severity == "error" {
+			return true
+		}
+	}
+	return false
 }
 
 // buildRepairPrompt constructs the prompt for repair proposal

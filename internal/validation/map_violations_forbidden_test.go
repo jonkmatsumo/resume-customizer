@@ -46,7 +46,7 @@ func TestMapViolationsToBullets_ForbiddenPhraseWithMap(t *testing.T) {
 	}
 
 	forbiddenPhraseMap := map[string][]string{
-		"bullet_002": []string{"ninja"},
+		"bullet_002": {"ninja"},
 	}
 
 	mapped := MapViolationsToBullets(violations, lineToBulletMap, bullets, plan, forbiddenPhraseMap)
@@ -147,7 +147,7 @@ func TestMapViolationsToBullets_ForbiddenPhraseMapButNotInBullet(t *testing.T) {
 
 	// Forbidden phrase map doesn't include this bullet
 	forbiddenPhraseMap := map[string][]string{
-		"bullet_001": []string{"ninja"}, // Different bullet
+		"bullet_001": {"ninja"}, // Different bullet
 	}
 
 	mapped := MapViolationsToBullets(violations, lineToBulletMap, bullets, plan, forbiddenPhraseMap)
