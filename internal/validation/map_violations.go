@@ -11,6 +11,7 @@ func MapViolationsToBullets(
 	lineToBulletMap map[int]string, // Line number → bullet_id
 	bullets *types.RewrittenBullets, // For bullet text and story ID lookup
 	plan *types.ResumePlan, // For story ID lookup
+	forbiddenPhraseMap map[string][]string, // bulletID → list of forbidden phrases found (optional)
 ) *types.Violations {
 	if violations == nil {
 		return nil
@@ -49,6 +50,18 @@ func MapViolationsToBullets(
 		if violation.LineNumber != nil {
 			bulletID, found := lineToBulletMap[*violation.LineNumber]
 			if found {
+				// For forbidden_phrase violations, verify the bullet is in the forbidden phrase map
+				// if the map is provided (for additional confirmation)
+				if violation.Type == "forbidden_phrase" && forbiddenPhraseMap != nil && len(forbiddenPhraseMap) > 0 {
+					// Only map if bullet is in forbidden phrase map (confirms we detected it during rewriting)
+					if _, hasPhrases := forbiddenPhraseMap[bulletID]; !hasPhrases {
+						// Bullet not in forbidden phrase map - skip mapping for forbidden_phrase violations
+						// This ensures we only map violations for bullets we detected during rewriting
+						mappedViolations = append(mappedViolations, mappedViolation)
+						continue
+					}
+				}
+
 				// Set bullet ID
 				mappedViolation.BulletID = &bulletID
 

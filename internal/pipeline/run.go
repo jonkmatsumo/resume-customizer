@@ -444,10 +444,14 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 	// Create validation options with line-to-bullet mapping
 	var validationOpts *validation.Options
 	if lineMap != nil {
+		// Compute forbidden phrase mapping from rewritten bullets
+		forbiddenPhraseMap := rewriting.CheckForbiddenPhrasesInBullets(rewrittenBullets, researchResult.CompanyProfile)
+
 		validationOpts = &validation.Options{
-			LineToBulletMap: lineMap.LineToBullet,
-			Bullets:         rewrittenBullets,
-			Plan:            experienceResult.ResumePlan,
+			LineToBulletMap:    lineMap.LineToBullet,
+			Bullets:            rewrittenBullets,
+			Plan:               experienceResult.ResumePlan,
+			ForbiddenPhraseMap: forbiddenPhraseMap,
 		}
 	}
 

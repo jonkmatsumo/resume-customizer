@@ -96,10 +96,14 @@ func RunRepairLoop(ctx context.Context, initialPlan *types.ResumePlan, initialBu
 		// 6. Validate LaTeX with line-to-bullet mapping
 		var validationOpts *validation.Options
 		if lineMap != nil {
+			// Compute forbidden phrase mapping from updated bullets
+			forbiddenPhraseMap := rewriting.CheckForbiddenPhrasesInBullets(updatedBullets, companyProfile)
+
 			validationOpts = &validation.Options{
-				LineToBulletMap: lineMap.LineToBullet,
-				Bullets:         updatedBullets,
-				Plan:            updatedPlan,
+				LineToBulletMap:    lineMap.LineToBullet,
+				Bullets:            updatedBullets,
+				Plan:               updatedPlan,
+				ForbiddenPhraseMap: forbiddenPhraseMap,
 			}
 		}
 		updatedViolations, err := validation.ValidateConstraints(tempTexPath, companyProfile, maxPages, maxCharsPerLine, validationOpts)

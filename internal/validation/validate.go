@@ -12,9 +12,10 @@ import (
 
 // Options provides optional parameters for violation mapping
 type Options struct {
-	LineToBulletMap map[int]string          // Line number → bullet_id
-	Bullets         *types.RewrittenBullets // For bullet text and story ID lookup
-	Plan            *types.ResumePlan       // For story ID lookup
+	LineToBulletMap    map[int]string          // Line number → bullet_id
+	Bullets            *types.RewrittenBullets // For bullet text and story ID lookup
+	Plan               *types.ResumePlan       // For story ID lookup
+	ForbiddenPhraseMap map[string][]string     // bulletID → list of forbidden phrases found (optional)
 }
 
 // ValidateFromContent validates LaTeX content against the specified constraints.
@@ -110,7 +111,8 @@ func ValidateConstraints(texPath string, companyProfile *types.CompanyProfile, m
 
 	// Map violations to bullets if mapping is provided
 	if opts != nil && opts.LineToBulletMap != nil && len(opts.LineToBulletMap) > 0 {
-		violations = MapViolationsToBullets(violations, opts.LineToBulletMap, opts.Bullets, opts.Plan)
+		forbiddenPhraseMap := opts.ForbiddenPhraseMap // Can be nil
+		violations = MapViolationsToBullets(violations, opts.LineToBulletMap, opts.Bullets, opts.Plan, forbiddenPhraseMap)
 	}
 
 	return violations, nil

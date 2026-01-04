@@ -47,7 +47,7 @@ func TestMapViolationsToBullets_LineTooLong(t *testing.T) {
 		},
 	}
 
-	mapped := MapViolationsToBullets(violations, lineToBulletMap, bullets, plan)
+	mapped := MapViolationsToBullets(violations, lineToBulletMap, bullets, plan, nil)
 	require.NotNil(t, mapped)
 	require.Equal(t, 1, len(mapped.Violations))
 
@@ -96,7 +96,7 @@ func TestMapViolationsToBullets_ForbiddenPhrase(t *testing.T) {
 		},
 	}
 
-	mapped := MapViolationsToBullets(violations, lineToBulletMap, bullets, plan)
+	mapped := MapViolationsToBullets(violations, lineToBulletMap, bullets, plan, nil)
 	require.NotNil(t, mapped)
 	require.Equal(t, 1, len(mapped.Violations))
 
@@ -124,7 +124,7 @@ func TestMapViolationsToBullets_NoLineNumber(t *testing.T) {
 		42: "bullet_001",
 	}
 
-	mapped := MapViolationsToBullets(violations, lineToBulletMap, nil, nil)
+	mapped := MapViolationsToBullets(violations, lineToBulletMap, nil, nil, nil)
 	require.NotNil(t, mapped)
 	require.Equal(t, 1, len(mapped.Violations))
 
@@ -152,7 +152,7 @@ func TestMapViolationsToBullets_UnmappedLineNumber(t *testing.T) {
 		42: "bullet_001", // Different line number
 	}
 
-	mapped := MapViolationsToBullets(violations, lineToBulletMap, nil, nil)
+	mapped := MapViolationsToBullets(violations, lineToBulletMap, nil, nil, nil)
 	require.NotNil(t, mapped)
 	require.Equal(t, 1, len(mapped.Violations))
 
@@ -214,7 +214,7 @@ func TestMapViolationsToBullets_MultipleViolations(t *testing.T) {
 		},
 	}
 
-	mapped := MapViolationsToBullets(violations, lineToBulletMap, bullets, plan)
+	mapped := MapViolationsToBullets(violations, lineToBulletMap, bullets, plan, nil)
 	require.NotNil(t, mapped)
 	require.Equal(t, 2, len(mapped.Violations))
 
@@ -276,7 +276,7 @@ func TestMapViolationsToBullets_MultipleViolationsSameBullet(t *testing.T) {
 		},
 	}
 
-	mapped := MapViolationsToBullets(violations, lineToBulletMap, bullets, plan)
+	mapped := MapViolationsToBullets(violations, lineToBulletMap, bullets, plan, nil)
 	require.NotNil(t, mapped)
 	require.Equal(t, 2, len(mapped.Violations))
 
@@ -304,7 +304,7 @@ func TestMapViolationsToBullets_NilMapping(t *testing.T) {
 	}
 
 	// No mapping provided
-	mapped := MapViolationsToBullets(violations, nil, nil, nil)
+	mapped := MapViolationsToBullets(violations, nil, nil, nil, nil)
 	require.NotNil(t, mapped)
 	require.Equal(t, 1, len(mapped.Violations))
 
@@ -331,7 +331,7 @@ func TestMapViolationsToBullets_EmptyMapping(t *testing.T) {
 	// Empty mapping
 	lineToBulletMap := map[int]string{}
 
-	mapped := MapViolationsToBullets(violations, lineToBulletMap, nil, nil)
+	mapped := MapViolationsToBullets(violations, lineToBulletMap, nil, nil, nil)
 	require.NotNil(t, mapped)
 	require.Equal(t, 1, len(mapped.Violations))
 
@@ -341,7 +341,7 @@ func TestMapViolationsToBullets_EmptyMapping(t *testing.T) {
 }
 
 func TestMapViolationsToBullets_NilViolations(t *testing.T) {
-	mapped := MapViolationsToBullets(nil, map[int]string{42: "bullet_001"}, nil, nil)
+	mapped := MapViolationsToBullets(nil, map[int]string{42: "bullet_001"}, nil, nil, nil)
 	assert.Nil(t, mapped)
 }
 
@@ -382,7 +382,7 @@ func TestMapViolationsToBullets_MissingBulletInMap(t *testing.T) {
 		},
 	}
 
-	mapped := MapViolationsToBullets(violations, lineToBulletMap, bullets, plan)
+	mapped := MapViolationsToBullets(violations, lineToBulletMap, bullets, plan, nil)
 	require.NotNil(t, mapped)
 	require.Equal(t, 1, len(mapped.Violations))
 

@@ -1,3 +1,4 @@
+//nolint:revive // types is a standard Go package name pattern
 package types
 
 import (
