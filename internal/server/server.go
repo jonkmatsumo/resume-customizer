@@ -33,6 +33,7 @@ type DBClient interface {
 	// Artifact operations
 	GetArtifactByID(ctx context.Context, artifactID uuid.UUID) (*db.Artifact, error)
 	GetTextArtifact(ctx context.Context, runID uuid.UUID, step string) (string, error)
+	SaveTextArtifact(ctx context.Context, runID uuid.UUID, step, category, text string) error
 	ListArtifacts(ctx context.Context, filters db.ArtifactFilters) ([]db.ArtifactSummary, error)
 
 	// Run step operations

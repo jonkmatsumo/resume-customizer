@@ -58,6 +58,15 @@ func (m *mockDB) GetTextArtifact(_ context.Context, runID uuid.UUID, step string
 	return content, nil
 }
 
+func (m *mockDB) SaveTextArtifact(_ context.Context, runID uuid.UUID, step, _ string, text string) error {
+	key := runID.String() + ":" + step
+	if m.textArtifacts == nil {
+		m.textArtifacts = make(map[string]string)
+	}
+	m.textArtifacts[key] = text
+	return nil
+}
+
 func (m *mockDB) Close() {}
 
 // Stub implementations for all other DBClient interface methods
@@ -79,7 +88,7 @@ func (m *mockDB) ListArtifacts(_ context.Context, _ db.ArtifactFilters) ([]db.Ar
 	return []db.ArtifactSummary{}, nil
 }
 
-func (m *mockDB) GetRunStep(_ context.Context, _, _ string) (*db.RunStep, error) {
+func (m *mockDB) GetRunStep(_ context.Context, _ uuid.UUID, _ string) (*db.RunStep, error) {
 	return nil, nil
 }
 
@@ -91,7 +100,7 @@ func (m *mockDB) CreateRunStep(_ context.Context, _ uuid.UUID, _ *db.RunStepInpu
 	return nil, nil
 }
 
-func (m *mockDB) UpdateRunStepStatus(_ context.Context, _, _ string, _ string, _ *string, _ *uuid.UUID) error {
+func (m *mockDB) UpdateRunStepStatus(_ context.Context, _ uuid.UUID, _ string, _ string, _ *string, _ *uuid.UUID) error {
 	return nil
 }
 
@@ -324,10 +333,13 @@ func (m *mockDB) Pool() *pgxpool.Pool {
 }
 
 // errorMockDB returns errors for testing error paths
+// TODO: Use this in error path tests when needed
+//nolint:unused // Reserved for future error path testing
 type errorMockDB struct {
 	mockDB
 }
 
+//nolint:unused // Reserved for future error path testing
 func (m *errorMockDB) GetRun(_ context.Context, _ uuid.UUID) (*db.Run, error) {
 	return nil, fmt.Errorf("database connection failed")
 }

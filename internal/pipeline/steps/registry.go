@@ -10,8 +10,8 @@ import (
 	dbpkg "github.com/jonathan/resume-customizer/internal/db"
 )
 
-// StepsDB defines the minimal database interface needed by the steps package
-type StepsDB interface {
+// Client defines the minimal database interface needed by the steps package
+type Client interface {
 	GetRunStep(ctx context.Context, runID uuid.UUID, stepName string) (*dbpkg.RunStep, error)
 }
 
@@ -29,7 +29,7 @@ type StepExecutor interface {
 	Category() string
 	Dependencies() []string
 	Execute(ctx context.Context, runID uuid.UUID, params map[string]interface{}) (*StepResult, error)
-	ValidateDependencies(ctx context.Context, db StepsDB, runID uuid.UUID) error
+	ValidateDependencies(ctx context.Context, db Client, runID uuid.UUID) error
 }
 
 // StepResult represents the result of executing a step
@@ -141,7 +141,7 @@ func (e *DependencyError) Error() string {
 }
 
 // ValidateDependencies checks if all required dependencies for a step are completed
-func ValidateDependencies(ctx context.Context, db StepsDB, runID uuid.UUID, stepName string) error {
+func ValidateDependencies(ctx context.Context, db Client, runID uuid.UUID, stepName string) error {
 	def, ok := StepRegistry[stepName]
 	if !ok {
 		return fmt.Errorf("unknown step: %s", stepName)
@@ -175,7 +175,7 @@ func ValidateDependencies(ctx context.Context, db StepsDB, runID uuid.UUID, step
 }
 
 // GetAvailableSteps returns steps that can be executed (dependencies met)
-func GetAvailableSteps(ctx context.Context, db StepsDB, runID uuid.UUID) ([]string, error) {
+func GetAvailableSteps(ctx context.Context, db Client, runID uuid.UUID) ([]string, error) {
 	var available []string
 
 	for stepName := range StepRegistry {
@@ -203,7 +203,7 @@ func GetAvailableSteps(ctx context.Context, db StepsDB, runID uuid.UUID) ([]stri
 }
 
 // GetBlockedSteps returns steps that are blocked (dependencies not met)
-func GetBlockedSteps(ctx context.Context, db StepsDB, runID uuid.UUID) ([]string, error) {
+func GetBlockedSteps(ctx context.Context, db Client, runID uuid.UUID) ([]string, error) {
 	var blocked []string
 
 	for stepName := range StepRegistry {
