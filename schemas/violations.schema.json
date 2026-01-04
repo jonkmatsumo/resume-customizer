@@ -42,6 +42,18 @@
             "type": "integer",
             "minimum": 0,
             "description": "Character count (for line length violations, optional)"
+          },
+          "bullet_id": {
+            "type": "string",
+            "description": "ID of the bullet that caused this violation (optional)"
+          },
+          "story_id": {
+            "type": "string",
+            "description": "ID of the story containing the violating bullet (optional)"
+          },
+          "bullet_text": {
+            "type": "string",
+            "description": "Original bullet text for context (optional)"
           }
         }
       }

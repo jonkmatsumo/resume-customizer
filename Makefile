@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt clean docker-up docker-down docker-db test-jobs test-profiles test-companies test-experience test-artifacts test-research
+.PHONY: build test lint fmt clean build-clean docker-up docker-down docker-db test-jobs test-profiles test-companies test-experience test-artifacts test-research
 
 # =============================================================================
 # Local Development
@@ -71,6 +71,11 @@ deps:
 clean:
 	rm -rf bin/
 	go clean
+
+# Clean Go cache and build
+build-clean:
+	go clean -cache
+	$(MAKE) build
 
 # CI checks
 ci: fmt lint test build

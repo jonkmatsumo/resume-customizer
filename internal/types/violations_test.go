@@ -1,6 +1,4 @@
 // Package types provides type definitions for structured data used throughout the resume-customizer system.
-//
-//nolint:revive // types is a standard Go package name pattern
 package types
 
 import (
@@ -11,81 +9,141 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestViolation_JSONMarshaling(t *testing.T) {
-	lineNum := 10
-	charCount := 95
+func TestViolation_JSONMarshal_WithNewFields(t *testing.T) {
+	bulletID := "bullet_123"
+	storyID := "story_456"
+	bulletText := "Built system with $1M budget"
+	lineNum := 42
+	charCount := 100
+
 	violation := Violation{
-		Type:             "line_too_long",
-		Severity:         "error",
-		Details:          "Line exceeds maximum character count",
-		AffectedSections: []string{"experience"},
-		LineNumber:       &lineNum,
-		CharCount:        &charCount,
+		Type:       "line_too_long",
+		Severity:   "error",
+		Details:    "Line exceeds maximum character count",
+		LineNumber: &lineNum,
+		CharCount:  &charCount,
+		BulletID:   &bulletID,
+		StoryID:    &storyID,
+		BulletText: &bulletText,
 	}
 
-	jsonBytes, err := json.MarshalIndent(violation, "", "  ")
+	data, err := json.Marshal(violation)
 	require.NoError(t, err)
-	assert.Contains(t, string(jsonBytes), `"type": "line_too_long"`)
-	assert.Contains(t, string(jsonBytes), `"severity": "error"`)
-	assert.Contains(t, string(jsonBytes), `"details": "Line exceeds maximum character count"`)
-	assert.Contains(t, string(jsonBytes), `"affected_sections": [`)
-	assert.Contains(t, string(jsonBytes), `"line_number": 10`)
-	assert.Contains(t, string(jsonBytes), `"char_count": 95`)
 
 	var unmarshaled Violation
-	err = json.Unmarshal(jsonBytes, &unmarshaled)
+	err = json.Unmarshal(data, &unmarshaled)
 	require.NoError(t, err)
+
 	assert.Equal(t, violation.Type, unmarshaled.Type)
 	assert.Equal(t, violation.Severity, unmarshaled.Severity)
 	assert.Equal(t, violation.Details, unmarshaled.Details)
-	assert.Equal(t, lineNum, *unmarshaled.LineNumber)
-	assert.Equal(t, charCount, *unmarshaled.CharCount)
+	assert.Equal(t, violation.LineNumber, unmarshaled.LineNumber)
+	assert.Equal(t, violation.CharCount, unmarshaled.CharCount)
+	assert.Equal(t, violation.BulletID, unmarshaled.BulletID)
+	assert.Equal(t, violation.StoryID, unmarshaled.StoryID)
+	assert.Equal(t, violation.BulletText, unmarshaled.BulletText)
 }
 
-func TestViolation_OptionalFields(t *testing.T) {
+func TestViolation_JSONMarshal_BackwardCompatibility(t *testing.T) {
+	// Test that old format (without new fields) still works
+	lineNum := 42
+	charCount := 100
+
 	violation := Violation{
-		Type:     "page_overflow",
-		Severity: "error",
-		Details:  "Resume exceeds maximum page count",
+		Type:       "line_too_long",
+		Severity:   "error",
+		Details:    "Line exceeds maximum character count",
+		LineNumber: &lineNum,
+		CharCount:  &charCount,
+		// BulletID, StoryID, BulletText are nil (old format)
 	}
 
-	jsonBytes, err := json.Marshal(violation)
+	data, err := json.Marshal(violation)
 	require.NoError(t, err)
 
 	var unmarshaled Violation
-	err = json.Unmarshal(jsonBytes, &unmarshaled)
+	err = json.Unmarshal(data, &unmarshaled)
 	require.NoError(t, err)
-	assert.Nil(t, unmarshaled.LineNumber)
-	assert.Nil(t, unmarshaled.CharCount)
-	assert.Empty(t, unmarshaled.AffectedSections)
+
+	assert.Equal(t, violation.Type, unmarshaled.Type)
+	assert.Equal(t, violation.Severity, unmarshaled.Severity)
+	assert.Equal(t, violation.Details, unmarshaled.Details)
+	assert.Equal(t, violation.LineNumber, unmarshaled.LineNumber)
+	assert.Equal(t, violation.CharCount, unmarshaled.CharCount)
+	assert.Nil(t, unmarshaled.BulletID)
+	assert.Nil(t, unmarshaled.StoryID)
+	assert.Nil(t, unmarshaled.BulletText)
 }
 
-func TestViolations_JSONMarshaling(t *testing.T) {
-	lineNum := 5
-	violations := Violations{
-		Violations: []Violation{
-			{
-				Type:     "page_overflow",
-				Severity: "error",
-				Details:  "Resume has 2 pages, maximum is 1",
-			},
-			{
-				Type:       "line_too_long",
-				Severity:   "warning",
-				Details:    "Line exceeds character limit",
-				LineNumber: &lineNum,
-			},
-		},
+func TestViolation_JSONUnmarshal_OldFormat(t *testing.T) {
+	// Test unmarshaling JSON without new fields (backward compatibility)
+	jsonStr := `{
+		"type": "line_too_long",
+		"severity": "error",
+		"details": "Line exceeds maximum character count",
+		"line_number": 42,
+		"char_count": 100
+	}`
+
+	var violation Violation
+	err := json.Unmarshal([]byte(jsonStr), &violation)
+	require.NoError(t, err)
+
+	assert.Equal(t, "line_too_long", violation.Type)
+	assert.Equal(t, "error", violation.Severity)
+	assert.Equal(t, "Line exceeds maximum character count", violation.Details)
+	assert.NotNil(t, violation.LineNumber)
+	assert.Equal(t, 42, *violation.LineNumber)
+	assert.NotNil(t, violation.CharCount)
+	assert.Equal(t, 100, *violation.CharCount)
+	assert.Nil(t, violation.BulletID)
+	assert.Nil(t, violation.StoryID)
+	assert.Nil(t, violation.BulletText)
+}
+
+func TestViolation_JSONUnmarshal_NewFormat(t *testing.T) {
+	// Test unmarshaling JSON with new fields
+	jsonStr := `{
+		"type": "line_too_long",
+		"severity": "error",
+		"details": "Line exceeds maximum character count",
+		"line_number": 42,
+		"char_count": 100,
+		"bullet_id": "bullet_123",
+		"story_id": "story_456",
+		"bullet_text": "Built system with $1M budget"
+	}`
+
+	var violation Violation
+	err := json.Unmarshal([]byte(jsonStr), &violation)
+	require.NoError(t, err)
+
+	assert.Equal(t, "line_too_long", violation.Type)
+	assert.NotNil(t, violation.BulletID)
+	assert.Equal(t, "bullet_123", *violation.BulletID)
+	assert.NotNil(t, violation.StoryID)
+	assert.Equal(t, "story_456", *violation.StoryID)
+	assert.NotNil(t, violation.BulletText)
+	assert.Equal(t, "Built system with $1M budget", *violation.BulletText)
+}
+
+func TestViolation_NilPointerHandling(t *testing.T) {
+	// Test that nil pointers are handled correctly
+	violation := Violation{
+		Type:     "page_overflow",
+		Severity: "error",
+		Details:  "Resume has 2 pages, maximum allowed is 1",
+		// All optional fields are nil
 	}
 
-	jsonBytes, err := json.MarshalIndent(violations, "", "  ")
+	data, err := json.Marshal(violation)
 	require.NoError(t, err)
-	assert.Contains(t, string(jsonBytes), `"violations": [`)
-	assert.Contains(t, string(jsonBytes), `"page_overflow"`)
-	assert.Contains(t, string(jsonBytes), `"line_too_long"`)
 
-	var unmarshaled Violations
-	err = json.Unmarshal(jsonBytes, &unmarshaled)
-	require.NoError(t, err)
-	assert.Len(t, unmarshaled.Violations, 2)
+	// Should not include nil fields in JSON (due to omitempty)
+	jsonStr := string(data)
+	assert.NotContains(t, jsonStr, "bullet_id")
+	assert.NotContains(t, jsonStr, "story_id")
+	assert.NotContains(t, jsonStr, "bullet_text")
+	assert.NotContains(t, jsonStr, "line_number")
+	assert.NotContains(t, jsonStr, "char_count")
 }

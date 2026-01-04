@@ -429,7 +429,7 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		fmt.Printf("Warning: Failed to start step tracking: %v\n", err)
 	}
 
-	latex, err := rendering.RenderLaTeX(experienceResult.ResumePlan, rewrittenBullets, opts.TemplatePath, opts.CandidateName, opts.CandidateEmail, opts.CandidatePhone, experienceResult.ExperienceBank, experienceResult.SelectedEducation)
+	latex, lineMap, err := rendering.RenderLaTeX(experienceResult.ResumePlan, rewrittenBullets, opts.TemplatePath, opts.CandidateName, opts.CandidateEmail, opts.CandidatePhone, experienceResult.ExperienceBank, experienceResult.SelectedEducation)
 	if err != nil {
 		_ = failStep(ctx, database, runID, db.StepResumeTex, err)
 		return fmt.Errorf("rendering latex failed: %w", err)
@@ -441,7 +441,17 @@ func RunPipeline(ctx context.Context, opts RunOptions) error {
 		fmt.Printf("Warning: Failed to start step tracking: %v\n", err)
 	}
 
-	violations, err := validation.ValidateFromContent(latex, researchResult.CompanyProfile, 1, 200) // Default max 1 page, 200 chars per line (2 lines)
+	// Create validation options with line-to-bullet mapping
+	var validationOpts *validation.Options
+	if lineMap != nil {
+		validationOpts = &validation.Options{
+			LineToBulletMap: lineMap.LineToBullet,
+			Bullets:         rewrittenBullets,
+			Plan:            experienceResult.ResumePlan,
+		}
+	}
+
+	violations, err := validation.ValidateFromContent(latex, researchResult.CompanyProfile, 1, 200, validationOpts) // Default max 1 page, 200 chars per line (2 lines)
 	if err != nil {
 		_ = failStep(ctx, database, runID, db.StepViolations, err)
 		return fmt.Errorf("validating latex failed: %w", err)

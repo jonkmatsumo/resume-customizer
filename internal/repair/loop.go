@@ -69,7 +69,7 @@ func RunRepairLoop(ctx context.Context, initialPlan *types.ResumePlan, initialBu
 		// If not needsRewrite and plan didn't change, use updatedBullets from ApplyRepairs (which may have dropped bullets)
 
 		// 5. Render LaTeX
-		latex, err := rendering.RenderLaTeX(updatedPlan, updatedBullets, templatePath, candidateInfo.Name, candidateInfo.Email, candidateInfo.Phone, experienceBank, selectedEducation)
+		latex, lineMap, err := rendering.RenderLaTeX(updatedPlan, updatedBullets, templatePath, candidateInfo.Name, candidateInfo.Email, candidateInfo.Phone, experienceBank, selectedEducation)
 		if err != nil {
 			return nil, nil, "", currentViolations, iterationsUsed, fmt.Errorf("failed to render LaTeX at iteration %d: %w", iterationsUsed, err)
 		}
@@ -81,8 +81,16 @@ func RunRepairLoop(ctx context.Context, initialPlan *types.ResumePlan, initialBu
 		}
 		defer func() { _ = cleanupTempFile(tempTexPath) }()
 
-		// 6. Validate LaTeX
-		updatedViolations, err := validation.ValidateConstraints(tempTexPath, companyProfile, maxPages, maxCharsPerLine)
+		// 6. Validate LaTeX with line-to-bullet mapping
+		var validationOpts *validation.Options
+		if lineMap != nil {
+			validationOpts = &validation.Options{
+				LineToBulletMap: lineMap.LineToBullet,
+				Bullets:         updatedBullets,
+				Plan:            updatedPlan,
+			}
+		}
+		updatedViolations, err := validation.ValidateConstraints(tempTexPath, companyProfile, maxPages, maxCharsPerLine, validationOpts)
 		if err != nil {
 			return nil, nil, "", currentViolations, iterationsUsed, fmt.Errorf("failed to validate LaTeX at iteration %d: %w", iterationsUsed, err)
 		}

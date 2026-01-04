@@ -4,6 +4,7 @@ package rendering
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"text/template"
@@ -50,9 +51,16 @@ type dateRange struct {
 }
 
 // RenderLaTeX renders a LaTeX resume from a template using ResumePlan and RewrittenBullets
+// Returns the LaTeX content and a line-to-bullet mapping for violation tracking.
 // This function is backwards compatible but now supports an optional education section.
-func RenderLaTeX(plan *types.ResumePlan, rewrittenBullets *types.RewrittenBullets, templatePath string, name, email, phone string, experienceBank *types.ExperienceBank, selectedEducation []types.Education) (string, error) {
-	return RenderLaTeXWithEducation(plan, rewrittenBullets, templatePath, name, email, phone, experienceBank, selectedEducation)
+func RenderLaTeX(plan *types.ResumePlan, rewrittenBullets *types.RewrittenBullets, templatePath string, name, email, phone string, experienceBank *types.ExperienceBank, selectedEducation []types.Education) (string, *LineBulletMap, error) {
+	latex, err := RenderLaTeXWithEducation(plan, rewrittenBullets, templatePath, name, email, phone, experienceBank, selectedEducation)
+	if err != nil {
+		return "", nil, err
+	}
+	// Parse bullet markers to create line-to-bullet mapping
+	mapping := parseBulletMarkers(latex)
+	return latex, mapping, nil
 }
 
 // parseTemplate reads and parses a LaTeX template file
@@ -144,7 +152,8 @@ func RenderLaTeXWithEducation(
 		}
 	}
 
-	return result.String(), nil
+	latex := result.String()
+	return latex, nil
 }
 
 // buildEducationSections converts Education types to EducationSection for template rendering
@@ -218,8 +227,15 @@ type roleKey struct {
 // bulletWithMeta holds bullet text along with its date range info
 type bulletWithMeta struct {
 	Text      string
+	BulletID  string // NEW: Track bullet ID for mapping
 	StartDate string
 	EndDate   string
+}
+
+// LineBulletMap maps line numbers to bullet IDs and vice versa
+type LineBulletMap struct {
+	LineToBullet map[int]string   // Line number → bullet_id
+	BulletToLine map[string][]int // bullet_id → []line_numbers
 }
 
 // groupByCompanyAndRole groups bullets by Company, then by Role, merging date ranges
@@ -283,6 +299,7 @@ func groupByCompanyAndRole(plan *types.ResumePlan, rewrittenBullets *types.Rewri
 			if bullet, ok := bulletMap[bulletID]; ok {
 				roleData[key] = append(roleData[key], bulletWithMeta{
 					Text:      EscapeLaTeX(bullet.FinalText),
+					BulletID:  bulletID, // Track bullet ID
 					StartDate: story.StartDate,
 					EndDate:   story.EndDate,
 				})
@@ -317,10 +334,13 @@ func groupByCompanyAndRole(plan *types.ResumePlan, rewrittenBullets *types.Rewri
 				}
 			}
 
-			// Extract bullet texts
+			// Extract bullet texts with LaTeX comments for mapping
+			// The template renders: \item {{ . }}, so we include comments in the bullet text
+			// Format: % BULLET_START:bullet_id\nactual text\n% BULLET_END:bullet_id
 			bulletTexts := make([]string, len(bullets))
 			for i, b := range bullets {
-				bulletTexts[i] = b.Text
+				// Add LaTeX comments to mark bullet boundaries
+				bulletTexts[i] = fmt.Sprintf("%% BULLET_START:%s\n%s\n%% BULLET_END:%s", b.BulletID, b.Text, b.BulletID)
 			}
 
 			roles = append(roles, RoleSection{
@@ -430,4 +450,54 @@ func formatDate(dateStr string) string {
 	}
 
 	return dateStr
+}
+
+// parseBulletMarkers parses LaTeX content to extract line-to-bullet mapping from comments
+// Looks for % BULLET_START:bullet_id and % BULLET_END:bullet_id comments
+func parseBulletMarkers(latex string) *LineBulletMap {
+	lineToBullet := make(map[int]string)
+	bulletToLine := make(map[string][]int)
+
+	lines := strings.Split(latex, "\n")
+	bulletStartRegex := regexp.MustCompile(`% BULLET_START:(\S+)`)
+	bulletEndRegex := regexp.MustCompile(`% BULLET_END:(\S+)`)
+
+	currentBulletID := ""
+
+	for lineNum, line := range lines {
+		// Check for BULLET_START comment
+		if matches := bulletStartRegex.FindStringSubmatch(line); matches != nil {
+			currentBulletID = matches[1]
+		}
+
+		// If we're inside a bullet, map this line to the bullet
+		if currentBulletID != "" {
+			lineToBullet[lineNum+1] = currentBulletID // Line numbers are 1-indexed
+			if !contains(bulletToLine[currentBulletID], lineNum+1) {
+				bulletToLine[currentBulletID] = append(bulletToLine[currentBulletID], lineNum+1)
+			}
+		}
+
+		// Check for BULLET_END comment
+		if matches := bulletEndRegex.FindStringSubmatch(line); matches != nil {
+			if matches[1] == currentBulletID {
+				currentBulletID = ""
+			}
+		}
+	}
+
+	return &LineBulletMap{
+		LineToBullet: lineToBullet,
+		BulletToLine: bulletToLine,
+	}
+}
+
+// contains checks if a slice contains a value
+func contains(slice []int, val int) bool {
+	for _, v := range slice {
+		if v == val {
+			return true
+		}
+	}
+	return false
 }

@@ -10,9 +10,17 @@ import (
 	"github.com/jonathan/resume-customizer/internal/types"
 )
 
+// Options provides optional parameters for violation mapping
+type Options struct {
+	LineToBulletMap map[int]string          // Line number → bullet_id
+	Bullets         *types.RewrittenBullets // For bullet text and story ID lookup
+	Plan            *types.ResumePlan       // For story ID lookup
+}
+
 // ValidateFromContent validates LaTeX content against the specified constraints.
 // It writes the content to a temp file for LaTeX compilation.
-func ValidateFromContent(latexContent string, companyProfile *types.CompanyProfile, maxPages int, maxCharsPerLine int) (*types.Violations, error) {
+// If opts is provided and contains line-to-bullet mapping, violations will be mapped to bullet IDs.
+func ValidateFromContent(latexContent string, companyProfile *types.CompanyProfile, maxPages int, maxCharsPerLine int, opts *Options) (*types.Violations, error) {
 	// Create temp directory for validation
 	tmpDir, err := os.MkdirTemp("", "resume-validation-*")
 	if err != nil {
@@ -26,11 +34,12 @@ func ValidateFromContent(latexContent string, companyProfile *types.CompanyProfi
 		return nil, fmt.Errorf("failed to write temp LaTeX file: %w", err)
 	}
 
-	return ValidateConstraints(texPath, companyProfile, maxPages, maxCharsPerLine)
+	return ValidateConstraints(texPath, companyProfile, maxPages, maxCharsPerLine, opts)
 }
 
-// ValidateConstraints validates a LaTeX resume file against the specified constraints
-func ValidateConstraints(texPath string, companyProfile *types.CompanyProfile, maxPages int, maxCharsPerLine int) (*types.Violations, error) {
+// ValidateConstraints validates a LaTeX resume file against the specified constraints.
+// If opts is provided and contains line-to-bullet mapping, violations will be mapped to bullet IDs.
+func ValidateConstraints(texPath string, companyProfile *types.CompanyProfile, maxPages int, maxCharsPerLine int, opts *Options) (*types.Violations, error) {
 	var allViolations []types.Violation
 
 	// 1. Validate line lengths
@@ -97,5 +106,12 @@ func ValidateConstraints(texPath string, companyProfile *types.CompanyProfile, m
 		_ = logOutput
 	}
 
-	return &types.Violations{Violations: allViolations}, nil
+	violations := &types.Violations{Violations: allViolations}
+
+	// Map violations to bullets if mapping is provided
+	if opts != nil && opts.LineToBulletMap != nil && len(opts.LineToBulletMap) > 0 {
+		violations = MapViolationsToBullets(violations, opts.LineToBulletMap, opts.Bullets, opts.Plan)
+	}
+
+	return violations, nil
 }

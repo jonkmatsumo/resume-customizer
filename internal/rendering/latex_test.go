@@ -4,6 +4,7 @@ package rendering
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/jonathan/resume-customizer/internal/types"
@@ -150,19 +151,43 @@ func TestGroupByCompanyAndRole_ValidInput(t *testing.T) {
 	require.Len(t, companies, 2)
 
 	// Check first company
+	// Note: Company names are escaped for LaTeX, but "Company A" has no special chars so should match
 	assert.Equal(t, "Company A", companies[0].Company)
 	require.Len(t, companies[0].Roles, 1)
+	// Role names are also escaped, but "Engineer" has no special chars
 	assert.Equal(t, "Engineer", companies[0].Roles[0].Role)
-	assert.Len(t, companies[0].Roles[0].Bullets, 2)
-	assert.Contains(t, companies[0].Roles[0].Bullets, "First bullet")
-	assert.Contains(t, companies[0].Roles[0].Bullets, "Second bullet")
+	require.Len(t, companies[0].Roles[0].Bullets, 2, "should have 2 bullets")
+	
+	// Bullets now include LaTeX comments for mapping (format: % BULLET_START:id\ntext\n% BULLET_END:id)
+	// Check that each bullet string contains the expected text
+	bullets := companies[0].Roles[0].Bullets
+	foundFirst := false
+	foundSecond := false
+	for _, bullet := range bullets {
+		if strings.Contains(bullet, "First bullet") {
+			foundFirst = true
+			assert.Contains(t, bullet, "bullet_001", "should contain bullet ID")
+			assert.Contains(t, bullet, "BULLET_START:bullet_001", "should contain start marker")
+			assert.Contains(t, bullet, "BULLET_END:bullet_001", "should contain end marker")
+		}
+		if strings.Contains(bullet, "Second bullet") {
+			foundSecond = true
+			assert.Contains(t, bullet, "bullet_002", "should contain bullet ID")
+			assert.Contains(t, bullet, "BULLET_START:bullet_002", "should contain start marker")
+			assert.Contains(t, bullet, "BULLET_END:bullet_002", "should contain end marker")
+		}
+	}
+	assert.True(t, foundFirst, "should find first bullet with text 'First bullet'")
+	assert.True(t, foundSecond, "should find second bullet with text 'Second bullet'")
 
 	// Check second company
 	assert.Equal(t, "Company B", companies[1].Company)
 	require.Len(t, companies[1].Roles, 1)
 	assert.Equal(t, "Lead", companies[1].Roles[0].Role)
 	assert.Len(t, companies[1].Roles[0].Bullets, 1)
-	assert.Contains(t, companies[1].Roles[0].Bullets, "Third bullet")
+	// Bullet now includes LaTeX comments, so check that the text is contained
+	assert.Contains(t, companies[1].Roles[0].Bullets[0], "Third bullet")
+	assert.Contains(t, companies[1].Roles[0].Bullets[0], "bullet_003")
 }
 
 func TestGroupByCompanyAndRole_NoExperienceBank(t *testing.T) {
@@ -249,7 +274,7 @@ Company: {{.Company}}
 		},
 	}
 
-	latex, err := RenderLaTeX(plan, rewrittenBullets, templatePath, "John Doe", "john@example.com", "555-1234", experienceBank, nil)
+	latex, _, err := RenderLaTeX(plan, rewrittenBullets, templatePath, "John Doe", "john@example.com", "555-1234", experienceBank, nil)
 	require.NoError(t, err)
 	assert.NotEmpty(t, latex)
 	assert.Contains(t, latex, "John Doe")
@@ -260,7 +285,7 @@ func TestRenderLaTeX_MissingTemplate(t *testing.T) {
 	plan := &types.ResumePlan{SelectedStories: []types.SelectedStory{}}
 	rewrittenBullets := &types.RewrittenBullets{Bullets: []types.RewrittenBullet{}}
 
-	_, err := RenderLaTeX(plan, rewrittenBullets, "/nonexistent/template.tex", "John", "john@example.com", "", nil, nil)
+	_, _, err := RenderLaTeX(plan, rewrittenBullets, "/nonexistent/template.tex", "John", "john@example.com", "", nil, nil)
 	assert.Error(t, err)
 	var templateErr *TemplateError
 	assert.ErrorAs(t, err, &templateErr)
@@ -281,7 +306,7 @@ Name: {{.Name}}
 	rewrittenBullets := &types.RewrittenBullets{Bullets: []types.RewrittenBullet{}}
 
 	// Name with special LaTeX characters
-	latex, err := RenderLaTeX(plan, rewrittenBullets, templatePath, "John & Jane", "test@example.com", "", nil, nil)
+	latex, _, err := RenderLaTeX(plan, rewrittenBullets, templatePath, "John & Jane", "test@example.com", "", nil, nil)
 	require.NoError(t, err)
 	// Should escape the ampersand
 	assert.Contains(t, latex, `\&`)
@@ -333,7 +358,7 @@ Bullet: {{.}}
 		},
 	}
 
-	latex, err := RenderLaTeX(plan, rewrittenBullets, templatePath, "Name", "email@example.com", "", experienceBank, nil)
+	latex, _, err := RenderLaTeX(plan, rewrittenBullets, templatePath, "Name", "email@example.com", "", experienceBank, nil)
 	require.NoError(t, err)
 	// Should escape the dollar sign - verify escaped version exists
 	assert.Contains(t, latex, `\$1M`, "should contain escaped dollar sign before '1M'")
@@ -367,8 +392,160 @@ Degree: {{.Degree}}
 		},
 	}
 
-	latex, err := RenderLaTeX(plan, bullets, templatePath, "Name", "email@example.com", "", nil, education)
+	latex, _, err := RenderLaTeX(plan, bullets, templatePath, "Name", "email@example.com", "", nil, education)
 	require.NoError(t, err)
 	assert.Contains(t, latex, "School: MIT")
 	assert.Contains(t, latex, "Degree: Master") // Should be normalized/capitalized if your code does that
+}
+
+func TestParseBulletMarkers_SingleBullet(t *testing.T) {
+	latex := `\documentclass{article}
+\begin{document}
+\begin{itemize}
+% BULLET_START:bullet_001
+    \item Test bullet text
+% BULLET_END:bullet_001
+\end{itemize}
+\end{document}`
+
+	mapping := parseBulletMarkers(latex)
+	require.NotNil(t, mapping)
+
+	// Check line-to-bullet mapping
+	// The \item line should map to bullet_001
+	// Line numbers: 1=documentclass, 2=begin, 3=itemize, 4=BULLET_START, 5=\item, 6=BULLET_END
+	assert.Equal(t, "bullet_001", mapping.LineToBullet[5]) // \item line
+
+	// Check bullet-to-line mapping
+	lines := mapping.BulletToLine["bullet_001"]
+	assert.Contains(t, lines, 5) // \item line should be included
+}
+
+func TestParseBulletMarkers_MultipleBullets(t *testing.T) {
+	latex := `\documentclass{article}
+\begin{document}
+\begin{itemize}
+% BULLET_START:bullet_001
+    \item First bullet
+% BULLET_END:bullet_001
+% BULLET_START:bullet_002
+    \item Second bullet
+% BULLET_END:bullet_002
+\end{itemize}
+\end{document}`
+
+	mapping := parseBulletMarkers(latex)
+	require.NotNil(t, mapping)
+
+	// Both bullets should be mapped
+	assert.Equal(t, "bullet_001", mapping.LineToBullet[5]) // First \item
+	assert.Equal(t, "bullet_002", mapping.LineToBullet[8]) // Second \item
+
+	// Check bullet-to-line mappings
+	assert.Contains(t, mapping.BulletToLine["bullet_001"], 5)
+	assert.Contains(t, mapping.BulletToLine["bullet_002"], 8)
+}
+
+func TestParseBulletMarkers_MultipleStories(t *testing.T) {
+	latex := `\documentclass{article}
+\begin{document}
+\begin{itemize}
+% BULLET_START:bullet_001
+    \item Story 1 bullet 1
+% BULLET_END:bullet_001
+% BULLET_START:bullet_002
+    \item Story 1 bullet 2
+% BULLET_END:bullet_002
+% BULLET_START:bullet_003
+    \item Story 2 bullet 1
+% BULLET_END:bullet_003
+\end{itemize}
+\end{document}`
+
+	mapping := parseBulletMarkers(latex)
+	require.NotNil(t, mapping)
+
+	// All three bullets should be mapped
+	assert.Equal(t, "bullet_001", mapping.LineToBullet[5])
+	assert.Equal(t, "bullet_002", mapping.LineToBullet[8])
+	assert.Equal(t, "bullet_003", mapping.LineToBullet[11])
+
+	// Check all bullets are in the mapping
+	assert.Equal(t, 3, len(mapping.BulletToLine))
+}
+
+func TestParseBulletMarkers_NoMarkers(t *testing.T) {
+	latex := `\documentclass{article}
+\begin{document}
+\begin{itemize}
+    \item Regular bullet without markers
+\end{itemize}
+\end{document}`
+
+	mapping := parseBulletMarkers(latex)
+	require.NotNil(t, mapping)
+
+	// Should have empty mappings
+	assert.Equal(t, 0, len(mapping.LineToBullet))
+	assert.Equal(t, 0, len(mapping.BulletToLine))
+}
+
+func TestRenderLaTeX_GeneratesBulletMarkers(t *testing.T) {
+	// Create a minimal test template
+	tmpDir := t.TempDir()
+	templatePath := filepath.Join(tmpDir, "test.tex")
+	templateContent := `\documentclass{article}
+\begin{document}
+{{range .Companies}}
+{{range .Roles}}
+\begin{itemize}
+{{range .Bullets}}
+    {{.}}
+{{end}}
+\end{itemize}
+{{end}}
+{{end}}
+\end{document}`
+	err := os.WriteFile(templatePath, []byte(templateContent), 0644)
+	require.NoError(t, err)
+
+	plan := &types.ResumePlan{
+		SelectedStories: []types.SelectedStory{
+			{
+				StoryID:   "story_001",
+				BulletIDs: []string{"bullet_001"},
+			},
+		},
+	}
+
+	rewrittenBullets := &types.RewrittenBullets{
+		Bullets: []types.RewrittenBullet{
+			{
+				OriginalBulletID: "bullet_001",
+				FinalText:        "Test bullet text",
+			},
+		},
+	}
+
+	experienceBank := &types.ExperienceBank{
+		Stories: []types.Story{
+			{
+				ID:      "story_001",
+				Company: "Test Company",
+				Role:    "Test Role",
+			},
+		},
+	}
+
+	latex, mapping, err := RenderLaTeX(plan, rewrittenBullets, templatePath, "Name", "email@example.com", "", experienceBank, nil)
+	require.NoError(t, err)
+
+	// Check that markers are in the LaTeX
+	assert.Contains(t, latex, "% BULLET_START:bullet_001")
+	assert.Contains(t, latex, "% BULLET_END:bullet_001")
+
+	// Check that mapping was generated
+	require.NotNil(t, mapping)
+	assert.Greater(t, len(mapping.LineToBullet), 0, "should have line-to-bullet mappings")
+	assert.Greater(t, len(mapping.BulletToLine), 0, "should have bullet-to-line mappings")
 }
