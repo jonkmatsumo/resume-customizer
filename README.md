@@ -101,7 +101,7 @@ flowchart TD
             PLAN --> MAT[Materialize Bullets]
         end
         
-        subgraph "Drafting & Refining"
+        subgraph "Drafting \u0026 Refining"
             MAT --> RW[LLM: Rewrite Bullets]
             CP -.->|Voice| RW
             REQ -.->|Keywords| RW
@@ -113,8 +113,14 @@ flowchart TD
             
             VAL --> VIO{Violations?}
             VIO -->|No| FIN[✅ Final Resume]
-            VIO -->|Yes| RL[LLM: Repair Plan]
+            VIO -->|Yes| OVF{Page Overflow?}
             
+            OVF -->|Yes| ANA[Analyze Overflow]
+            ANA --> SCR[Score Bullet Relevance]
+            SCR --> DRP[Drop Least Relevant]
+            DRP --> RL[LLM: Repair Plan]
+            
+            OVF -->|No| RL
             RL -->|Updates| MAT
         end
     end
@@ -126,7 +132,7 @@ flowchart TD
     classDef data fill:#bba6c7,stroke:#666,stroke-width:1px,stroke-dasharray: 5 5,color:#000;
     
     class C,DI,DF,FL,EX,SV,RW,RL,RK,ES,EDU_REQ llm;
-    class B,FE,GS,PAT,AG,SP,MAT,TEX,PDF,VAL tool;
+    class B,FE,GS,PAT,AG,SP,MAT,TEX,PDF,VAL,ANA,SCR,DRP tool;
     class REQ,T,S,FR,CP,RS,PLAN,FIN,SE data;
     class JOB,EXP input;
 ```
